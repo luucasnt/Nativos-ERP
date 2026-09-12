@@ -8,6 +8,23 @@ import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
 import { generateNextReservationCode } from "@/lib/reservations/code";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
+import { generateServiceFinanceEntries } from "@/lib/finance/settlement";
+import { recalculateReservationCommissions } from "@/lib/finance/commissions";
+
+// Campos da reserva (collection_mode, is_cortesia, origin_partner) entram
+// na fórmula de liquidação de cada serviço — mudar algum deles exige
+// recalcular os lançamentos "programado" de todo serviço já comprometido
+// (aceito, não cancelado) desta reserva.
+async function regenerateAcceptedServiceEntries(reservationId: string) {
+  const services = await prisma.service.findMany({
+    where: { reservation_id: reservationId, acceptance_status: "aceito", execution_status: { not: "cancelado" } },
+    select: { id: true },
+  });
+
+  for (const service of services) {
+    await generateServiceFinanceEntries(service.id);
+  }
+}
 
 const reservationSchema = z.object({
   client_id: z.string().uuid("Selecione o cliente."),
@@ -105,6 +122,7 @@ export async function createReservation(
   });
 
   await recalculateReservationTax(reservation.id);
+  await recalculateReservationCommissions(reservation.id);
 
   await logAudit({
     actorId: user.id,
@@ -135,6 +153,8 @@ export async function updateReservation(
   // desta reserva sendo definida/limpa manualmente, ou o padrão global
   // tendo passado a existir desde o último cálculo.
   await recalculateReservationTax(id);
+  await recalculateReservationCommissions(id);
+  await regenerateAcceptedServiceEntries(id);
 
   await logAudit({
     actorId: user.id,

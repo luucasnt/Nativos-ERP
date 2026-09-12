@@ -255,6 +255,11 @@ enum FinancePartyType {
   fornecedor
   parceiro
   interno
+  // INFERIDO (Fase 4): indicador pessoa física avulsa (sem cadastro
+  // próprio no sistema) pode gerar comissão de indicação — party_id fica
+  // null, o nome/documento já estão em Reservation.referrer_name/
+  // referrer_document.
+  pessoa_fisica
 }
 
 enum PaymentType {

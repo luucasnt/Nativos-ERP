@@ -10,6 +10,8 @@ import { computeCollectionActor, computeServicePrice } from "@/lib/reservations/
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
 import { acceptService, rejectService } from "@/lib/reservations/acceptance";
+import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
+import { recalculateReservationCommissions } from "@/lib/finance/commissions";
 
 const decimalField = z
   .string()
@@ -161,9 +163,18 @@ function mapCommonData(d: z.infer<typeof updateServiceSchema>) {
   };
 }
 
-async function afterServiceMutation(reservationId: string) {
+async function afterServiceMutation(reservationId: string, serviceId: string) {
+  const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
+
+  if (service.execution_status === "cancelado" || service.acceptance_status === "recusado") {
+    await cancelServiceFinanceEntries(serviceId);
+  } else if (service.acceptance_status === "aceito") {
+    await generateServiceFinanceEntries(serviceId);
+  }
+
   await recalculateReservationStatus(reservationId);
   await recalculateReservationTax(reservationId);
+  await recalculateReservationCommissions(reservationId);
 }
 
 export async function createService(
@@ -208,7 +219,7 @@ export async function createService(
     },
   });
 
-  await afterServiceMutation(reservationId);
+  await afterServiceMutation(reservationId, service.id);
 
   await logAudit({
     actorId: user.id,
@@ -274,7 +285,7 @@ export async function updateService(
     },
   });
 
-  await afterServiceMutation(reservationId);
+  await afterServiceMutation(reservationId, serviceId);
 
   await logAudit({
     actorId: user.id,
@@ -296,7 +307,7 @@ export async function cancelService(reservationId: string, serviceId: string) {
     data: { execution_status: "cancelado" },
   });
 
-  await afterServiceMutation(reservationId);
+  await afterServiceMutation(reservationId, serviceId);
 
   await logAudit({
     actorId: user.id,

@@ -10,6 +10,9 @@ import { PrismaClient } from "@prisma/client";
 import { computeCollectionActor, computeServicePrice } from "../src/lib/reservations/pricing";
 import { recalculateReservationStatus } from "../src/lib/reservations/status";
 import { recalculateReservationTax } from "../src/lib/reservations/tax";
+import { generateServiceFinanceEntries, markServiceFinanceEntriesEligible } from "../src/lib/finance/settlement";
+import { markReservationCommissionsEligible, recalculateReservationCommissions } from "../src/lib/finance/commissions";
+import { createPayment } from "../src/lib/finance/ledger";
 
 const prisma = new PrismaClient();
 
@@ -682,66 +685,50 @@ async function seedReservationsAndServices(refs: {
   return { r1, r2, r3, r4, r5, r6 };
 }
 
-async function seedFinanceExamples(bankAccounts: {
-  caixa: { id: string };
-  contaCorrente: { id: string };
-}) {
-  // Um lançamento "programado" (serviço ainda não concluído — não elegível
-  // a pagamento) e um "pendente"/"pago" (serviço concluído) para provar que
-  // o schema sustenta o ciclo completo do razão.
-  const programado = await prisma.financeEntry.upsert({
-    where: { id: "70000000-0000-0000-0000-000000000001" },
-    update: {},
-    create: {
-      id: "70000000-0000-0000-0000-000000000001",
-      type: "receita",
-      category: "venda_servico",
-      status: "programado",
-      payment_eligible: false,
-      amount: 500,
-      party_type: "cliente",
-      reservation_id: "50000000-0000-0000-0000-000000000003",
-      service_id: "60000000-0000-0000-0000-000000000003",
-      origin_type: "manual",
-      auto_key: "seed-programado-r3",
-    },
+async function seedFinanceExamples(bankAccounts: { contaCorrente: { id: string } }) {
+  // Aciona o motor real (settlement.ts/commissions.ts — o mesmo caminho das
+  // Server Actions de aceite/conclusão), nunca lançamentos hardcoded: os
+  // serviços de seed já cobrem os três marcos (aguardando aceite, aceito/
+  // agendado, concluído), então rodar o motor sobre eles basta para o
+  // painel /admin/financeiro mostrar os três estados de status
+  // (programado/pendente/pago) de forma consistente com o app real.
+  const acceptedServices = await prisma.service.findMany({
+    where: { acceptance_status: "aceito", execution_status: { not: "cancelado" } },
   });
 
-  const pendente = await prisma.financeEntry.upsert({
-    where: { id: "70000000-0000-0000-0000-000000000002" },
-    update: {},
-    create: {
-      id: "70000000-0000-0000-0000-000000000002",
-      type: "receita",
-      category: "recebimento_cliente",
-      status: "pago",
-      payment_eligible: true,
-      amount: 450,
-      party_type: "cliente",
-      reservation_id: "50000000-0000-0000-0000-000000000001",
-      service_id: "60000000-0000-0000-0000-000000000001",
-      origin_type: "service_settlement",
-      auto_key: "seed-pago-r1",
-    },
-  });
+  for (const service of acceptedServices) {
+    await generateServiceFinanceEntries(service.id);
+    if (service.execution_status === "concluido") {
+      await markServiceFinanceEntriesEligible(service.id);
+    }
+  }
 
-  await prisma.payment.upsert({
-    where: { id: "80000000-0000-0000-0000-000000000001" },
-    update: {},
-    create: {
-      id: "80000000-0000-0000-0000-000000000001",
-      finance_entry_id: pendente.id,
+  const reservationIds = [...new Set(acceptedServices.map((s) => s.reservation_id))];
+  for (const reservationId of reservationIds) {
+    await recalculateReservationCommissions(reservationId);
+    const reservation = await prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+    if (reservation.status === "concluido") {
+      await markReservationCommissionsEligible(reservationId);
+    }
+  }
+
+  // Um pagamento já registrado (via createPayment, idempotente por
+  // dedupe_key), para demonstrar o ciclo completo até "pago" no painel —
+  // os demais lançamentos ficam pendentes/programados de propósito, para
+  // mostrar os três estados lado a lado.
+  const eligibleEntry = await prisma.financeEntry.findFirst({
+    where: { service_id: "60000000-0000-0000-0000-000000000001", status: "pendente" },
+  });
+  if (eligibleEntry) {
+    await createPayment({
+      finance_entry_id: eligibleEntry.id,
       type: "recebimento",
-      amount: 450,
+      amount: eligibleEntry.amount,
       payment_method: "pix",
       bank_account_id: bankAccounts.contaCorrente.id,
       dedupe_key: "seed-payment-r1",
-      reconciled: true,
-      reconciled_at: new Date(),
-    },
-  });
-
-  return { programado, pendente };
+    });
+  }
 }
 
 async function main() {

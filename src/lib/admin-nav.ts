@@ -5,6 +5,7 @@ export const ADMIN_NAV = [
   { href: "/admin/motoristas", label: "Motoristas" },
   { href: "/admin/veiculos", label: "Veículos" },
   { href: "/admin/empresas", label: "Empresas" },
+  { href: "/admin/financeiro", label: "Financeiro" },
   { href: "/admin/aprovacoes", label: "Aprovações" },
   { href: "/admin/configuracoes", label: "Configurações" },
 ];

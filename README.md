@@ -159,6 +159,79 @@ nesta fase:
   recusa). Um serviço não pode ser iniciado (`startService`) antes de
   aceito.
 
+## O que existe na Fase 4
+
+Motor financeiro completo (spec seção 6 — as 3 variáveis comerciais
+independentes: quem executa, quem cobra, se há indicação/comissão). Nenhuma
+regra de negócio nova roda por conta própria: tudo é acionado a partir dos
+mesmos marcos operacionais já existentes (aceite do fornecedor, conclusão
+do serviço), pelos mesmos caminhos usados pelo admin e pelos portais.
+
+- **Primitivas do razão** (`src/lib/finance/ledger.ts`): `createFinanceEntry`
+  (idempotente por `auto_key`), `markFinanceEntryEligible` (o único lugar
+  que liga `payment_eligible = true`), `cancelUnpaidFinanceEntry`,
+  `reverseFinanceEntry` (estorno: cria um lançamento novo de tipo oposto,
+  nunca apaga o original), `createPayment`/`reversePayment` (idempotentes
+  por `dedupe_key`), `createDirectCollection`, `createCompensation`
+  (idempotente por `idempotency_key`). Nenhuma função aqui — nem em nenhum
+  outro lugar do sistema — apaga fisicamente `FinanceEntry`, `Payment`,
+  `Compensation` ou `DirectCollection`: o trigger de banco da Fase 1
+  (`prisma/migrations/20260912150700_financial_integrity_triggers`) barra a
+  tentativa mesmo que o código tentasse.
+- **Motor de liquidação por serviço** (`src/lib/finance/settlement.ts`):
+  `computeServiceSettlementEntries` é uma função pura que decide, a partir
+  de `execution_type` + `collection_actor` (derivado de `collection_mode`) +
+  `is_cortesia` + o modo de acerto do fornecedor, quais lançamentos nascem
+  para aquele serviço — 17 cenários testados
+  (`tests/finance/settlement.test.ts`), incluindo toda a combinatória de
+  cortesia. `generateServiceFinanceEntries` orquestra isso contra o banco de
+  forma idempotente: enquanto um lançamento segue `programado` (rascunho),
+  reeditar o serviço ajusta o mesmo registro; uma vez que ele avança para
+  `pendente`/`pago`/`cancelado`, uma nova geração nunca sobrescreve o valor
+  em silêncio — só uma reversão formal altera um lançamento já finalizado.
+  `markServiceFinanceEntriesEligible` é chamada exclusivamente quando o
+  serviço atinge `concluido` (regra não-negociável da spec) e, no caso
+  específico de fornecedor com acerto "repassa bruto" em cobrança direta,
+  também dispara `createCompensation` automaticamente para o único par
+  determinístico que a spec descreve (repasse ao fornecedor × pagamento ao
+  fornecedor da mesma reserva/serviço) — não é uma ferramenta geral de
+  compensação de razão.
+- **Comissões no nível da reserva** (`src/lib/finance/commissions.ts`):
+  `recalculateReservationCommissions` calcula `comissao_parceiro` (a partir
+  de `Company.commission_percent`, se `origin_partner_id` e
+  `commission_enabled`) e `comissao_indicacao` (a partir de
+  `Reservation.commission_percent`, se houver indicador) sobre a soma do
+  `price` dos serviços não cancelados — nenhuma das duas roda em tarifa NET
+  ou cortesia. `markReservationCommissionsEligible` só é chamada quando o
+  status calculado da reserva chega a `concluido`.
+- **Fiação no ciclo de vida existente**: `acceptService` agora chama
+  `generateServiceFinanceEntries`; `rejectService` chama
+  `cancelServiceFinanceEntries` defensivamente; `completeService` (portal)
+  e as Server Actions de serviço/reserva do admin chamam
+  `markServiceFinanceEntriesEligible`/`markReservationCommissionsEligible`/
+  `recalculateReservationCommissions` nos mesmos pontos. Ao editar campos da
+  reserva que alimentam a fórmula de liquidação (`collection_mode`,
+  indicação, cortesia), os lançamentos `programado` de todo serviço já
+  aceito são recalculados.
+- **Painel `/admin/financeiro`**: lista somente-leitura dos `FinanceEntry`
+  (mais recentes primeiro, contraparte resolvida por nome), com totais de
+  receita/despesa não cancelada e uma ação de "Registrar pagamento" para
+  lançamentos já elegíveis e `pendente` — chama `createPayment` com
+  `dedupe_key = manual:<entryId>` (determinístico: um clique duplo ou um
+  retry de rede nunca duplica o pagamento). Não há edição de valor nem de
+  categoria nesta tela — isso seria alterar um lançamento já gerado pelo
+  motor, o que a spec proíbe fora de uma reversão formal.
+- **Suite de integridade obrigatória**: `tests/finance/settlement.test.ts`
+  (17 testes, puro) cobre a combinatória das 3 variáveis comerciais.
+  `tests/finance/lifecycle.test.ts` (9 testes, contra Postgres real) prova,
+  através do motor — não só via SQL cru — que: nenhum lançamento existe
+  antes do aceite; `payment_eligible` só vira `true` depois do marco de
+  conclusão; cancelar um serviço cancela (nunca apaga) seus lançamentos;
+  recusa não gera lançamento; regenerar é idempotente e nunca sobrescreve
+  um valor já elegível/pago; o DELETE físico continua bloqueado mesmo para
+  um lançamento criado pelo motor; `reverseFinanceEntry` e `createPayment`
+  são idempotentes e nunca apagam nada.
+
 ## Arquitetura de autorização
 
 O backend fala com o Postgres via Prisma usando a role dona das tabelas —
@@ -341,14 +414,69 @@ devem ser revisadas:
    a guarda não agregava proteção real e custava testabilidade. Os módulos
    realmente sensíveis (`admin.ts` com a service role key,
    `provision-user.ts`, `get-current-user.ts`) continuam guardados.
+10. **Escopo do repasse automático ao motorista próprio** (Fase 4): a spec
+    diz que motoristas podem ser pagos por `comissao`, `diaria`,
+    `salario_mensal` ou `mesclado`, mas só descreve a fórmula para
+    `comissao` (percentual sobre o serviço). Só `comissao`/`mesclado` geram
+    um `repasse_motorista` automático por serviço concluído
+    (`src/lib/finance/settlement.ts::computeOwnDriverCommissionPay`).
+    `diaria`/`salario_mensal` não geram nenhum lançamento automático —
+    inventar um rateio por dia/mês sem um algoritmo explícito da spec
+    arriscaria contar o mesmo pagamento duas vezes entre serviços do mesmo
+    dia. Fica como trabalho manual (ou de uma fase futura, se o cliente
+    quiser especificar o rateio) até então.
+11. **Cobrança direta pelo motorista próprio, sem modo de acerto dedicado**:
+    a spec descreve `direct_collection_settlement_mode`
+    (`retain_supplier_cost`/`gross_repass`) só para fornecedores. Para
+    motorista próprio em cobrança direta não existe custo de fornecedor a
+    reter (o motorista é frota interna, sem `supplier_cost`) — então o
+    único lançamento gerado é `repasse_motorista` (receita) pelo valor
+    cheio menos a comissão configurada, por analogia ao caso
+    "retém custo" (não existe um segundo lançamento de "pagamento" porque
+    não há nada que a Nativos deva pagar de volta).
+12. **`is_net_fare` bloqueia os dois tipos de comissão de reserva**: a spec
+    não deixa explícito se tarifa NET afeta `comissao_indicacao` além de
+    `comissao_parceiro`. Tratado como bloqueio para as duas, já que "tarifa
+    líquida" descreve o valor que a Nativos recebe sem margem para
+    comissionar ninguém sobre ele.
+13. **Cortesia + cobrança direta + fornecedor retendo custo = zero
+    lançamentos** (`tests/finance/settlement.test.ts`, cenário "cortesia +
+    cobrança direta + retém custo"): nada foi cobrado do passageiro e o
+    fornecedor absorve o próprio custo (mesma lógica de uma cortesia
+    comum), então nenhum lançamento nasce para esse serviço — nem receita
+    nem despesa. Vale a pena o cliente confirmar que este é o
+    comportamento esperado, já que é o único cenário testado em que um
+    serviço de fornecedor não gera absolutamente nenhum registro.
+14. **Fora do escopo da Fase 4** (deixado explicitamente para depois, sem
+    inventar automação sem uma regra clara na spec): `FinanceEntry`
+    automático para `hora_extra`/`km_extra`/`imposto`; uma ferramenta geral
+    de compensação de razão (só o par determinístico repasse×pagamento do
+    "repassa bruto" é automático); UI de `DirectCollection`
+    (registro de "o motorista recebeu direto e confirmou/não confirmou");
+    `BillingCycle`/fechamento de fatura por parceiro; `ClientCredit`. Os
+    modelos já existem no schema desde a Fase 1; a lógica de negócio sobre
+    eles ainda não foi construída.
+15. **Correção incidental descoberta durante a Fase 4**: `startService` e
+    `completeService` (`src/lib/services/service-execution.ts`, construídos
+    na Fase 2/requisito 6) nunca chamavam `recalculateReservationStatus` —
+    uma reserva concluída inteiramente pelo portal do motorista/fornecedor
+    (sem nenhuma edição pelo admin) nunca teria seu status automático
+    recalculado. Corrigido como parte da fiação do motor financeiro (o
+    motor depende do status ficar correto para saber quando liberar
+    comissões), mas é uma correção de um bug de uma fase já aprovada, não
+    uma decisão de design nova — sinalizando aqui para visibilidade.
 
 ## Próximas fases
 
-Conforme o plano de construção, a Fase 4 (Motor financeiro completo, com
-suite de testes de integridade obrigatória simulando as 3 variáveis
-comerciais) só deve começar após confirmação de que esta fase está
-correta. A Fase 3 deixou pronta a base sobre a qual a Fase 4 se apoia:
-`collection_actor` já diz quem cobra o passageiro, `price`/`supplier_cost`
-já estão corretos e isolados um do outro, e o status da reserva já reflete
-o estado real da execução — mas nenhum `FinanceEntry` é criado
-automaticamente ainda (isso é o próprio motor financeiro da Fase 4).
+Conforme o plano de construção, a Fase 5 (portais/aprovação/alertas —
+incluindo o botão manual de rejeitar reserva inteira, adiado da Fase 3) só
+deve começar após confirmação de que a Fase 4 está correta. A Fase 4
+deixou pronto o motor financeiro completo: todo `FinanceEntry` de venda,
+repasse, pagamento a fornecedor e comissão nasce automaticamente do aceite
+e da conclusão dos serviços, `payment_eligible` só liga no marco correto, e
+as duas regras não-negociáveis (nunca DELETE físico; nunca `pago` antes do
+serviço concluído) têm suíte de teste dedicada rodando contra Postgres
+real (`tests/finance/`) — mas o painel administrativo sobre esse razão
+ainda é somente-leitura + "registrar pagamento" manual; nenhuma tela de
+reconciliação bancária, fechamento de fatura por parceiro ou de
+compensação manual foi construída (ver item 14 da seção anterior).

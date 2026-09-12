@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
+import { recalculateReservationStatus } from "@/lib/reservations/status";
+import { markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
+import { markReservationCommissionsEligible } from "@/lib/finance/commissions";
 
 // Requisito adicional pós-Fase 1 (item 6): o dono/responsável de uma
 // empresa fornecedora pode, pelo portal dele, iniciar e finalizar os
@@ -53,6 +56,8 @@ export async function startService(
       data: { execution_status: "em_andamento", started_at: new Date() },
     });
 
+    await recalculateReservationStatus(service.reservation_id);
+
     await logAudit({
       actorId: user.id,
       action: "servico_iniciado",
@@ -82,6 +87,16 @@ export async function completeService(
       where: { id: serviceId },
       data: { execution_status: "concluido", completed_at: new Date() },
     });
+
+    // Regra não-negociável (spec seção 6, item 5): só agora, com o marco
+    // operacional atingido, os lançamentos deste serviço passam a ser
+    // elegíveis a pagamento.
+    await markServiceFinanceEntriesEligible(serviceId);
+
+    const { status } = await recalculateReservationStatus(service.reservation_id);
+    if (status === "concluido") {
+      await markReservationCommissionsEligible(service.reservation_id);
+    }
 
     await logAudit({
       actorId: user.id,
