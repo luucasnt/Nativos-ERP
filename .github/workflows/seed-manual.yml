@@ -1,0 +1,48 @@
+name: Seed manual (produção)
+
+# Aplica as migrations do Prisma e roda o seed de dados de exemplo + logins
+# de teste (admin/parceiro/fornecedor/motorista) contra o banco real
+# (Supabase). Só dispara por botão manual na aba Actions — nunca em
+# push/PR — porque o seed cria dados e usuários reais no Supabase Auth.
+# Rodar de novo contra um banco já povoado tende a falhar em constraints de
+# unicidade (e-mail/CNPJ já cadastrados); isso é esperado, não um bug do
+# workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite SEED para confirmar (grava dados e logins reais em produção)'
+        required: true
+
+jobs:
+  migrate-and-seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verifica confirmação
+        if: ${{ github.event.inputs.confirm != 'SEED' }}
+        run: |
+          echo "Confirmação incorreta — digite exatamente SEED no campo do workflow_dispatch para prosseguir."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instala dependências
+        run: npm ci
+
+      - name: Aplica migrations do Prisma
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Roda o seed (dados de exemplo + logins de teste)
+        run: npm run prisma:seed
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
