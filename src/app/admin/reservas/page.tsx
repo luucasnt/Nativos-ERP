@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { buttonClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
-
-const statusLabel: Record<string, string> = {
-  aguardando_confirmacao: "Aguardando confirmação",
-  confirmada: "Confirmada",
-  em_andamento: "Em andamento",
-  concluida: "Concluída",
-  cancelada: "Cancelada",
-  parcialmente_cancelada: "Parcialmente cancelada",
-};
+import { RESERVATION_STATUS_LABEL } from "@/lib/reservations/status-labels";
 
 export default async function ReservasPage() {
   const reservations = await prisma.reservation.findMany({
@@ -45,7 +37,14 @@ export default async function ReservasPage() {
                 <td className={tdClass}>{r.code}</td>
                 <td className={tdClass}>{r.client.name}</td>
                 <td className={tdClass}>{r._count.services}</td>
-                <td className={tdClass}>{statusLabel[r.status]}</td>
+                <td className={tdClass}>
+                  {RESERVATION_STATUS_LABEL[r.status]}
+                  {r.has_partial_cancellation && (
+                    <span className="ml-2 rounded-sm bg-gold/20 px-1.5 py-0.5 text-xs text-forest">
+                      parcialmente cancelada
+                    </span>
+                  )}
+                </td>
                 <td className={tdClass}>
                   <Link href={`/admin/reservas/${r.id}`} className={linkClass}>
                     Abrir

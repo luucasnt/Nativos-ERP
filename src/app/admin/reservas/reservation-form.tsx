@@ -28,6 +28,7 @@ type ReservationFormProps = {
     is_net_fare: boolean;
     requires_nf: boolean;
     collection_mode: string;
+    tax_percent_snapshot: string | null;
   };
 };
 
@@ -42,6 +43,7 @@ export function ReservationForm({
 }: ReservationFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [referrerType, setReferrerType] = useState(defaultValues?.referrer_type ?? "");
+  const [requiresNf, setRequiresNf] = useState(defaultValues?.requires_nf ?? false);
 
   const referrerOptions = referrerType === "company" ? companies : referrerType === "driver" ? drivers : referrerType === "client" ? clients : [];
 
@@ -192,10 +194,37 @@ export function ReservationForm({
           Tarifa NET (sem comissão de parceiro)
         </label>
         <label className="flex items-center gap-2 text-sm text-forest/80">
-          <input type="checkbox" name="requires_nf" defaultChecked={defaultValues?.requires_nf} />
+          <input
+            type="checkbox"
+            name="requires_nf"
+            checked={requiresNf}
+            onChange={(e) => setRequiresNf(e.target.checked)}
+          />
           Exige nota fiscal
         </label>
       </div>
+
+      {requiresNf && (
+        <div className="flex flex-col gap-1 rounded-sm border border-forest/10 p-4">
+          <label htmlFor="tax_percent_override" className={labelClass}>
+            Alíquota de imposto para esta reserva (%)
+          </label>
+          <input
+            id="tax_percent_override"
+            name="tax_percent_override"
+            inputMode="decimal"
+            placeholder="deixe em branco para usar o padrão global (se houver)"
+            defaultValue={defaultValues?.tax_percent_snapshot ?? ""}
+            className={inputClass}
+          />
+          <p className="text-xs text-forest/50">
+            Preencher aqui congela a alíquota desta reserva, sobrepondo o
+            padrão global de Configurações &gt; Impostos. Deixar em branco
+            remove a sobreposição — sem alíquota definida em nenhum dos
+            dois lugares, o imposto não é calculado.
+          </p>
+        </div>
+      )}
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
       <div className="flex gap-3">

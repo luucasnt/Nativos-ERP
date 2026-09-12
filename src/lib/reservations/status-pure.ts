@@ -5,49 +5,69 @@ export type ServiceStatusSlice = {
   execution_status: ServiceExecutionStatus;
 };
 
-// INFERIDO (sinalizado desde a Fase 1): a especificação diz que
-// Reservation.status é "calculado automaticamente a partir dos serviços
-// vinculados", sem detalhar o algoritmo. Regra adotada, por ordem de
-// precedência:
-//   1. Sem serviços -> aguardando_confirmacao.
-//   2. Todos os serviços cancelados -> cancelada.
-//   3. Todos os serviços não cancelados estão concluídos -> concluida
-//      (ou parcialmente_cancelada, se havia algum cancelado no meio).
+export type ReservationStatusResult = {
+  status: ReservationStatus;
+  has_partial_cancellation: boolean;
+};
+
+// INFERIDO (sinalizado desde a Fase 1, enum e mapeamento confirmados pelo
+// cliente na revisão da Fase 3): a especificação diz que Reservation.status
+// é "calculado automaticamente a partir dos serviços vinculados", sem
+// detalhar o algoritmo. Enum aprovado: rascunho, pendente, confirmado,
+// em_andamento, concluido, cancelado, rejeitado.
+//
+// Regras de status, por ordem de precedência (a primeira que bater decide):
+//   1. Sem serviços -> rascunho.
+//   2. Todos os serviços cancelados -> cancelado.
+//   3. Todos os serviços não cancelados estão concluídos -> concluido.
 //   4. Algum serviço não cancelado já iniciado ou concluído, mas nem todos
 //      concluídos -> em_andamento.
-//   5. Algum serviço aguardando aceite do fornecedor ou recusado -> volta
-//      para aguardando_confirmacao (recusado exige reatribuição manual).
-//   6. Caso contrário (tudo agendado e aceito) -> confirmada.
-export function computeReservationStatus(services: ServiceStatusSlice[]): ReservationStatus {
+//   5. Algum serviço não cancelado aguardando aceite do fornecedor OU
+//      recusado -> pendente (uma recusa não tem status próprio — cai no
+//      mesmo "precisa de atenção" de quem ainda não foi aceito, porque as
+//      duas situações pedem a mesma ação: o admin reatribuir e seguir).
+//   6. Caso contrário (tudo agendado e aceito) -> confirmado.
+//
+// "rejeitado" não é alcançado por este algoritmo — fica reservado para uma
+// ação manual de rejeitar a reserva inteira (ainda não construída).
+//
+// has_partial_cancellation é um sinal independente, sempre calculado junto
+// com o status mas sem influenciar as regras acima (exceto no caso 2, onde
+// cancelamento total não conta como "parcial"): true sempre que existe pelo
+// menos um serviço cancelado E pelo menos um não cancelado na mesma reserva.
+export function computeReservationStatus(services: ServiceStatusSlice[]): ReservationStatusResult {
   if (services.length === 0) {
-    return "aguardando_confirmacao";
+    return { status: "rascunho", has_partial_cancellation: false };
   }
 
+  const hasCancelled = services.some((s) => s.execution_status === "cancelado");
+  const hasNonCancelled = services.some((s) => s.execution_status !== "cancelado");
+  const has_partial_cancellation = hasCancelled && hasNonCancelled;
+
   const active = services.filter((s) => s.execution_status !== "cancelado");
-  const someCancelled = active.length < services.length;
 
   if (active.length === 0) {
-    return "cancelada";
+    return { status: "cancelado", has_partial_cancellation: false };
   }
 
   const allConcluded = active.every((s) => s.execution_status === "concluido");
   if (allConcluded) {
-    return someCancelled ? "parcialmente_cancelada" : "concluida";
+    return { status: "concluido", has_partial_cancellation };
   }
 
   const anyStarted = active.some(
     (s) => s.execution_status === "em_andamento" || s.execution_status === "concluido",
   );
   if (anyStarted) {
-    return "em_andamento";
+    return { status: "em_andamento", has_partial_cancellation };
   }
 
   const needsAttention = active.some(
     (s) => s.acceptance_status === "aguardando_aceite" || s.acceptance_status === "recusado",
   );
   if (needsAttention) {
-    return "aguardando_confirmacao";
+    return { status: "pendente", has_partial_cancellation };
   }
 
-  return "confirmada";
+  return { status: "confirmado", has_partial_cancellation };
 }

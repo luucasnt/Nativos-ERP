@@ -131,13 +131,27 @@ nesta fase:
   teste de integração real contra Postgres.
 - **Cálculo automático de status da reserva**
   (`src/lib/reservations/status.ts`, `status-pure.ts`): resolve a
-  pendência da Fase 1 — algoritmo definido e testado (9 cenários) a partir
-  do estado de aceite/execução dos serviços vinculados.
+  pendência da Fase 1. Enum revisado e aprovado pelo cliente: `rascunho`,
+  `pendente`, `confirmado`, `em_andamento`, `concluido`, `cancelado`,
+  `rejeitado` (este último não é alcançado pelo algoritmo automático — fica
+  reservado para uma ação manual de rejeitar a reserva inteira, ainda não
+  construída). Recusa de fornecedor cai em `pendente` (mesma ação de
+  reatribuir e seguir que "aguardando aceite"). Cancelamento parcial não
+  ganhou um status próprio — é um campo booleano independente,
+  `has_partial_cancellation`, calculado junto com o status mas sem
+  substituir nenhum dos 7 valores do enum. Algoritmo com 10 cenários
+  testados.
 - **Cálculo de imposto/NF** (`src/lib/reservations/tax.ts`): resolve a
-  outra pendência da Fase 1 — percentual "congelado" na primeira vez que a
-  reserva com `requires_nf` é calculada (lido de
-  `Setting["imposto_padrao"]`), recalculado a cada mudança nos serviços,
-  mas sem herdar mudanças futuras no padrão global.
+  outra pendência da Fase 1, com uma correção pedida pelo cliente na
+  revisão — não existe alíquota "de fábrica" em lugar nenhum. Uma reserva
+  com `requires_nf` só calcula imposto depois que uma alíquota é definida
+  manualmente: pelo padrão global (`/admin/configuracoes/impostos`, vazio
+  até o admin preencher) ou diretamente naquela reserva (sobrepõe o
+  padrão, editável no formulário de reserva). Sem nenhuma das duas,
+  `tax_percent_snapshot`/`tax_amount`/`nf_value` ficam `null` — nada é
+  calculado nem "chutado". Uma vez que uma alíquota existe e é usada pela
+  primeira vez, fica congelada; mudar o padrão global depois não afeta
+  reservas já calculadas.
 - **Fluxo de aceite do fornecedor**: `aguardando_aceite -> aceito/recusado`
   (`src/lib/reservations/acceptance.ts`), acionável tanto pelo admin
   (registro interno, ex.: confirmação por telefone) quanto pelo próprio
@@ -257,15 +271,21 @@ devem ser revisadas:
 2. **Status de `Reservation`** (`ReservationStatus`): a especificação diz
    que o status é "calculado automaticamente a partir dos serviços
    vinculados", mas não lista os valores possíveis nem o algoritmo.
-   Resolvido na Fase 3 — algoritmo em
-   `src/lib/reservations/status-pure.ts::computeReservationStatus`, com 9
+   Resolvido e **confirmado pelo cliente** na revisão da Fase 3 — enum
+   final: `rascunho`, `pendente`, `confirmado`, `em_andamento`,
+   `concluido`, `cancelado`, `rejeitado`. Algoritmo em
+   `src/lib/reservations/status-pure.ts::computeReservationStatus`, 10
    cenários testados (`tests/reservations/status.test.ts`). Ordem de
-   precedência: sem serviços → aguardando_confirmacao; todos cancelados →
-   cancelada; todos os não-cancelados concluídos → concluida (ou
-   parcialmente_cancelada, se havia cancelamento no meio); algum já
+   precedência: sem serviços → rascunho; todos cancelados → cancelado;
+   todos os não-cancelados concluídos → concluido; algum já
    iniciado/concluído sem que todos estejam concluídos → em_andamento;
-   algum aguardando aceite do fornecedor ou recusado → aguardando_confirmacao;
-   caso contrário → confirmada.
+   algum aguardando aceite do fornecedor ou recusado → pendente; caso
+   contrário → confirmado. `rejeitado` não é alcançado por este algoritmo —
+   fica reservado para uma ação manual de rejeitar a reserva inteira, que
+   ainda não foi construída. Cancelamento parcial vira o campo
+   independente `has_partial_cancellation` (true sempre que há pelo menos
+   um serviço cancelado e pelo menos um não cancelado na mesma reserva),
+   em vez de um oitavo valor de enum.
 3. **Campos operacionais mínimos em `Service`** (data/hora agendada,
    local de origem/destino, número de passageiros, número de voo): não
    estão itemizados na especificação (que foca em preço/desconto/bagagem/
@@ -274,12 +294,20 @@ devem ser revisadas:
    da Fase 3 (`/admin/reservas/[id]/servicos`).
 4. **Fórmula de imposto/NF** (`tax_amount`/`tax_percent_snapshot`/
    `nf_value`): a especificação define os campos mas não a fórmula exata
-   nem o momento em que o percentual é fixado. Adotado em
-   `src/lib/reservations/tax.ts`: o percentual vem do padrão global
-   (`Setting["imposto_padrao"]`) e é "congelado" na primeira vez que uma
-   reserva com `requires_nf` é calculada — mudanças futuras no padrão
-   global não afetam reservas já calculadas, só novas. A base de cálculo é
-   a soma do `price` (já líquido de desconto) dos serviços não cancelados;
+   nem o momento em que o percentual é fixado. Adotado e **corrigido pelo
+   cliente** na revisão da Fase 3 (a primeira versão seedava 6% de
+   fábrica — removido): não existe alíquota "de fábrica" em lugar nenhum.
+   `src/lib/reservations/tax.ts` só calcula quando existe uma alíquota
+   definida manualmente por alguém — pelo padrão global
+   (`/admin/configuracoes/impostos`, sem seed, vazio até o admin
+   preencher) ou diretamente na reserva (campo editável no formulário,
+   sobrepõe o padrão). Sem nenhuma das duas, `tax_percent_snapshot` /
+   `tax_amount` / `nf_value` ficam `null`. A primeira vez que uma alíquota
+   é usada, fica congelada em `tax_percent_snapshot` — mudar o padrão
+   global depois não afeta reservas já calculadas, só novas; editar o
+   campo da própria reserva sempre tem efeito imediato (é ação manual
+   direta, não passa pela lógica de congelamento). A base de cálculo é a
+   soma do `price` (já líquido de desconto) dos serviços não cancelados;
    `nf_value` é essa base, `tax_amount` é a alíquota sobre ela.
 5. **Contraparte de `FinanceEntry`** (`party_type` / `party_id`): a
    especificação não lista explicitamente de quem é a favor/contra um

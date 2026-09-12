@@ -95,10 +95,13 @@ describe("orquestração reserva + serviço", () => {
       });
     });
 
-    expect(computeReservationStatus(services)).toBe("confirmada");
+    expect(computeReservationStatus(services)).toEqual({
+      status: "confirmado",
+      has_partial_cancellation: false,
+    });
   });
 
-  it("recalculateReservationTax soma apenas serviços não cancelados e aplica o percentual congelado", async () => {
+  it("recalculateReservationTax soma apenas serviços não cancelados e aplica o percentual congelado (padrão global definido)", async () => {
     const client = await prisma.client.create({
       data: { name: "Cliente Integração 3", origin: "proprio" },
     });
@@ -155,6 +158,112 @@ describe("orquestração reserva + serviço", () => {
       }
     } finally {
       await prisma.client.delete({ where: { id: client.id } });
+      // Restaura o estado "sem alíquota padrão" para não vazar para outros
+      // testes — o cliente pediu explicitamente que não exista valor de
+      // fábrica seedado.
+      await prisma.setting.delete({ where: { key: "imposto_padrao" } }).catch(() => {});
+    }
+  });
+
+  it("sem alíquota em lugar nenhum (nem padrão global, nem na reserva) => nada é calculado", async () => {
+    await prisma.setting.delete({ where: { key: "imposto_padrao" } }).catch(() => {});
+
+    const client = await prisma.client.create({
+      data: { name: "Cliente Integração 4", origin: "proprio" },
+    });
+
+    try {
+      const reservation = await prisma.reservation.create({
+        data: { code: `TEST-${Date.now()}-4`, client_id: client.id, requires_nf: true },
+      });
+
+      try {
+        await prisma.service.create({
+          data: {
+            reservation_id: reservation.id,
+            type: "transfer_chegada",
+            execution_type: "propria",
+            original_price: 500,
+            price: 500,
+          },
+        });
+
+        await recalculateReservationTax(reservation.id);
+
+        const updated = await prisma.reservation.findUniqueOrThrow({
+          where: { id: reservation.id },
+        });
+
+        expect(updated.tax_percent_snapshot).toBeNull();
+        expect(updated.tax_amount).toBeNull();
+        expect(updated.nf_value).toBeNull();
+      } finally {
+        await prisma.service.deleteMany({ where: { reservation_id: reservation.id } });
+        await prisma.reservation.delete({ where: { id: reservation.id } });
+      }
+    } finally {
+      await prisma.client.delete({ where: { id: client.id } });
+    }
+  });
+
+  it("alíquota definida manualmente na própria reserva fica congelada mesmo que o padrão global mude depois", async () => {
+    await prisma.setting.delete({ where: { key: "imposto_padrao" } }).catch(() => {});
+
+    const client = await prisma.client.create({
+      data: { name: "Cliente Integração 5", origin: "proprio" },
+    });
+
+    try {
+      // Alíquota definida manualmente nesta reserva (10%), sem nenhum
+      // padrão global existir ainda.
+      const reservation = await prisma.reservation.create({
+        data: {
+          code: `TEST-${Date.now()}-5`,
+          client_id: client.id,
+          requires_nf: true,
+          tax_percent_snapshot: 10,
+        },
+      });
+
+      try {
+        await prisma.service.create({
+          data: {
+            reservation_id: reservation.id,
+            type: "transfer_chegada",
+            execution_type: "propria",
+            original_price: 200,
+            price: 200,
+          },
+        });
+
+        await recalculateReservationTax(reservation.id);
+
+        const afterFirstCalc = await prisma.reservation.findUniqueOrThrow({
+          where: { id: reservation.id },
+        });
+        expect(afterFirstCalc.tax_percent_snapshot?.toString()).toBe("10");
+        expect(afterFirstCalc.tax_amount?.toString()).toBe("20");
+
+        // Agora o admin define um padrão global diferente (8%) — não deve
+        // afetar esta reserva, que já tem alíquota própria congelada.
+        await prisma.setting.create({
+          data: { key: "imposto_padrao", category: "financeiro", value: { percentual: 8 } },
+        });
+
+        await recalculateReservationTax(reservation.id);
+
+        const afterGlobalChange = await prisma.reservation.findUniqueOrThrow({
+          where: { id: reservation.id },
+        });
+        expect(afterGlobalChange.tax_percent_snapshot?.toString()).toBe("10");
+        expect(afterGlobalChange.tax_amount?.toString()).toBe("20");
+      } finally {
+        await prisma.service.deleteMany({ where: { reservation_id: reservation.id } });
+        await prisma.reservation.delete({ where: { id: reservation.id } });
+      }
+    } finally {
+      await prisma.client.delete({ where: { id: client.id } });
+      await prisma.setting.delete({ where: { key: "imposto_padrao" } }).catch(() => {});
     }
   });
 });

@@ -121,15 +121,10 @@ async function seedSettings() {
     },
   });
 
-  await prisma.setting.upsert({
-    where: { key: "imposto_padrao" },
-    update: {},
-    create: {
-      key: "imposto_padrao",
-      category: "financeiro",
-      value: { percentual: 6 },
-    },
-  });
+  // Alíquota padrão de imposto ("imposto_padrao") não é seedada de
+  // propósito: o cliente pediu explicitamente para nunca ter um percentual
+  // "de fábrica" — só existe quando o admin preenche em
+  // Configurações > Impostos. Nenhuma reserva calcula imposto/NF até lá.
 
   // Requisito adicional pós-Fase 1 (itens 2, 3 e 4): padrão global de
   // exibição de valor em documentos — cada reserva/serviço pode substituir
@@ -640,7 +635,10 @@ async function seedReservationsAndServices(refs: {
   });
 
   // R6 — reserva faturada (parceiro), tarifa NET (sem comissão), cortesia
-  // não se aplica; indicação por pessoa física avulsa.
+  // não se aplica; indicação por pessoa física avulsa. requires_nf=true
+  // sem nenhuma alíquota definida ainda (nem padrão global, nem por
+  // reserva) — demonstra que o imposto fica null até o admin preencher
+  // uma em Configurações > Impostos ou diretamente nesta reserva.
   const r6 = await prisma.reservation.upsert({
     where: { id: "50000000-0000-0000-0000-000000000006" },
     update: {},

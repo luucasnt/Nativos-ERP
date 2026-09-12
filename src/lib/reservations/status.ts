@@ -14,12 +14,15 @@ export async function recalculateReservationStatus(reservationId: string) {
     select: { acceptance_status: true, execution_status: true },
   });
 
-  const status = computeReservationStatus(services);
+  const result = computeReservationStatus(services);
 
   await prisma.reservation.update({
     where: { id: reservationId },
-    data: { status },
+    data: {
+      status: result.status,
+      has_partial_cancellation: result.has_partial_cancellation,
+    },
   });
 
-  return status;
+  return result;
 }

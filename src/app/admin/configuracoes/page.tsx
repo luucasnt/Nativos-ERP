@@ -22,6 +22,11 @@ const sections = [
     description: "Padrão de exibição de valor em voucher e ordem de serviço.",
   },
   {
+    href: "/admin/configuracoes/impostos",
+    title: "Impostos",
+    description: "Alíquota padrão de imposto/NF — sem valor de fábrica, só o que você definir aqui.",
+  },
+  {
     href: "/admin/configuracoes/comissoes",
     title: "Comissões padrão",
     description: "Percentual de comissão sugerido ao cadastrar uma nova empresa ou motorista, por categoria.",

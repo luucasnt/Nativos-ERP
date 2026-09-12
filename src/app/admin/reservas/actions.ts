@@ -25,6 +25,11 @@ const reservationSchema = z.object({
   is_net_fare: z.enum(["on"]).optional(),
   requires_nf: z.enum(["on"]).optional(),
   collection_mode: z.enum(["nativos", "direto", "faturado"]),
+  tax_percent_override: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.trim() : ""))
+    .refine((v) => v === "" || !Number.isNaN(Number(v)), "Alíquota inválida."),
 });
 
 export type ReservationFormState = { error: string | null };
@@ -42,6 +47,7 @@ function parse(formData: FormData) {
     is_net_fare: formData.get("is_net_fare") || undefined,
     requires_nf: formData.get("requires_nf") || undefined,
     collection_mode: formData.get("collection_mode"),
+    tax_percent_override: formData.get("tax_percent_override") || undefined,
   });
 
   if (!parsed.success) {
@@ -72,6 +78,11 @@ function parse(formData: FormData) {
       is_net_fare: d.is_net_fare === "on",
       requires_nf: d.requires_nf === "on",
       collection_mode: d.collection_mode,
+      // Edição manual e direta: preencher congela imediatamente a
+      // alíquota efetiva desta reserva (sobrepõe o padrão global); deixar
+      // em branco remove a sobreposição (volta a depender do padrão
+      // global, ou fica sem cálculo se o padrão também estiver vazio).
+      tax_percent_snapshot: d.tax_percent_override === "" ? null : d.tax_percent_override,
     },
   };
 }
@@ -92,6 +103,8 @@ export async function createReservation(
   const reservation = await prisma.reservation.create({
     data: { ...result.data, code },
   });
+
+  await recalculateReservationTax(reservation.id);
 
   await logAudit({
     actorId: user.id,
@@ -116,14 +129,12 @@ export async function updateReservation(
     return { error: result.error };
   }
 
-  const before = await prisma.reservation.findUniqueOrThrow({ where: { id } });
-
   await prisma.reservation.update({ where: { id }, data: result.data });
 
-  // requires_nf pode ter mudado — recalcula imposto/NF.
-  if (before.requires_nf !== result.data.requires_nf) {
-    await recalculateReservationTax(id);
-  }
+  // Sempre recalcula: cobre requires_nf ligando/desligando, a alíquota
+  // desta reserva sendo definida/limpa manualmente, ou o padrão global
+  // tendo passado a existir desde o último cálculo.
+  await recalculateReservationTax(id);
 
   await logAudit({
     actorId: user.id,

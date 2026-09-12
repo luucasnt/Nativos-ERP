@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { updateReservation } from "../actions";
 import { ReservationForm } from "../reservation-form";
 import { buttonClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
+import { RESERVATION_STATUS_LABEL } from "@/lib/reservations/status-labels";
 
 const acceptanceLabel: Record<string, string> = {
   aguardando_aceite: "Aguardando aceite",
@@ -49,13 +50,25 @@ export default async function ReservaDetailPage({
       <div>
         <h1 className="font-serif text-3xl text-forest">{reservation.code}</h1>
         <p className="mt-1 text-sm text-forest/60">
-          Status calculado automaticamente: <strong>{reservation.status}</strong>
+          Status calculado automaticamente:{" "}
+          <strong>{RESERVATION_STATUS_LABEL[reservation.status]}</strong>
+          {reservation.has_partial_cancellation && (
+            <span className="ml-2 rounded-sm bg-gold/20 px-1.5 py-0.5 text-xs text-forest">
+              parcialmente cancelada
+            </span>
+          )}
         </p>
         {reservation.requires_nf && (
           <p className="mt-1 text-sm text-forest/60">
-            NF: R$ {reservation.nf_value?.toString() ?? "0"} · Imposto (
-            {reservation.tax_percent_snapshot?.toString() ?? "0"}%): R${" "}
-            {reservation.tax_amount?.toString() ?? "0"}
+            {reservation.tax_percent_snapshot === null ? (
+              <>NF: nenhuma alíquota definida ainda — informe uma abaixo ou em Configurações &gt; Impostos.</>
+            ) : (
+              <>
+                NF: R$ {reservation.nf_value?.toString() ?? "0"} · Imposto (
+                {reservation.tax_percent_snapshot.toString()}%): R${" "}
+                {reservation.tax_amount?.toString() ?? "0"}
+              </>
+            )}
           </p>
         )}
       </div>
@@ -81,6 +94,7 @@ export default async function ReservaDetailPage({
             is_net_fare: reservation.is_net_fare,
             requires_nf: reservation.requires_nf,
             collection_mode: reservation.collection_mode,
+            tax_percent_snapshot: reservation.tax_percent_snapshot?.toString() ?? null,
           }}
         />
       </section>

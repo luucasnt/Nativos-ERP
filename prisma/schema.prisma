@@ -147,13 +147,18 @@ enum CollectionAllocationMode {
 // INFERIDO: status de alto nível da reserva, calculado a partir dos
 // serviços vinculados. O algoritmo exato de cálculo é trabalho da Fase 3
 // (Operacional) — aqui só o campo/domínio de valores é definido.
+// Enum confirmado pelo cliente (substitui o rascunho de nomes proposto na
+// primeira versão da Fase 3). "rejeitado" não é alcançável pelo algoritmo
+// automático hoje — fica reservado para uma ação manual de rejeitar a
+// reserva inteira, que ainda não foi construída (ver README).
 enum ReservationStatus {
-  aguardando_confirmacao
-  confirmada
+  rascunho
+  pendente
+  confirmado
   em_andamento
-  concluida
-  cancelada
-  parcialmente_cancelada
+  concluido
+  cancelado
+  rejeitado
 }
 
 enum ServiceType {
@@ -662,10 +667,20 @@ model Reservation {
   collection_mode            CollectionMode           @default(nativos)
   collection_allocation_mode CollectionAllocationMode @default(single)
   collection_allocations     Json?
+  // Alíquota efetiva desta reserva: null até (a) o admin definir uma
+  // alíquota padrão global em Configurações > Impostos, ou (b) o admin
+  // preencher esta reserva especificamente (sobrepõe o padrão). Uma vez
+  // preenchida (por qualquer um dos dois caminhos), fica congelada aqui —
+  // mudar o padrão global depois não altera reservas já calculadas. Nunca
+  // preenchida automaticamente com um valor "de fábrica".
   tax_percent_snapshot       Decimal?                 @db.Decimal(5, 2)
   tax_amount                 Decimal?                 @db.Decimal(12, 2)
   nf_value                   Decimal?                 @db.Decimal(12, 2)
-  status                     ReservationStatus        @default(aguardando_confirmacao)
+  status                     ReservationStatus        @default(rascunho)
+  // Sinaliza cancelamento parcial (alguns serviços cancelados, outros não)
+  // sem precisar de um status fora do enum aprovado pelo cliente — sempre
+  // computado junto com `status`, nunca editado manualmente.
+  has_partial_cancellation   Boolean                  @default(false)
 
   // Opções de exibição de documento (requisito adicional pós-Fase 1):
   // null = usa o padrão global definido em Setting ("documentos_exibicao_valor");
