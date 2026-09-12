@@ -5,6 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { tableClass, tdClass, thClass } from "@/lib/ui";
 import { ServiceExecutionActions } from "@/components/portal/service-execution-actions";
 import { ServiceAcceptanceActions } from "@/components/portal/service-acceptance-actions";
+import { DirectCollectionActions } from "@/components/portal/direct-collection-actions";
+import { DriverRegistrationForm } from "@/components/portal/driver-registration-form";
+import { VehicleRegistrationForm } from "@/components/portal/vehicle-registration-form";
+import { FinanceExtractTable } from "@/components/portal/finance-extract-table";
+import { NotificationBell } from "@/components/portal/notification-bell";
+import { getUnreadNotifications } from "@/lib/notifications";
+import { getPartyFinanceExtract } from "@/lib/finance/party-extract";
+import { RESERVATION_STATUS_LABEL } from "@/lib/reservations/status-labels";
+import { confirmNotReceivedPortalEmpresa, confirmReceivedPortalEmpresa } from "./actions";
 
 export default async function PortalEmpresaHomePage() {
   const user = await getCurrentUser();
@@ -19,15 +28,30 @@ export default async function PortalEmpresaHomePage() {
     .join(" · ");
 
   const isFornecedor = company.roles.includes("fornecedor");
+  const isParceiro = company.roles.includes("parceiro");
 
-  const [pendingAcceptance, services] = isFornecedor
-    ? await Promise.all([
-        prisma.service.findMany({
+  const [
+    notifications,
+    pendingAcceptance,
+    services,
+    servicesAwaitingCollection,
+    notReceivedReasons,
+    drivers,
+    vehicles,
+    vehicleCategories,
+    extract,
+    reservationsAsPartner,
+  ] = await Promise.all([
+    getUnreadNotifications(user.id),
+    isFornecedor
+      ? prisma.service.findMany({
           where: { supplier_id: company.id, acceptance_status: "aguardando_aceite" },
           include: { reservation: true, driver: true },
           orderBy: { scheduled_date: "asc" },
-        }),
-        prisma.service.findMany({
+        })
+      : Promise.resolve([]),
+    isFornecedor
+      ? prisma.service.findMany({
           where: {
             supplier_id: company.id,
             acceptance_status: "aceito",
@@ -35,17 +59,85 @@ export default async function PortalEmpresaHomePage() {
           },
           include: { reservation: true, driver: true },
           orderBy: { scheduled_date: "asc" },
-        }),
-      ])
-    : [[], []];
+        })
+      : Promise.resolve([]),
+    isFornecedor
+      ? prisma.service.findMany({
+          where: {
+            supplier_id: company.id,
+            collection_actor: "fornecedor",
+            execution_status: "concluido",
+            direct_collections: { none: {} },
+          },
+          include: { reservation: true },
+          orderBy: { scheduled_date: "desc" },
+        })
+      : Promise.resolve([]),
+    isFornecedor
+      ? prisma.catalogItem.findMany({ where: { type: "motivo_perda", active: true }, orderBy: { order: "asc" } })
+      : Promise.resolve([]),
+    isFornecedor
+      ? prisma.driver.findMany({ where: { supplier_id: company.id }, orderBy: { created_at: "desc" } })
+      : Promise.resolve([]),
+    isFornecedor
+      ? prisma.vehicle.findMany({ where: { supplier_id: company.id }, orderBy: { created_at: "desc" } })
+      : Promise.resolve([]),
+    isFornecedor
+      ? prisma.catalogItem.findMany({ where: { type: "tipo_veiculo", active: true }, orderBy: { order: "asc" } })
+      : Promise.resolve([]),
+    isFornecedor
+      ? getPartyFinanceExtract("fornecedor", company.id)
+      : isParceiro
+        ? getPartyFinanceExtract("parceiro", company.id)
+        : Promise.resolve([]),
+    isParceiro
+      ? prisma.reservation.findMany({
+          where: { origin_partner_id: company.id },
+          include: { client: true, _count: { select: { services: true } } },
+          orderBy: { created_at: "desc" },
+          take: 50,
+        })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <AppShell
       title="Portal do parceiro / fornecedor"
       userName={user.display_name ?? company.name}
+      notifications={<NotificationBell notifications={notifications} />}
     >
       <h1 className="font-serif text-3xl text-forest">{company.name}</h1>
       <p className="mt-2 text-forest/70">{roleLabels}</p>
+
+      {isParceiro && (
+        <>
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Minhas reservas</h2>
+          {reservationsAsPartner.length === 0 ? (
+            <p className="text-sm text-forest/60">Nenhuma reserva vinculada a você ainda.</p>
+          ) : (
+            <table className={tableClass}>
+              <thead>
+                <tr>
+                  <th className={thClass}>Código</th>
+                  <th className={thClass}>Cliente</th>
+                  <th className={thClass}>Serviços</th>
+                  <th className={thClass}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationsAsPartner.map((r) => (
+                  <tr key={r.id}>
+                    <td className={tdClass}>{r.code}</td>
+                    <td className={tdClass}>{r.client.name}</td>
+                    <td className={tdClass}>{r._count.services}</td>
+                    <td className={tdClass}>{RESERVATION_STATUS_LABEL[r.status]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
 
       {isFornecedor && (
         <>
@@ -118,6 +210,98 @@ export default async function PortalEmpresaHomePage() {
               </tbody>
             </table>
           )}
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">
+            Confirmação de recebimento direto
+          </h2>
+          <p className="mb-3 max-w-2xl text-sm text-forest/60">
+            Serviços concluídos em que o passageiro paga direto à sua empresa
+            — confirme se o valor foi recebido.
+          </p>
+          {servicesAwaitingCollection.length === 0 ? (
+            <p className="text-sm text-forest/60">Nenhuma confirmação pendente.</p>
+          ) : (
+            <table className={tableClass}>
+              <thead>
+                <tr>
+                  <th className={thClass}>Reserva</th>
+                  <th className={thClass}>Tipo</th>
+                  <th className={thClass}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {servicesAwaitingCollection.map((s) => (
+                  <tr key={s.id}>
+                    <td className={tdClass}>{s.reservation.code}</td>
+                    <td className={tdClass}>{s.type}</td>
+                    <td className={tdClass}>
+                      <DirectCollectionActions
+                        serviceId={s.id}
+                        reasons={notReceivedReasons}
+                        onConfirmReceived={confirmReceivedPortalEmpresa}
+                        onConfirmNotReceived={confirmNotReceivedPortalEmpresa}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Meus motoristas</h2>
+          {drivers.length === 0 ? (
+            <p className="mb-3 text-sm text-forest/60">Nenhum motorista cadastrado ainda.</p>
+          ) : (
+            <table className={`${tableClass} mb-4`}>
+              <thead>
+                <tr>
+                  <th className={thClass}>Nome</th>
+                  <th className={thClass}>Aprovação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drivers.map((d) => (
+                  <tr key={d.id}>
+                    <td className={tdClass}>{d.name}</td>
+                    <td className={tdClass}>{d.approval_status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <DriverRegistrationForm />
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Meus veículos</h2>
+          {vehicles.length === 0 ? (
+            <p className="mb-3 text-sm text-forest/60">Nenhum veículo cadastrado ainda.</p>
+          ) : (
+            <table className={`${tableClass} mb-4`}>
+              <thead>
+                <tr>
+                  <th className={thClass}>Placa</th>
+                  <th className={thClass}>Modelo</th>
+                  <th className={thClass}>Aprovação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vehicles.map((v) => (
+                  <tr key={v.id}>
+                    <td className={tdClass}>{v.plate}</td>
+                    <td className={tdClass}>{v.model}</td>
+                    <td className={tdClass}>{v.approval_status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <VehicleRegistrationForm categories={vehicleCategories} />
+        </>
+      )}
+
+      {(isFornecedor || isParceiro) && (
+        <>
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Extrato financeiro</h2>
+          <FinanceExtractTable entries={extract} />
         </>
       )}
     </AppShell>

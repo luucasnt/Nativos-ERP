@@ -40,6 +40,12 @@ export const FINANCE_PARTY_TYPE_LABEL: Record<string, string> = {
   pessoa_fisica: "Pessoa física",
 };
 
+export const SERVICE_EXPENSE_STATUS_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  aprovado: "Aprovado",
+  rejeitado: "Rejeitado",
+};
+
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   pix: "Pix",
   cartao: "Cartão",

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
 import { createPayment } from "@/lib/finance/ledger";
+import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
 
 const paymentMethodSchema = z.enum(["pix", "cartao", "dinheiro", "transferencia", "boleto", "outro"]);
 
@@ -32,6 +33,29 @@ export async function registerPayment(entryId: string, paymentMethodInput: strin
     payment_method: paymentMethod as PaymentMethod,
     dedupe_key: `manual:${entryId}`,
   });
+
+  // Só notifica quando é a Nativos pagando/repassando à contraparte (não
+  // quando é ela quem remete dinheiro à Nativos) — é esse sentido que o
+  // tipo "repasse_confirmado" descreve.
+  if (entry.type === "despesa" && entry.party_id) {
+    if (entry.party_type === "motorista") {
+      await notifyDriverPortalUser({
+        driverId: entry.party_id,
+        type: "repasse_confirmado",
+        message: "Um repasse foi confirmado no seu extrato financeiro.",
+        entityRefType: "finance_entry",
+        entityRefId: entry.id,
+      });
+    } else if (entry.party_type === "fornecedor") {
+      await notifyCompanyPortalUsers({
+        companyId: entry.party_id,
+        type: "repasse_confirmado",
+        message: "Um repasse foi confirmado no seu extrato financeiro.",
+        entityRefType: "finance_entry",
+        entityRefId: entry.id,
+      });
+    }
+  }
 
   await logAudit({
     actorId: user.id,

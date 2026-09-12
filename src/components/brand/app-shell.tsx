@@ -10,10 +10,11 @@ type AppShellProps = {
   title: string;
   userName: string;
   nav?: NavItem[];
+  notifications?: React.ReactNode;
   children: React.ReactNode;
 };
 
-export function AppShell({ title, userName, nav, children }: AppShellProps) {
+export function AppShell({ title, userName, nav, notifications, children }: AppShellProps) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b border-forest/10 bg-forest px-6 py-4 text-cream">
@@ -23,6 +24,7 @@ export function AppShell({ title, userName, nav, children }: AppShellProps) {
           <span className="font-serif text-lg tracking-wide">{title}</span>
         </div>
         <div className="flex items-center gap-4 text-sm">
+          {notifications}
           <span className="text-cream/80">{userName}</span>
           <form action="/logout" method="post">
             <button

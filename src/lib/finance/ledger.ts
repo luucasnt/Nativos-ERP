@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client";
 import type {
   CompensationCounterpartyType,
   DirectCollectionReceiverType,
+  DirectCollectionStatus,
   FinanceEntryCategory,
   FinanceEntryOriginType,
   FinanceEntryStatus,
@@ -265,6 +266,8 @@ type CreateDirectCollectionInput = {
   financial_responsible_id: string;
   amount: Prisma.Decimal.Value;
   idempotency_key: string;
+  status?: DirectCollectionStatus;
+  not_received_reason_id?: string | null;
 };
 
 export async function createDirectCollection(input: CreateDirectCollectionInput) {
@@ -283,6 +286,8 @@ export async function createDirectCollection(input: CreateDirectCollectionInput)
       financial_responsible_type: input.financial_responsible_type,
       financial_responsible_id: input.financial_responsible_id,
       amount: input.amount,
+      status: input.status ?? "pending",
+      not_received_reason_id: input.not_received_reason_id,
       idempotency_key: input.idempotency_key,
     },
   });

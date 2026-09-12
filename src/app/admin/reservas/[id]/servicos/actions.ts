@@ -12,6 +12,7 @@ import { recalculateReservationTax } from "@/lib/reservations/tax";
 import { acceptService, rejectService } from "@/lib/reservations/acceptance";
 import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
+import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
 
 const decimalField = z
   .string()
@@ -221,6 +222,25 @@ export async function createService(
 
   await afterServiceMutation(reservationId, service.id);
 
+  if (service.acceptance_status === "aguardando_aceite" && service.supplier_id) {
+    await notifyCompanyPortalUsers({
+      companyId: service.supplier_id,
+      type: "novo_servico",
+      message: `Novo serviço aguardando sua confirmação: ${service.type}.`,
+      entityRefType: "service",
+      entityRefId: service.id,
+    });
+  }
+  if (service.driver_id) {
+    await notifyDriverPortalUser({
+      driverId: service.driver_id,
+      type: "servico_atribuido",
+      message: `Você foi atribuído a um novo serviço: ${service.type}.`,
+      entityRefType: "service",
+      entityRefId: service.id,
+    });
+  }
+
   await logAudit({
     actorId: user.id,
     action: "servico_criado",
@@ -286,6 +306,25 @@ export async function updateService(
   });
 
   await afterServiceMutation(reservationId, serviceId);
+
+  if (common.data.supplier_id && executionOrSupplierChanged) {
+    await notifyCompanyPortalUsers({
+      companyId: common.data.supplier_id,
+      type: "novo_servico",
+      message: `Novo serviço aguardando sua confirmação: ${common.data.type}.`,
+      entityRefType: "service",
+      entityRefId: serviceId,
+    });
+  }
+  if (common.data.driver_id && common.data.driver_id !== existing.driver_id) {
+    await notifyDriverPortalUser({
+      driverId: common.data.driver_id,
+      type: "servico_atribuido",
+      message: `Você foi atribuído a um serviço: ${common.data.type}.`,
+      entityRefType: "service",
+      entityRefId: serviceId,
+    });
+  }
 
   await logAudit({
     actorId: user.id,

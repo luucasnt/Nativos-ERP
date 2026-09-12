@@ -235,6 +235,68 @@ do serviço), pelos mesmos caminhos usados pelo admin e pelos portais.
   concluídos no mesmo dia/mês; e o registro de rastreio de cortesia nasce
   fechado e nunca duplica numa regeneração posterior.
 
+## O que existe na Fase 5
+
+Portais externos completos (parceiro, fornecedor, motorista) — item 5 do
+plano de construção. Escopo combinado com o cliente antes de começar: só
+visualização e ações que já têm um caminho direto no modelo hoje (aceitar/
+recusar serviço, iniciar/finalizar, registrar despesa, confirmar
+recebimento direto, cadastrar motorista/veículo); a criação de
+`ChangeRequest` (solicitar nova reserva/alteração/cancelamento/repasse,
+com aprovação e SLA) fica inteiramente para a Fase 6, junto com o resto do
+"fluxo de aprovação + alertas".
+
+- **Portal do parceiro** (`/portal/empresa`, papel `parceiro`): antes só
+  mostrava um cabeçalho vazio para quem não era fornecedor. Agora lista as
+  reservas vinculadas (`Reservation.origin_partner_id`) e um extrato
+  financeiro somente-leitura da própria contraparte no razão.
+- **Portal do fornecedor**: ganhou (a) confirmação de recebimento direto
+  (ver abaixo), (b) extrato financeiro somente-leitura, e (c) cadastro de
+  motorista/veículo pelo próprio portal — nascem `terceirizado`,
+  vinculados à empresa logada, `created_from_portal=true`, pendentes de
+  aprovação do admin (mesmo fluxo já existente desde a Fase 2). O
+  formulário de motorista não expõe `payment_type`/comissão/diária —
+  termos financeiros que continuam de controle exclusivo do admin (ver
+  item 16 abaixo).
+- **Portal do motorista**: ganhou (a) registro de despesa por serviço
+  (`ServiceExpense` — categoria, valor, link de comprovante), (b)
+  confirmação de recebimento direto, e (c) extrato financeiro próprio.
+- **`ServiceExpense`** (`src/lib/finance/expenses.ts`): motorista registra
+  pelo portal (`pendente`); admin aprova/rejeita em `/admin/despesas`.
+  Aprovar gera automaticamente um `FinanceEntry` (despesa,
+  `despesa_servico`, já elegível a pagamento — não há marco operacional
+  futuro para esperar, a própria aprovação já é o marco) — idempotente
+  (`ServiceExpense.finance_entry_id` é único; aprovar de novo não duplica).
+  Rejeitar grava o motivo e não gera nenhum lançamento; uma despesa já
+  decidida não pode ser decidida de novo.
+- **Confirmação de recebimento direto** (`src/lib/finance/direct-collection.ts`,
+  `DirectCollection`): quando `collection_actor` do serviço é
+  `motorista_proprio` ou `fornecedor`, o portal correspondente (motorista
+  ou empresa) pode confirmar "recebi o valor" ou "não recebi" (com motivo
+  catalogado) depois do serviço concluído. Idempotente por
+  `idempotency_key`. "Não recebido" fica registrado como fato — não
+  reverte nem cancela automaticamente o `FinanceEntry` de repasse
+  correspondente (ver item 17 abaixo).
+- **Sino de notificação** (`src/lib/notifications.ts`,
+  `PortalNotification`): bell no cabeçalho dos dois portais, com contagem
+  de não lidos, marcar-como-lido individual e "marcar todos". Disparado em
+  4 pontos concretos: `novo_servico` (fornecedor recebe um serviço novo/
+  reatribuído aguardando aceite), `servico_atribuido` (motorista recebe
+  um serviço novo/reatribuído), `despesa_rejeitada` (motorista, quando o
+  admin rejeita sua despesa) e `repasse_confirmado` (motorista/fornecedor,
+  quando o admin registra um pagamento de despesa a favor deles em
+  `/admin/financeiro`). Os demais tipos do enum (`reserva_confirmada`,
+  `alteracao_aprovada`, `cancelamento_aprovado`, `pagamento_confirmado`,
+  `comprovante_aprovado`, `solicitacao_atualizada`) não têm gatilho ainda
+  — dependem de fluxos que só existem a partir da Fase 6 (ChangeRequest) ou
+  da Fase 7 (documentos/faturamento).
+- **Suite de integridade**: `tests/finance/expenses.test.ts` (4 testes,
+  Postgres real) cobre aprovação/rejeição/idempotência do `ServiceExpense`.
+  `tests/finance/direct-collection.test.ts` (3 testes) cobre a
+  confirmação de recebimento para os dois `collection_actor` aplicáveis e
+  o DELETE físico continuar bloqueado. `tests/notifications.test.ts` (5
+  testes) cobre o sino ponta a ponta.
+
 ## Arquitetura de autorização
 
 O backend fala com o Postgres via Prisma usando a role dona das tabelas —
@@ -477,18 +539,69 @@ devem ser revisadas:
     motor depende do status ficar correto para saber quando liberar
     comissões), mas é uma correção de um bug de uma fase já aprovada, não
     uma decisão de design nova — sinalizando aqui para visibilidade.
+16. **Escopo Fase 5 vs. Fase 6** (combinado com o cliente antes de
+    começar): a Fase 1 descreve o portal do parceiro como quem "solicita/
+    altera/cancela reservas" e o do fornecedor como quem "solicita
+    repasse" — ações que, no modelo, viram um `ChangeRequest`. Como o
+    plano de fases separa "Portais externos" (5) de "Fluxo de aprovação +
+    alertas" (6, onde `ChangeRequest` vive com SLA/status/aprovação),
+    ficou definido que a Fase 5 constrói só visualização + ações diretas
+    que já tinham caminho pronto no modelo (aceite/execução de serviço,
+    despesa, recebimento direto, cadastro de motorista/veículo) — nenhum
+    `ChangeRequest` é criado ainda. "Solicitar nova reserva/alteração/
+    cancelamento/repasse" fica inteiramente para a Fase 6.
+17. **Formulário de motorista pelo portal do fornecedor não tem
+    `payment_type`/comissão/diária/salário**: só nasce `terceirizado`,
+    vinculado à empresa logada — a relação financeira desse motorista é
+    com a empresa, não com ele (spec seção 6), então esses campos não se
+    aplicam. Exceção: o caso "dono-motorista" (`is_company_owner_driver`)
+    tem, sim, remuneração própria por analogia — o formulário do portal
+    também não os expõe (ficam com um valor de fábrica inerte,
+    `payment_type: diaria`, sem `daily_rate`), porque são termos que a
+    spec deixa como decisão do admin, nunca do próprio fornecedor. O admin
+    ajusta isso ao revisar/aprovar o cadastro (mesma tela de edição da
+    Fase 2, que já tem esses campos).
+18. **Granularidade da confirmação de recebimento direto por fornecedor**:
+    a spec separa `receiver_type` (quem recebeu fisicamente: inclui
+    `motorista_terceirizado`) de `financial_responsible_type` (quem
+    responde perante a Nativos), mas o motor de liquidação da Fase 4 nunca
+    rastreia repasse por motorista terceirizado individualmente — só por
+    fornecedor como um todo. Por isso, quando `collection_actor=fornecedor`,
+    o `DirectCollection` usa `receiver_type=fornecedor` (não
+    `motorista_terceirizado`) e é confirmado pelo portal da empresa, não do
+    motorista — mantendo a granularidade que o razão já usa. Ver
+    `src/lib/finance/direct-collection.ts`.
+19. **"Não recebido" não reverte o `FinanceEntry` automaticamente**: quando
+    o motorista/fornecedor confirma que não recebeu o valor do passageiro,
+    isso fica registrado no `DirectCollection` (com o motivo catalogado),
+    mas o `FinanceEntry` de repasse correspondente não é revertido nem
+    cancelado por conta disso. Decidir se isso vira uma reversão formal,
+    um ajuste, ou uma cortesia é um julgamento financeiro do admin — as
+    primitivas para isso já existem desde a Fase 4
+    (`reverseFinanceEntry`/`cancelUnpaidFinanceEntry`), mas acioná-las
+    automaticamente a partir de "não recebido" arriscaria uma decisão
+    financeira errada sem revisão humana.
+20. **Sino de notificação cobre só 4 dos 11 tipos do enum**: os que têm um
+    gatilho concreto e já construído nesta fase (`novo_servico`,
+    `servico_atribuido`, `despesa_rejeitada`, `repasse_confirmado`). Os
+    demais (`reserva_confirmada`, `alteracao_aprovada`,
+    `cancelamento_aprovado`, `pagamento_confirmado`, `comprovante_aprovado`,
+    `solicitacao_atualizada`) dependem de fluxos que só existem a partir da
+    Fase 6 (`ChangeRequest`) ou da Fase 7 (documentos/faturamento) — não
+    foram forçados a disparar de algum jeito aproximado só para "usar o
+    enum inteiro".
 
 ## Próximas fases
 
-Conforme o plano de construção, a Fase 5 (portais/aprovação/alertas —
-incluindo o botão manual de rejeitar reserva inteira, adiado da Fase 3) só
-deve começar após confirmação de que a Fase 4 está correta. A Fase 4
-deixou pronto o motor financeiro completo: todo `FinanceEntry` de venda,
-repasse, pagamento a fornecedor e comissão nasce automaticamente do aceite
-e da conclusão dos serviços, `payment_eligible` só liga no marco correto, e
-as duas regras não-negociáveis (nunca DELETE físico; nunca `pago` antes do
-serviço concluído) têm suíte de teste dedicada rodando contra Postgres
-real (`tests/finance/`) — mas o painel administrativo sobre esse razão
-ainda é somente-leitura + "registrar pagamento" manual; nenhuma tela de
-reconciliação bancária, fechamento de fatura por parceiro ou de
-compensação manual foi construída (ver item 14 da seção anterior).
+Conforme o plano de construção, a Fase 6 (fluxo de aprovação + alertas +
+auditoria — incluindo o modelo `ChangeRequest` para solicitações de
+portal, o botão manual de rejeitar reserva inteira adiado da Fase 3, e o
+painel de `Alert`) só deve começar após confirmação de que a Fase 5 está
+correta. A Fase 5 deixou os 3 portais externos funcionais dentro do
+escopo combinado com o cliente (item 16 da seção anterior): parceiro
+(reservas + extrato), fornecedor (aceite/execução de serviço, cadastro de
+motorista/veículo, confirmação de recebimento direto, extrato) e
+motorista (execução de serviço, despesa, confirmação de recebimento
+direto, extrato), todos com o sino de notificação — mas nenhuma
+solicitação de portal ainda passa por um fluxo de aprovação formal com
+SLA; isso é exatamente o que a Fase 6 constrói.

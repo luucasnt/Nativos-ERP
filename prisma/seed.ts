@@ -13,6 +13,7 @@ import { recalculateReservationTax } from "../src/lib/reservations/tax";
 import { generateServiceFinanceEntries, markServiceFinanceEntriesEligible } from "../src/lib/finance/settlement";
 import { markReservationCommissionsEligible, recalculateReservationCommissions } from "../src/lib/finance/commissions";
 import { createPayment } from "../src/lib/finance/ledger";
+import { confirmDirectCollectionReceived } from "../src/lib/finance/direct-collection";
 
 const prisma = new PrismaClient();
 
@@ -731,6 +732,34 @@ async function seedFinanceExamples(bankAccounts: { contaCorrente: { id: string }
   }
 }
 
+// Fase 5 (portais externos): exercita o motor de ServiceExpense e de
+// confirmação de recebimento direto do mesmo jeito que o Fase 4 já fazia
+// para o resto do razão — via as funções reais, não linhas hardcoded.
+async function seedPortalExamples() {
+  const categoriaCombustivel = await prisma.catalogItem.findFirstOrThrow({
+    where: { type: "categoria_despesa", key: "combustivel" },
+  });
+
+  // Despesa de motorista pendente (R1 — motorista próprio), para o painel
+  // /admin/despesas e o portal do motorista terem o que mostrar.
+  await prisma.serviceExpense.upsert({
+    where: { id: "90000000-0000-0000-0000-000000000001" },
+    update: {},
+    create: {
+      id: "90000000-0000-0000-0000-000000000001",
+      service_id: "60000000-0000-0000-0000-000000000001",
+      driver_id: "20000000-0000-0000-0000-000000000001",
+      category_id: categoriaCombustivel.id,
+      amount: 45,
+    },
+  });
+
+  // Confirmação de recebimento direto (R2 — motorista próprio, cobrança
+  // direta): idempotente por idempotency_key, então rodar de novo não
+  // duplica.
+  await confirmDirectCollectionReceived("60000000-0000-0000-0000-000000000002");
+}
+
 async function main() {
   console.log("Seed: catálogo…");
   await seedCatalog();
@@ -761,6 +790,9 @@ async function main() {
 
   console.log("Seed: exemplos de lançamento financeiro…");
   await seedFinanceExamples(bankAccounts);
+
+  console.log("Seed: exemplos de portal (despesa de motorista, recebimento direto)…");
+  await seedPortalExamples();
 
   const hasSupabaseCredentials =
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
