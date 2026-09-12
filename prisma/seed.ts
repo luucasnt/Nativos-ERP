@@ -250,6 +250,7 @@ async function seedCompaniesDriversVehicles() {
       name: "Hotel Vila Trancoso",
       legal_person: true,
       document: "12.345.678/0001-01",
+      portal_email: "parceiro@nativos-portal.test",
       roles: ["parceiro"],
       modelo_parceiro: "faturado",
       billing_enabled: true,
@@ -897,6 +898,15 @@ async function main() {
       isOwner: true,
     });
     console.log(`  admin@nativosexperiences.test — senha temporária: ${admin.temporaryPassword}`);
+
+    const parceiroLogin = await createPortalUser({
+      email: registry.parceiroHotel.portal_email ?? "parceiro@nativos-portal.test",
+      nativeName: registry.parceiroHotel.name,
+      linkedCompanyId: registry.parceiroHotel.id,
+    });
+    console.log(
+      `  ${parceiroLogin.user.email} — senha temporária: ${parceiroLogin.temporaryPassword}`,
+    );
 
     const fornecedorLogin = await createPortalUser({
       email: registry.fornecedorRetain.portal_email ?? "fornecedor@nativos-portal.test",
