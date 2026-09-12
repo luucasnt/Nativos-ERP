@@ -887,19 +887,32 @@ async function main() {
     );
   } else {
     console.log("Seed: provisionando logins de teste no Supabase Auth…");
-    const { createInternalUser, createPortalUser } = await import(
-      "../src/lib/auth/provision-user"
+    // Importa direto de provisioning-core.ts (sem a marca `server-only`) em
+    // vez de provision-user.ts: este script roda via `tsx`, fora do runtime
+    // do Next.js, que é quem faz o pacote `server-only` funcionar sem lançar
+    // erro (via a condição de bundler "react-server"). O client é construído
+    // aqui mesmo, com o mesmo par URL/service role key usado pelo app.
+    const { createClient } = await import("@supabase/supabase-js");
+    const { createInternalUserWithClient, createPortalUserWithClient } = await import(
+      "../src/lib/auth/provisioning-core"
+    );
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const admin = await createInternalUser({
+    const adminLogin = await createInternalUserWithClient(admin, {
       email: "admin@nativosexperiences.test",
       nativeName: "Administrador Nativos",
       internalRole: "operacional",
       isOwner: true,
     });
-    console.log(`  admin@nativosexperiences.test — senha temporária: ${admin.temporaryPassword}`);
+    console.log(
+      `  admin@nativosexperiences.test — senha temporária: ${adminLogin.temporaryPassword}`,
+    );
 
-    const parceiroLogin = await createPortalUser({
+    const parceiroLogin = await createPortalUserWithClient(admin, {
       email: registry.parceiroHotel.portal_email ?? "parceiro@nativos-portal.test",
       nativeName: registry.parceiroHotel.name,
       linkedCompanyId: registry.parceiroHotel.id,
@@ -908,7 +921,7 @@ async function main() {
       `  ${parceiroLogin.user.email} — senha temporária: ${parceiroLogin.temporaryPassword}`,
     );
 
-    const fornecedorLogin = await createPortalUser({
+    const fornecedorLogin = await createPortalUserWithClient(admin, {
       email: registry.fornecedorRetain.portal_email ?? "fornecedor@nativos-portal.test",
       nativeName: registry.fornecedorRetain.name,
       linkedCompanyId: registry.fornecedorRetain.id,
@@ -917,7 +930,7 @@ async function main() {
       `  ${fornecedorLogin.user.email} — senha temporária: ${fornecedorLogin.temporaryPassword}`,
     );
 
-    const motoristaLogin = await createPortalUser({
+    const motoristaLogin = await createPortalUserWithClient(admin, {
       email: registry.motoristaProprio.portal_email ?? "motorista@nativos-portal.test",
       nativeName: registry.motoristaProprio.name,
       linkedDriverId: registry.motoristaProprio.id,
