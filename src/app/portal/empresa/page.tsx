@@ -150,6 +150,7 @@ export default async function PortalEmpresaHomePage() {
                   <th className={thClass}>Cliente</th>
                   <th className={thClass}>Serviços</th>
                   <th className={thClass}>Status</th>
+                  <th className={thClass}></th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +160,11 @@ export default async function PortalEmpresaHomePage() {
                     <td className={tdClass}>{r.client.name}</td>
                     <td className={tdClass}>{r._count.services}</td>
                     <td className={tdClass}>{RESERVATION_STATUS_LABEL[r.status]}</td>
+                    <td className={tdClass}>
+                      <a href={`/api/documentos/voucher/${r.id}`} target="_blank" rel="noreferrer" className="text-forest underline decoration-gold hover:text-forest-light">
+                        Voucher
+                      </a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -251,10 +257,15 @@ export default async function PortalEmpresaHomePage() {
                     <td className={tdClass}>{s.type}</td>
                     <td className={tdClass}>{s.execution_status}</td>
                     <td className={tdClass}>
-                      <ServiceExecutionActions
-                        serviceId={s.id}
-                        executionStatus={s.execution_status}
-                      />
+                      <div className="flex items-center gap-3">
+                        <ServiceExecutionActions
+                          serviceId={s.id}
+                          executionStatus={s.execution_status}
+                        />
+                        <a href={`/api/documentos/os/${s.id}`} target="_blank" rel="noreferrer" className="text-forest underline decoration-gold hover:text-forest-light">
+                          OS
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}

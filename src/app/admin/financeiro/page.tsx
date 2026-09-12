@@ -23,6 +23,7 @@ export default async function FinanceiroPage() {
     include: {
       reservation: { include: { client: true } },
       service: true,
+      payments: { where: { reversed_at: null }, orderBy: { created_at: "desc" }, take: 1 },
     },
   });
 
@@ -151,6 +152,16 @@ export default async function FinanceiroPage() {
                 <td className={tdClass}>
                   {entry.payment_eligible && entry.status === "pendente" && (
                     <RegisterPaymentForm entryId={entry.id} onRegister={registerPayment} />
+                  )}
+                  {entry.status === "pago" && entry.payments[0] && (
+                    <a
+                      href={`/api/documentos/recibo/${entry.payments[0].id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={linkClass}
+                    >
+                      Recibo
+                    </a>
                   )}
                 </td>
               </tr>

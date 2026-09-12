@@ -77,6 +77,17 @@ export default async function ReservaDetailPage({
             <RejectReservationButton reservationId={reservation.id} />
           </div>
         )}
+        <div className="mt-4 flex gap-4 text-sm">
+          <a href={`/api/documentos/voucher/${id}`} target="_blank" rel="noreferrer" className={linkClass}>
+            Voucher
+          </a>
+          <a href={`/api/documentos/orcamento/${id}`} target="_blank" rel="noreferrer" className={linkClass}>
+            Orçamento
+          </a>
+          <a href={`/api/documentos/contrato/${id}`} target="_blank" rel="noreferrer" className={linkClass}>
+            Contrato
+          </a>
+        </div>
       </div>
 
       <section>

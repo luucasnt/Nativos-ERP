@@ -128,6 +128,7 @@ describe("reviewChangeRequest", () => {
       await cleanupChangeRequest(cr.id);
     } finally {
       await prisma.portalNotification.deleteMany({ where: { user_id: portalUser.id } });
+      await prisma.communication.deleteMany({ where: { recipient_email: portalUser.email } });
       await prisma.user.delete({ where: { id: portalUser.id } }).catch(() => {});
       await prisma.user.delete({ where: { id: reviewer.id } }).catch(() => {});
       await prisma.company.delete({ where: { id: company.id } }).catch(() => {});

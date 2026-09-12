@@ -116,10 +116,15 @@ export default async function PortalMotoristaHomePage() {
                 <td className={tdClass}>{s.type}</td>
                 <td className={tdClass}>{s.execution_status}</td>
                 <td className={tdClass}>
-                  <ServiceExecutionActions
-                    serviceId={s.id}
-                    executionStatus={s.execution_status}
-                  />
+                  <div className="flex items-center gap-3">
+                    <ServiceExecutionActions
+                      serviceId={s.id}
+                      executionStatus={s.execution_status}
+                    />
+                    <a href={`/api/documentos/os/${s.id}`} target="_blank" rel="noreferrer" className="text-forest underline decoration-gold hover:text-forest-light">
+                      OS
+                    </a>
+                  </div>
                 </td>
               </tr>
             ))}

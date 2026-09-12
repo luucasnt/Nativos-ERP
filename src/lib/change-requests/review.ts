@@ -10,10 +10,15 @@ import { prisma } from "@/lib/prisma";
 import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
 import type { PortalNotificationType } from "@prisma/client";
 
+// "reserva_confirmada" NÃO é disparado por aqui: aprovar um pedido de
+// nova reserva só aprova o PEDIDO — a reserva de fato (com código) só
+// passa a existir quando o admin a monta manualmente em
+// /admin/reservas/novo, e é lá (quando o status calculado chega a
+// "confirmado" pela primeira vez) que essa notificação faria sentido —
+// ainda não construído nesta fase (ver README).
 function notificationTypeFor(type: string, status: ChangeRequestStatus): PortalNotificationType {
   if (status === "aprovada" && type === "alteracao") return "alteracao_aprovada";
   if (status === "aprovada" && type === "cancelamento") return "cancelamento_aprovado";
-  if (status === "aprovada" && type === "nova_reserva") return "reserva_confirmada";
   return "solicitacao_atualizada";
 }
 
@@ -31,10 +36,15 @@ export async function reviewChangeRequest(params: {
       reviewed_at: new Date(),
       response_note: params.responseNote || null,
     },
+    include: { reservation: true },
   });
 
   const notificationType = notificationTypeFor(changeRequest.type, changeRequest.status);
   const message = `Sua solicitação ${changeRequest.protocol} foi atualizada: ${changeRequest.status}.`;
+  const emailVariables = {
+    protocolo: changeRequest.protocol,
+    codigo_reserva: changeRequest.reservation?.code ?? "",
+  };
 
   if (changeRequest.requester_type === "company") {
     await notifyCompanyPortalUsers({
@@ -43,6 +53,7 @@ export async function reviewChangeRequest(params: {
       message,
       entityRefType: "change_request",
       entityRefId: changeRequest.id,
+      emailVariables,
     });
   } else {
     await notifyDriverPortalUser({
@@ -51,6 +62,7 @@ export async function reviewChangeRequest(params: {
       message,
       entityRefType: "change_request",
       entityRefId: changeRequest.id,
+      emailVariables,
     });
   }
 

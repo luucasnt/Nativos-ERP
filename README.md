@@ -356,6 +356,89 @@ pontos que ficaram pendentes da Fase 5.
   `tests/reservations/rejection.test.ts` (3 testes) cobre a rejeição de
   reserva inteira e a blindagem contra reabertura automática.
 
+## O que existe na Fase 7
+
+Documentos PDF + comunicação (item 7 do plano). Escopo combinado com o
+cliente antes de começar: dos 8 tipos de documento da spec, só os 5 que já
+tinham todo o dado necessário modelado (voucher, ordem de serviço,
+recibo, contrato, orçamento) — fatura parcial/mensal fechada ficam para
+quando o `BillingCycle` for construído (ainda não decidido em que fase), e
+"relatório" fica para a Fase 8 (painel de relatórios), para não duplicar
+escopo.
+
+- **Identidade visual em PDF** (`src/lib/documents/`): paleta
+  (`brand.ts`) e fontes (`register-fonts.ts`) idênticas ao resto do
+  app — Cormorant Garamond (títulos) + Jost (corpo), verde-floresta
+  `#233b35`/dourado `#c9a978`/creme `#f8f5ee`. As fontes foram baixadas do
+  Google Fonts uma vez e vendorizadas em `src/lib/documents/fonts/*.ttf`
+  (arquivos binários no repo) — @react-pdf/renderer não roda no DOM, não
+  enxerga o `next/font` já usado no resto do app, e gerar PDF não deveria
+  depender de uma chamada de rede a um serviço de fontes de terceiros no
+  momento do request. O wordmark "nativos" (`components/wordmark-pdf.tsx`)
+  reproduz o mesmo texto itálico + círculo decorativo do componente React
+  da Fase 1 (`src/components/brand/logo.tsx`), só que com offsets em pt em
+  vez de `em` (o layout do react-pdf não entende unidades relativas a
+  fonte). `DocumentShell` (`components/document-shell.tsx`) é o cabeçalho/
+  rodapé compartilhado pelos 5 documentos; a plaquinha de recepção usa um
+  layout próprio, deliberadamente diferente (ver item 27 abaixo).
+- **Voucher e OS respeitam o toggle de valor opcional da Fase 2** —
+  `Reservation.voucher_show_price`/`Service.os_show_price` sobrepõem o
+  padrão global (`Setting "documentos_exibicao_valor"`), reaproveitando a
+  mesma configuração sem duplicar lógica
+  (`src/lib/documents/price-visibility.ts`). Orçamento sempre mostra o
+  valor (não haveria orçamento sem preço); recibo mostra o valor do
+  `Payment` (é o próprio propósito do documento).
+- **Rotas de geração**: `/api/documentos/{voucher,orcamento,contrato}/[reservationId]`,
+  `/api/documentos/{os,plaquinha}/[serviceId]`,
+  `/api/documentos/recibo/[paymentId]` — todas devolvem o PDF direto
+  (`renderToBuffer`), sem persistir em Storage (ver item 29 abaixo).
+  Voucher e OS aceitam tanto a equipe interna quanto o portal do
+  parceiro/fornecedor/motorista dono daquele recurso; recibo/contrato/
+  orçamento ficam só com a equipe interna (ver item 28). Links de
+  download já plugados em `/admin/reservas/[id]` (voucher/orçamento/
+  contrato), na tela de serviço (OS/plaquinha), em `/admin/financeiro`
+  (recibo de um lançamento pago) e nos dois portais externos (voucher
+  para o parceiro, OS para motorista/fornecedor).
+- **Outbox real de e-mail** (`src/lib/communication/outbox.ts`):
+  `enqueueCommunication` só grava a fila (idempotente por
+  `idempotency_key`, exige um `EmailTemplate` ativo); `processOutboxOnce`
+  é quem manda de verdade pelo Resend, com retry por `attempts` (limite 5)
+  — nunca chamado inline no mesmo request que enfileira. Disparado por
+  `POST/GET /api/outbox/process` (protegido por `CRON_SECRET`), agendado a
+  cada 5min via `vercel.json` (Vercel Cron) em produção, e por um botão
+  manual em `/admin/configuracoes/outbox` (que também lista o log
+  completo: status, tentativas, último erro). Sem `RESEND_API_KEY`
+  configurada nesta sessão de desenvolvimento (mesma situação do Supabase
+  em fases anteriores), todo envio real falha com um erro claro — a fila e
+  o retry funcionam de verdade, só o envio de fato depende de uma conta
+  Resend real.
+- **Sino + e-mail automático**: `src/lib/notifications.ts` agora
+  enfileira um e-mail junto com toda notificação de portal cujo `type`
+  bata com a `key` de um `EmailTemplate` ativo com `auto_send=true` —
+  convenção que já existia no seed desde a Fase 1/2
+  (`reserva_confirmada`, `alteracao_aprovada`, `cancelamento_aprovado`,
+  `pagamento_confirmado`). Isso dá e-mail automático de graça para
+  `alteracao_aprovada`/`cancelamento_aprovado` (Fase 6) sem precisar
+  tocar em cada callsite — só os que já tinham template correspondente
+  ganham o e-mail; os demais eventos do sino continuam só no sino.
+- **Correção de bug próprio, pré-Fase 7**: ao construir isso, percebi que
+  o fallback de `reviewChangeRequest` (Fase 6) disparava
+  `reserva_confirmada` ao aprovar um pedido de "nova_reserva" — mas nesse
+  momento nenhuma `Reservation` de fato existe ainda (aprovar o pedido não
+  cria a reserva automaticamente, por decisão da própria Fase 6), então o
+  e-mail sairia com `{{codigo_reserva}}` vazio. Corrigido para cair no
+  fallback genérico (`solicitacao_atualizada`) nesse caso — `reserva_confirmada`
+  fica reservado para quando a reserva de fato existir (ver item 30).
+- **Suite de integridade**: `tests/communication/render-template.test.ts`
+  (3 testes, puro) cobre a substituição de `{{variavel}}`.
+  `tests/communication/outbox.test.ts` (4 testes, Postgres real) cobre
+  exigência de template ativo, idempotência, falha com erro claro sem
+  `RESEND_API_KEY`, e o limite de tentativas.
+  `tests/documents/render-smoke.test.ts` (6 testes) gera de verdade os 5
+  documentos + a plaquinha em PDF contra dados reais de seed e confirma
+  que o buffer resultante é um PDF válido — não valida o layout visual
+  (isso é revisão humana; amostras enviadas na revisão desta fase).
+
 ## Arquitetura de autorização
 
 O backend fala com o Postgres via Prisma usando a role dona das tabelas —
@@ -699,19 +782,65 @@ devem ser revisadas:
     tem um `auth_user_id` real do Supabase (é um UUID qualquer), então não
     é um login funcional, só um dado de referência para o seed não
     depender de um projeto Supabase configurado.
+27. **Escopo de documentos combinado com o cliente antes de começar**
+    (Fase 7): voucher, ordem de serviço, recibo, contrato e orçamento —
+    os 5 que já tinham todo o dado necessário modelado hoje. Fatura
+    parcial/mensal fechada (dependem do `BillingCycle`, nunca construído)
+    e "relatório" (sobreposto ao painel da Fase 8) ficaram de fora
+    deliberadamente, não por limitação técnica.
+28. **Recibo/contrato/orçamento só para a equipe interna**: voucher e OS já
+    têm um destinatário natural fora da equipe (o parceiro que originou a
+    reserva; o motorista/fornecedor do serviço), então o portal pode
+    baixá-los. Os outros 3 ficam só com `requireInternalUser()` — são
+    documentos tipicamente enviados por e-mail pelo admin depois de
+    revisar, não desenhados para o próprio portal solicitar/baixar; nada
+    impede estender isso depois, mas não foi construído sem um pedido
+    explícito.
+29. **Nenhum documento fica salvo em Storage**: todos os 6 (5 documentos +
+    plaquinha) são gerados sob demanda e devolvidos direto na resposta
+    (`renderToBuffer`), nunca persistidos. A spec menciona "Supabase
+    Storage (comprovantes/contratos)" — interpretado como armazenamento
+    de comprovante/anexo que o USUÁRIO sobe (`Payment.receipt_url`,
+    `ServiceExpense.receipt_url`, ainda um link colado à mão desde a Fase
+    5), não como um arquivo de saída que o sistema gera; regenerar o PDF é
+    sempre idêntico ao original (mesmos dados, mesmo layout), então
+    guardar uma cópia não traria uma garantia adicional que valesse a
+    complexidade de configurar um bucket agora.
+30. **Contrato: todas as cláusulas ativas, sem seleção por reserva**: a
+    spec não define qual cláusula entra em qual contrato — só que
+    `ContractClause` é reutilizável por categoria/ordem. Adotado: o
+    documento inclui todas as cláusulas ativas, agrupadas por categoria
+    (geral primeiro, depois financeiro/cancelamento, o resto em ordem
+    alfabética) e ordenadas por `order` — nenhuma tela de "escolher
+    cláusulas desta reserva" foi construída.
+31. **E-mail automático cobre só os 4 eventos que já tinham
+    `EmailTemplate` com `auto_send=true`** (convenção do seed desde a Fase
+    1/2): `reserva_confirmada`, `alteracao_aprovada`, `cancelamento_aprovado`,
+    `pagamento_confirmado`. Note que `pagamento_confirmado` nunca é
+    disparado por nenhum código ainda — a Fase 5 usa `repasse_confirmado`
+    (sem template) para "Nativos pagou você"; `pagamento_confirmado`
+    descreveria o sentido oposto ("Nativos recebeu seu pagamento", ex. de
+    um parceiro faturado), que não tem gatilho construído ainda — fica
+    pronto para quando o fluxo de fatura existir.
 
 ## Próximas fases
 
-Conforme o plano de construção, a Fase 7 (documentos PDF + comunicação —
-outbox de e-mail real com job assíncrono, Supabase Storage para
-comprovantes/contratos, geração de todos os templates de documento na
-identidade da marca) só deve começar após confirmação de que a Fase 6 está
-correta. A Fase 6 deixou pronto o fluxo de aprovação: `ChangeRequest`
-completo para os 3 portais com protocolo e SLA, o botão de rejeitar
-reserva inteira (adiado desde a Fase 3), e o painel de `Alert` com 5
-detectores automáticos determinísticos — mas nenhuma automação por tempo
-(despesa/serviço atrasado, fatura vencida) existe ainda, porque isso
-depende da infraestrutura de job agendado que só a Fase 7 constrói (o
-outbox de e-mail tem exatamente o mesmo requisito). `allocation_details`
-do `ChangeRequest` também não tem um formulário rígido — fica como JSON
+Conforme o plano de construção, a Fase 8 (relatórios e dashboard admin) só
+deve começar após confirmação de que a Fase 7 está correta. A Fase 7
+deixou pronta a geração de 5 documentos (voucher, ordem de serviço,
+recibo, contrato, orçamento) mais a plaquinha de recepção, todos na
+identidade da marca, e um outbox de e-mail real via Resend (fila com
+retry, processado por cron a cada 5 minutos ou por botão manual — nunca
+disparo direto). Duas coisas ficaram deliberadamente de fora do escopo,
+por decisão do cliente: fatura parcial e fatura mensal fechada, que
+dependem de um `BillingCycle` que ainda não existe em nenhuma fase (é
+decisão de modelo de negócio que merece fase própria — o cliente pediu
+para ser avisado quando chegarmos nesse ponto do plano, para decidir onde
+ela entra); e "Relatório" como documento avulso, que se sobrepõe ao painel
+da própria Fase 8. Vale registrar também que a automação por tempo
+(despesa/serviço atrasado, fatura vencida) prevista na Fase 6 continua sem
+gatilho: o outbox construído aqui resolve a fila de envio, mas nenhum job
+agendado varre o banco procurando exceções de prazo — isso segue em
+aberto para quando houver necessidade concreta. `allocation_details` do
+`ChangeRequest` também não tem um formulário rígido — fica como JSON
 livre até haver um caso de uso que exija mais estrutura.

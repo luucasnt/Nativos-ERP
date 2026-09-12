@@ -17,6 +17,7 @@ import { confirmDirectCollectionReceived } from "../src/lib/finance/direct-colle
 import { submitChangeRequest } from "../src/lib/change-requests/submit";
 import { reviewChangeRequest } from "../src/lib/change-requests/review";
 import { alertPendingExpense } from "../src/lib/alerts/detectors";
+import { enqueueCommunication } from "../src/lib/communication/outbox";
 
 const prisma = new PrismaClient();
 
@@ -819,6 +820,20 @@ async function seedApprovalWorkflowExamples() {
   });
 }
 
+// Fase 7: um e-mail de exemplo já enfileirado (nunca enviado inline aqui —
+// isso é papel do outbox, /admin/configuracoes/outbox ou o cron), para o
+// painel do outbox ter o que mostrar mesmo sem nenhum login de portal
+// provisionado (o que exigiria um projeto Supabase real).
+async function seedOutboxExample() {
+  await enqueueCommunication({
+    templateKey: "reserva_confirmada",
+    recipientType: "cliente",
+    recipientEmail: "cliente-exemplo@nativos-portal.test",
+    variables: { codigo_reserva: "RES-2026-000001" },
+    idempotencyKey: "seed-outbox-reserva-confirmada-r1",
+  });
+}
+
 async function main() {
   console.log("Seed: catálogo…");
   await seedCatalog();
@@ -855,6 +870,9 @@ async function main() {
 
   console.log("Seed: exemplos de fluxo de aprovação (solicitações, alertas)…");
   await seedApprovalWorkflowExamples();
+
+  console.log("Seed: exemplo de e-mail enfileirado (outbox)…");
+  await seedOutboxExample();
 
   const hasSupabaseCredentials =
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;

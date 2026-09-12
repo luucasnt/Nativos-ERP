@@ -57,11 +57,27 @@ export default async function EditarServicoPage({
         )}
       </div>
 
-      <p className="mb-4 text-sm text-forest/60">
+      <p className="mb-2 text-sm text-forest/60">
         Status de execução: <strong>{service.execution_status}</strong> ·
         Aceite: <strong>{service.acceptance_status}</strong> · Cobrança:{" "}
         <strong>{service.collection_actor}</strong>
       </p>
+
+      <div className="mb-6 flex gap-4 text-sm">
+        <a href={`/api/documentos/os/${serviceId}`} target="_blank" rel="noreferrer" className="text-forest underline decoration-gold hover:text-forest-light">
+          Ordem de serviço
+        </a>
+        {service.reception_sign_enabled && (
+          <a
+            href={`/api/documentos/plaquinha/${serviceId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-forest underline decoration-gold hover:text-forest-light"
+          >
+            Plaquinha de recepção
+          </a>
+        )}
+      </div>
 
       {service.acceptance_status === "aguardando_aceite" && (
         <InternalAcceptancePanel reservationId={reservationId} serviceId={serviceId} />

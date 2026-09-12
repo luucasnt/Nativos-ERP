@@ -12,6 +12,11 @@ const sections = [
     description: "Assunto, corpo e variáveis de cada e-mail transacional, com disparo automático opcional.",
   },
   {
+    href: "/admin/configuracoes/outbox",
+    title: "Fila de e-mail (outbox)",
+    description: "Log do que foi enfileirado, enviado ou falhou no envio real via Resend, com reprocessamento manual.",
+  },
+  {
     href: "/admin/configuracoes/contratos",
     title: "Cláusulas de contrato",
     description: "Textos reutilizáveis na geração de contratos, por categoria e ordem.",
