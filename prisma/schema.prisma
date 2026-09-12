@@ -1,0 +1,1100 @@
+// Nativos ERP — schema de fundação (Fase 1)
+//
+// Convenções:
+// - Nomes de model em PascalCase; nomes de campo em snake_case, seguindo
+//   literalmente a nomenclatura usada na especificação funcional.
+// - Toda tabela mapeada para snake_case plural via @@map.
+// - Chaves primárias: uuid.
+// - Valores monetários: Decimal(12,2) — nunca Float, para não perder
+//   precisão no motor financeiro.
+// - Campos marcados "// INFERIDO:" não estão listados explicitamente na
+//   especificação, mas são estruturalmente necessários para o model ser
+//   utilizável (ex.: um FinanceEntry precisa saber a favor/contra de quem
+//   é o lançamento). Ver relatório de fundação para a lista completa —
+//   ficam sujeitos a confirmação antes da Fase 2/3.
+// - Associações polimórficas (ex.: indicador de reserva, contraparte de
+//   compensação) são modeladas como par (tipo + id) sem FK de banco,
+//   porque apontam para tabelas diferentes dependendo do tipo. Integridade
+//   referencial nesses casos é responsabilidade da camada de aplicação.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// =========================================================================
+// ENUMS
+// =========================================================================
+
+enum Role {
+  admin
+  user
+}
+
+enum AccountType {
+  internal
+  portal
+}
+
+enum InternalRole {
+  financeiro
+  operacional
+}
+
+enum UserStatus {
+  ativo
+  inativo
+}
+
+enum ApprovalStatus {
+  pendente
+  aprovado
+  rejeitado
+}
+
+enum ClientOrigin {
+  proprio
+  parceiro
+}
+
+enum OwnerType {
+  proprio
+  terceirizado
+}
+
+enum DriverPaymentType {
+  diaria
+  comissao
+  salario_mensal
+  mesclado
+}
+
+// INFERIDO: estado operacional de Driver/Vehicle além do fluxo de aprovação.
+enum OperationalStatus {
+  ativo
+  inativo
+}
+
+enum VehicleStatus {
+  ativo
+  manutencao
+  inativo
+}
+
+enum CompanyRoleType {
+  parceiro
+  fornecedor
+}
+
+enum ModeloParceiro {
+  comissionado
+  faturado
+  ambos
+}
+
+enum DirectCollectionSettlementMode {
+  retain_supplier_cost
+  gross_repass
+}
+
+// INFERIDO: taxonomia padrão de tipo de chave PIX no Brasil (não é regra de
+// negócio específica da Nativos).
+enum PixKeyType {
+  cpf
+  cnpj
+  email
+  telefone
+  aleatoria
+}
+
+enum CatalogItemType {
+  tipo_veiculo
+  tipo_bagagem
+  tipo_cadeirinha
+  categoria_despesa
+  categoria_fornecedor_parceiro
+  forma_pagamento
+  motivo_perda
+  pacote_disposicao
+  tipo_concierge
+}
+
+enum ReferrerType {
+  company
+  driver
+  client
+  pessoa_fisica
+}
+
+enum CollectionMode {
+  nativos
+  direto
+  faturado
+}
+
+enum CollectionAllocationMode {
+  single
+  divided
+  flexible
+}
+
+// INFERIDO: status de alto nível da reserva, calculado a partir dos
+// serviços vinculados. O algoritmo exato de cálculo é trabalho da Fase 3
+// (Operacional) — aqui só o campo/domínio de valores é definido.
+enum ReservationStatus {
+  aguardando_confirmacao
+  confirmada
+  em_andamento
+  concluida
+  cancelada
+  parcialmente_cancelada
+}
+
+enum ServiceType {
+  transfer_chegada
+  transfer_saida
+  transfer_interno
+  disposicao
+  passeio
+  concierge
+  carrinho_golfe
+}
+
+enum DiscountType {
+  nenhum
+  percentual
+  fixo
+}
+
+enum ExecutionType {
+  propria
+  fornecedor
+}
+
+enum ServiceAcceptanceStatus {
+  aguardando_aceite
+  aceito
+  recusado
+}
+
+// INFERIDO: status operacional mínimo de execução do serviço — necessário
+// porque o motor financeiro depende explicitamente do marco "serviço
+// concluído" (seção 6) para liberar elegibilidade de pagamento.
+enum ServiceExecutionStatus {
+  agendado
+  em_andamento
+  concluido
+  cancelado
+}
+
+enum FinanceEntryType {
+  receita
+  despesa
+}
+
+enum FinanceEntryCategory {
+  venda_servico
+  recebimento_cliente
+  pagamento_fornecedor
+  repasse_fornecedor
+  comissao_parceiro
+  comissao_indicacao
+  repasse_motorista
+  recebido_direto_motorista
+  despesa_servico
+  hora_extra
+  km_extra
+  ajuste
+  ajuste_manual
+  estorno
+  transferencia_interna
+  imposto
+  outro
+}
+
+enum FinanceEntryStatus {
+  programado
+  pendente
+  pago
+  vencido
+  cancelado
+}
+
+enum FinanceEntryOriginType {
+  direct_collection
+  service_settlement
+  manual
+  compensation
+}
+
+// INFERIDO: quem é a contraparte de um FinanceEntry (a favor/contra de
+// quem o lançamento existe). Necessário para o razão ser navegável.
+enum FinancePartyType {
+  cliente
+  motorista
+  fornecedor
+  parceiro
+  interno
+}
+
+enum PaymentType {
+  recebimento
+  pagamento
+}
+
+enum PaymentMethod {
+  pix
+  cartao
+  dinheiro
+  transferencia
+  boleto
+  outro
+}
+
+enum DirectCollectionReceiverType {
+  motorista_proprio
+  motorista_terceirizado
+  fornecedor
+}
+
+enum FinancialResponsibleType {
+  driver
+  company
+}
+
+enum DirectCollectionStatus {
+  pending
+  received
+  partial
+  not_received
+  reversed
+}
+
+enum CompensationCounterpartyType {
+  driver
+  supplier
+}
+
+enum CompensationStatus {
+  confirmada
+  estornada
+}
+
+enum BillingCycleStatus {
+  aberto
+  fechado
+  faturado
+  parcialmente_pago
+  pago
+  vencido
+}
+
+enum CashClosingDifferenceType {
+  quebra_caixa
+  erro_lancamento
+  nao_conciliado
+  outro
+}
+
+enum ClientCreditOrigin {
+  cortesia
+  ajuste
+  estorno
+  pre_pago
+}
+
+enum BankAccountType {
+  corrente
+  poupanca
+  caixa
+  digital
+}
+
+enum ChangeRequestCategory {
+  operacional
+  financeiro
+}
+
+enum ChangeRequestStatus {
+  solicitada
+  em_analise
+  aprovada
+  rejeitada
+  concluida
+  aguardando_comprovante
+  comprovante_em_analise
+  pago
+}
+
+// INFERIDO: quem originou a solicitação vinda de portal externo.
+enum ChangeRequestRequesterType {
+  company
+  driver
+}
+
+enum AlertSeverity {
+  info
+  atencao
+  critico
+}
+
+enum AlertType {
+  overbooking
+  conflito_motorista_veiculo
+  reserva_sem_recursos
+  fornecedor_recusou_sem_aceite
+  parceiro_proximo_limite
+  parceiro_acima_limite
+  fatura_vencida
+  conta_vencida
+  solicitacao_alteracao
+  solicitacao_cancelamento
+  despesa_motorista_pendente
+  financeiro_inconsistente
+  servico_atrasado
+  servico_nao_iniciado
+  sem_motorista
+  sem_veiculo
+  bagagem_incompativel
+  passageiros_acima_capacidade
+}
+
+// INFERIDO: a que tipo de entidade um Alert/AuditLog se refere — associação
+// polimórfica.
+enum EntityRefType {
+  reservation
+  service
+  company
+  driver
+  vehicle
+  client
+  finance_entry
+  payment
+  billing_cycle
+  change_request
+  user
+  other
+}
+
+enum PortalNotificationType {
+  reserva_confirmada
+  alteracao_aprovada
+  cancelamento_aprovado
+  novo_servico
+  pagamento_confirmado
+  comprovante_aprovado
+  despesa_rejeitada
+  documento_disponivel
+  solicitacao_atualizada
+  repasse_confirmado
+  servico_atribuido
+}
+
+enum ServiceExpenseStatus {
+  pendente
+  aprovado
+  rejeitado
+}
+
+enum CommunicationStatus {
+  pendente
+  enviando
+  enviado
+  falhou
+  cancelado
+}
+
+// INFERIDO: destinatário de e-mail/notificação — usado por Communication.
+enum RecipientType {
+  cliente
+  parceiro
+  fornecedor
+  motorista
+  interno
+}
+
+// =========================================================================
+// 3. USUÁRIOS
+// =========================================================================
+
+model User {
+  id                   String        @id @default(uuid()) @db.Uuid
+  auth_user_id         String        @unique @db.Uuid // id em auth.users (Supabase Auth)
+  email                String        @unique
+  native_name          String? // nome original vindo do cadastro de origem
+  display_name         String? // sobrescreve o nome nativo na interface
+  role                 Role          @default(user)
+  account_type         AccountType
+  internal_role        InternalRole?
+  status               UserStatus    @default(ativo)
+  is_owner             Boolean       @default(false)
+  linked_company_id    String?       @db.Uuid
+  linked_driver_id     String?       @unique @db.Uuid
+  must_change_password Boolean       @default(false)
+  created_at           DateTime      @default(now())
+  updated_at           DateTime      @updatedAt
+
+  linked_company Company? @relation("UserLinkedCompany", fields: [linked_company_id], references: [id])
+  linked_driver  Driver?  @relation("UserLinkedDriver", fields: [linked_driver_id], references: [id])
+
+  audit_logs                  AuditLog[]           @relation("AuditLogActor")
+  reconciled_payments         Payment[]            @relation("PaymentReconciledBy")
+  reviewed_change_requests    ChangeRequest[]      @relation("ChangeRequestReviewedBy")
+  archived_alerts             Alert[]              @relation("AlertArchivedBy")
+  reviewed_service_expenses   ServiceExpense[]     @relation("ServiceExpenseReviewedBy")
+  reviewed_drivers            Driver[]             @relation("DriverReviewedBy")
+  reviewed_vehicles           Vehicle[]            @relation("VehicleReviewedBy")
+  performed_cash_closings     CashClosing[]        @relation("CashClosingPerformedBy")
+  reopened_cash_closings      CashClosing[]        @relation("CashClosingReopenedBy")
+  portal_notifications        PortalNotification[]
+  reversed_finance_entries    FinanceEntry[]       @relation("FinanceEntryReversedBy")
+  reversed_payments           Payment[]            @relation("PaymentReversedBy")
+  reversed_direct_collections DirectCollection[]   @relation("DirectCollectionReversedBy")
+  reversed_compensations      Compensation[]       @relation("CompensationReversedBy")
+
+  @@map("users")
+}
+
+// =========================================================================
+// 4. CADASTROS BASE
+// =========================================================================
+
+model Client {
+  id                String       @id @default(uuid()) @db.Uuid
+  name              String
+  document          String? // CPF/CNPJ
+  email             String?
+  phone             String?
+  origin            ClientOrigin @default(proprio)
+  origin_partner_id String?      @db.Uuid
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  origin_partner Company?       @relation("ClientOriginPartner", fields: [origin_partner_id], references: [id])
+  reservations   Reservation[]
+  client_credits ClientCredit[]
+
+  @@map("clients")
+}
+
+model Driver {
+  id                      String            @id @default(uuid()) @db.Uuid
+  name                    String
+  document                String?
+  email                   String?
+  phone                   String?
+  owner_type              OwnerType
+  supplier_id             String?           @db.Uuid
+  is_company_owner_driver Boolean           @default(false)
+  payment_type            DriverPaymentType
+  commission              Decimal?          @db.Decimal(5, 2)
+  daily_rate              Decimal?          @db.Decimal(12, 2)
+  salario_mensal          Decimal?          @db.Decimal(12, 2)
+  portal_email            String?           @unique
+  approval_status         ApprovalStatus    @default(pendente)
+  created_from_portal     Boolean           @default(false)
+  reviewed_by_id          String?           @db.Uuid
+  status                  OperationalStatus @default(ativo)
+  created_at              DateTime          @default(now())
+  updated_at              DateTime          @updatedAt
+
+  supplier    Company? @relation("DriverSupplier", fields: [supplier_id], references: [id])
+  reviewed_by User?    @relation("DriverReviewedBy", fields: [reviewed_by_id], references: [id])
+
+  user               User?            @relation("UserLinkedDriver")
+  owner_of_companies Company[]        @relation("CompanyOwnerDriver")
+  services           Service[]
+  service_expenses   ServiceExpense[]
+
+  @@map("drivers")
+}
+
+model Vehicle {
+  id                  String         @id @default(uuid()) @db.Uuid
+  plate               String         @unique
+  model               String
+  category_id         String?        @db.Uuid // CatalogItem (tipo_veiculo)
+  capacity            Int
+  owner_type          OwnerType
+  supplier_id         String?        @db.Uuid
+  approval_status     ApprovalStatus @default(pendente)
+  created_from_portal Boolean        @default(false)
+  reviewed_by_id      String?        @db.Uuid
+  status              VehicleStatus  @default(ativo)
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  supplier    Company?     @relation("VehicleSupplier", fields: [supplier_id], references: [id])
+  reviewed_by User?        @relation("VehicleReviewedBy", fields: [reviewed_by_id], references: [id])
+  category    CatalogItem? @relation("VehicleCategory", fields: [category_id], references: [id])
+
+  services Service[]
+
+  @@map("vehicles")
+}
+
+model Company {
+  id                                String                          @id @default(uuid()) @db.Uuid
+  name                              String
+  document                          String? // CPF/CNPJ
+  legal_person                      Boolean                         @default(true) // PJ=true, PF=false
+  contact_name                      String?
+  contact_email                     String?
+  contact_phone                     String?
+  roles                             CompanyRoleType[]
+  portal_email                      String?                         @unique
+  modelo_parceiro                   ModeloParceiro?
+  billing_enabled                   Boolean                         @default(false)
+  billing_limit                     Decimal?                        @db.Decimal(12, 2)
+  closing_day                       Int?
+  invoice_due_day                   Int?
+  requires_nf                       Boolean                         @default(false)
+  net_enabled                       Boolean                         @default(false)
+  commission_enabled                Boolean                         @default(false)
+  commission                        Decimal?                        @db.Decimal(5, 2)
+  pix_key                           String?
+  pix_key_type                      PixKeyType?
+  pix_favorecido_name               String?
+  saldo_conta_corrente              Decimal                         @default(0) @db.Decimal(12, 2)
+  recebe_pagamento_direto           Boolean                         @default(false)
+  direct_collection_settlement_mode DirectCollectionSettlementMode?
+  limite_inadimplencia              Decimal?                        @db.Decimal(12, 2)
+  owner_driver_id                   String?                         @db.Uuid
+  category_id                       String?                         @db.Uuid // CatalogItem (categoria_fornecedor_parceiro)
+  created_at                        DateTime                        @default(now())
+  updated_at                        DateTime                        @updatedAt
+
+  owner_driver Driver?      @relation("CompanyOwnerDriver", fields: [owner_driver_id], references: [id])
+  category     CatalogItem? @relation("CompanyCategory", fields: [category_id], references: [id])
+
+  users                   User[]          @relation("UserLinkedCompany")
+  clients_originated      Client[]        @relation("ClientOriginPartner")
+  drivers_as_supplier     Driver[]        @relation("DriverSupplier")
+  vehicles_as_supplier    Vehicle[]       @relation("VehicleSupplier")
+  reservations_as_partner Reservation[]   @relation("ReservationOriginPartner")
+  services_as_supplier    Service[]       @relation("ServiceSupplier")
+  billing_cycles          BillingCycle[]
+  change_requests         ChangeRequest[] @relation("ChangeRequestCompany")
+
+  @@map("companies")
+}
+
+// Tabela genérica de categorias reutilizáveis (evita enum hardcoded
+// espalhado pelo sistema para taxonomias que crescem por cadastro).
+model CatalogItem {
+  id         String          @id @default(uuid()) @db.Uuid
+  type       CatalogItemType
+  key        String
+  label      String
+  order      Int             @default(0)
+  active     Boolean         @default(true)
+  created_at DateTime        @default(now())
+  updated_at DateTime        @updatedAt
+
+  vehicles_by_category          Vehicle[]          @relation("VehicleCategory")
+  companies_by_category         Company[]          @relation("CompanyCategory")
+  services_by_pacote_disposicao Service[]          @relation("ServicePacoteDisposicao")
+  service_expenses_by_category  ServiceExpense[]   @relation("ServiceExpenseCategory")
+  direct_collections_by_reason  DirectCollection[] @relation("DirectCollectionNotReceivedReason")
+
+  @@unique([type, key])
+  @@map("catalog_items")
+}
+
+// =========================================================================
+// 5. OPERACIONAL
+// =========================================================================
+
+model Reservation {
+  id                         String                   @id @default(uuid()) @db.Uuid
+  code                       String                   @unique
+  client_id                  String                   @db.Uuid
+  origin_partner_id          String?                  @db.Uuid
+  referrer_type              ReferrerType?
+  referrer_id                String?                  @db.Uuid // polimórfico: aponta para Company ou Driver ou Client, conforme referrer_type
+  referrer_name              String? // usado quando referrer_type = pessoa_fisica
+  referrer_document          String? // usado quando referrer_type = pessoa_fisica
+  commission_percent         Decimal?                 @db.Decimal(5, 2)
+  is_cortesia                Boolean                  @default(false)
+  is_net_fare                Boolean                  @default(false)
+  requires_nf                Boolean                  @default(false)
+  collection_mode            CollectionMode           @default(nativos)
+  collection_allocation_mode CollectionAllocationMode @default(single)
+  collection_allocations     Json?
+  tax_percent_snapshot       Decimal?                 @db.Decimal(5, 2)
+  tax_amount                 Decimal?                 @db.Decimal(12, 2)
+  nf_value                   Decimal?                 @db.Decimal(12, 2)
+  status                     ReservationStatus        @default(aguardando_confirmacao)
+  created_at                 DateTime                 @default(now())
+  updated_at                 DateTime                 @updatedAt
+
+  client         Client   @relation(fields: [client_id], references: [id])
+  origin_partner Company? @relation("ReservationOriginPartner", fields: [origin_partner_id], references: [id])
+
+  services                   Service[]
+  change_requests            ChangeRequest[]
+  finance_entries            FinanceEntry[]
+  billing_cycle_reservations BillingCycleReservation[]
+
+  @@map("reservations")
+}
+
+model Service {
+  id             String        @id @default(uuid()) @db.Uuid
+  reservation_id String        @db.Uuid
+  type           ServiceType
+  execution_type ExecutionType
+  supplier_id    String?       @db.Uuid
+  driver_id      String?       @db.Uuid
+  vehicle_id     String?       @db.Uuid
+
+  // INFERIDO: campos operacionais mínimos (agenda/local/capacidade) — não
+  // itemizados na especificação, mas indispensáveis para um serviço de
+  // transfer/passeio/disposição existir de forma operável.
+  scheduled_date   DateTime?
+  scheduled_time   String?
+  pickup_location  String?
+  dropoff_location String?
+  passenger_count  Int?
+  flight_number    String?
+  notes            String?
+
+  // Pacote de disposição (8h/12h/24h)
+  pacote_disposicao_id String?  @db.Uuid
+  km_incluido          Decimal? @db.Decimal(10, 2)
+  valor_hora_extra     Decimal? @db.Decimal(12, 2)
+  valor_km_extra       Decimal? @db.Decimal(12, 2)
+  horas_extras         Decimal? @db.Decimal(10, 2)
+  km_extras            Decimal? @db.Decimal(10, 2)
+
+  // Preço / desconto — desconto nunca altera supplier_cost.
+  original_price  Decimal      @db.Decimal(12, 2)
+  discount_type   DiscountType @default(nenhum)
+  discount_value  Decimal?     @db.Decimal(12, 2)
+  discount_reason String?
+  price           Decimal      @db.Decimal(12, 2)
+  supplier_cost   Decimal?     @db.Decimal(12, 2)
+
+  // Bagagem estruturada
+  luggage_10kg Int @default(0)
+  luggage_23kg Int @default(0)
+  luggage_32kg Int @default(0)
+
+  // Cadeirinha estruturada
+  bebe_conforto Int @default(0)
+  cadeirinha    Int @default(0)
+  booster       Int @default(0)
+
+  // Fluxo de aceite do fornecedor
+  acceptance_status ServiceAcceptanceStatus @default(aguardando_aceite)
+  acceptance_reason String? // aceite_motivo
+
+  execution_status ServiceExecutionStatus @default(agendado)
+
+  // Pagamento direto
+  driver_can_receive_payment Boolean @default(false)
+  supplier_payment_confirmed Boolean @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  reservation       Reservation  @relation(fields: [reservation_id], references: [id])
+  supplier          Company?     @relation("ServiceSupplier", fields: [supplier_id], references: [id])
+  driver            Driver?      @relation(fields: [driver_id], references: [id])
+  vehicle           Vehicle?     @relation(fields: [vehicle_id], references: [id])
+  pacote_disposicao CatalogItem? @relation("ServicePacoteDisposicao", fields: [pacote_disposicao_id], references: [id])
+
+  service_expenses   ServiceExpense[]
+  finance_entries    FinanceEntry[]
+  direct_collections DirectCollection[]
+
+  @@map("services")
+}
+
+// =========================================================================
+// 6. MOTOR FINANCEIRO
+// =========================================================================
+
+model FinanceEntry {
+  id               String               @id @default(uuid()) @db.Uuid
+  type             FinanceEntryType
+  category         FinanceEntryCategory
+  status           FinanceEntryStatus   @default(programado)
+  payment_eligible Boolean              @default(false)
+  amount           Decimal              @db.Decimal(12, 2)
+  due_date         DateTime?
+  description      String?
+
+  // INFERIDO: contraparte do lançamento — necessário para o razão ser
+  // navegável (a favor/contra de quem é a obrigação).
+  party_type FinancePartyType
+  party_id   String?          @db.Uuid
+
+  reservation_id String? @db.Uuid
+  service_id     String? @db.Uuid
+
+  origin_type FinanceEntryOriginType
+  origin_id   String?                @db.Uuid
+
+  auto_key        String?   @unique
+  estorno_of_id   String?   @db.Uuid
+  reversed_at     DateTime?
+  reversed_by_id  String?   @db.Uuid
+  reversal_reason String?
+  compensacao_id  String?   @db.Uuid
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  reservation Reservation?   @relation(fields: [reservation_id], references: [id])
+  service     Service?       @relation(fields: [service_id], references: [id])
+  estorno_of  FinanceEntry?  @relation("FinanceEntryReversal", fields: [estorno_of_id], references: [id])
+  reversals   FinanceEntry[] @relation("FinanceEntryReversal")
+  reversed_by User?          @relation("FinanceEntryReversedBy", fields: [reversed_by_id], references: [id])
+  compensacao Compensation?  @relation(fields: [compensacao_id], references: [id])
+
+  payments Payment[]
+
+  @@map("finance_entries")
+}
+
+model Payment {
+  id               String        @id @default(uuid()) @db.Uuid
+  finance_entry_id String        @db.Uuid
+  type             PaymentType
+  amount           Decimal       @db.Decimal(12, 2)
+  payment_method   PaymentMethod
+  bank_account_id  String?       @db.Uuid
+  receipt_url      String?
+  estorno_of_id    String?       @db.Uuid
+  reversed_at      DateTime?
+  reversed_by_id   String?       @db.Uuid
+  reversal_reason  String?
+  reconciled       Boolean       @default(false)
+  reconciled_at    DateTime?
+  reconciled_by_id String?       @db.Uuid
+  dedupe_key       String?       @unique
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  finance_entry FinanceEntry @relation(fields: [finance_entry_id], references: [id])
+  bank_account  BankAccount? @relation(fields: [bank_account_id], references: [id])
+  estorno_of    Payment?     @relation("PaymentReversal", fields: [estorno_of_id], references: [id])
+  reversals     Payment[]    @relation("PaymentReversal")
+  reversed_by   User?        @relation("PaymentReversedBy", fields: [reversed_by_id], references: [id])
+  reconciled_by User?        @relation("PaymentReconciledBy", fields: [reconciled_by_id], references: [id])
+
+  @@map("payments")
+}
+
+model DirectCollection {
+  id                         String                       @id @default(uuid()) @db.Uuid
+  service_id                 String                       @db.Uuid
+  receiver_type              DirectCollectionReceiverType
+  receiver_id                String                       @db.Uuid // polimórfico: Driver ou Company
+  financial_responsible_type FinancialResponsibleType
+  financial_responsible_id   String                       @db.Uuid // polimórfico: Driver (dono-motorista) ou Company
+  amount                     Decimal                      @db.Decimal(12, 2)
+  status                     DirectCollectionStatus       @default(pending)
+  not_received_reason_id     String?                      @db.Uuid // CatalogItem (motivo_perda)
+  reversed_at                DateTime?
+  reversed_by_id             String?                      @db.Uuid
+  reversal_reason            String?
+  idempotency_key            String                       @unique
+  created_at                 DateTime                     @default(now())
+  updated_at                 DateTime                     @updatedAt
+
+  service             Service      @relation(fields: [service_id], references: [id])
+  not_received_reason CatalogItem? @relation("DirectCollectionNotReceivedReason", fields: [not_received_reason_id], references: [id])
+  reversed_by         User?        @relation("DirectCollectionReversedBy", fields: [reversed_by_id], references: [id])
+
+  @@map("direct_collections")
+}
+
+model Compensation {
+  id                    String                       @id @default(uuid()) @db.Uuid
+  counterparty_type     CompensationCounterpartyType
+  counterparty_id       String                       @db.Uuid // polimórfico: Driver ou Company
+  payable_allocation    Json
+  receivable_allocation Json
+  amount                Decimal                      @db.Decimal(12, 2)
+  status                CompensationStatus           @default(confirmada)
+  reversed_at           DateTime?
+  reversed_by_id        String?                      @db.Uuid
+  reversal_reason       String?
+  idempotency_key       String                       @unique
+  created_at            DateTime                     @default(now())
+  updated_at            DateTime                     @updatedAt
+
+  reversed_by     User?          @relation("CompensationReversedBy", fields: [reversed_by_id], references: [id])
+  finance_entries FinanceEntry[]
+
+  @@map("compensations")
+}
+
+model BillingCycle {
+  id           String             @id @default(uuid()) @db.Uuid
+  company_id   String             @db.Uuid
+  period       String // ex.: "2026-09"
+  closing_day  Int
+  due_day      Int
+  total_amount Decimal            @default(0) @db.Decimal(12, 2)
+  paid_amount  Decimal            @default(0) @db.Decimal(12, 2)
+  status       BillingCycleStatus @default(aberto)
+  created_at   DateTime           @default(now())
+  updated_at   DateTime           @updatedAt
+
+  company      Company                   @relation(fields: [company_id], references: [id])
+  reservations BillingCycleReservation[]
+
+  @@unique([company_id, period])
+  @@map("billing_cycles")
+}
+
+// Join table explícita para BillingCycle.reservation_ids
+model BillingCycleReservation {
+  id               String   @id @default(uuid()) @db.Uuid
+  billing_cycle_id String   @db.Uuid
+  reservation_id   String   @db.Uuid
+  created_at       DateTime @default(now())
+
+  billing_cycle BillingCycle @relation(fields: [billing_cycle_id], references: [id])
+  reservation   Reservation  @relation(fields: [reservation_id], references: [id])
+
+  @@unique([billing_cycle_id, reservation_id])
+  @@map("billing_cycle_reservations")
+}
+
+model CashClosing {
+  id                          String                     @id @default(uuid()) @db.Uuid
+  bank_account_id             String                     @db.Uuid
+  closing_date                DateTime
+  opening_balance             Decimal                    @db.Decimal(12, 2)
+  total_in                    Decimal                    @default(0) @db.Decimal(12, 2)
+  total_out                   Decimal                    @default(0) @db.Decimal(12, 2)
+  total_transfers             Decimal                    @default(0) @db.Decimal(12, 2)
+  theoretical_balance         Decimal                    @db.Decimal(12, 2)
+  counted_balance             Decimal?                   @db.Decimal(12, 2)
+  difference                  Decimal?                   @db.Decimal(12, 2)
+  difference_type             CashClosingDifferenceType?
+  adjustment_finance_entry_id String?                    @db.Uuid
+  performed_by_id             String                     @db.Uuid
+  reopened_at                 DateTime?
+  reopened_by_id              String?                    @db.Uuid
+  reopen_reason               String?
+  created_at                  DateTime                   @default(now())
+  updated_at                  DateTime                   @updatedAt
+
+  bank_account BankAccount @relation(fields: [bank_account_id], references: [id])
+  performed_by User        @relation("CashClosingPerformedBy", fields: [performed_by_id], references: [id])
+  reopened_by  User?       @relation("CashClosingReopenedBy", fields: [reopened_by_id], references: [id])
+
+  @@map("cash_closings")
+}
+
+model ClientCredit {
+  id          String             @id @default(uuid()) @db.Uuid
+  client_id   String             @db.Uuid
+  amount      Decimal            @db.Decimal(12, 2)
+  origin      ClientCreditOrigin
+  valid_until DateTime?
+  active      Boolean            @default(true)
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @updatedAt
+
+  client Client @relation(fields: [client_id], references: [id])
+
+  @@map("client_credits")
+}
+
+model BankAccount {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  type            BankAccountType
+  pix_key         String?
+  initial_balance Decimal         @default(0) @db.Decimal(12, 2)
+  active          Boolean         @default(true)
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
+
+  payments      Payment[]
+  cash_closings CashClosing[]
+
+  @@map("bank_accounts")
+}
+
+// =========================================================================
+// 7. PORTAIS, APROVAÇÃO E EXCEÇÕES
+// =========================================================================
+
+model ChangeRequest {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  protocol           String                     @unique // ex.: SOL-2026-000123
+  category           ChangeRequestCategory
+  type               String // tipo textual: nova_reserva, alteracao, cancelamento, pagamento_fatura, repasse_nativos, repasse_motorista, contestacao_valor, troca_recurso, cadastro_motorista, cadastro_veiculo, correcao_horario, correcao_informacao, antecipacao_fatura, outro
+  requester_type     ChangeRequestRequesterType
+  requester_id       String                     @db.Uuid // polimórfico: Company ou Driver
+  company_id         String?                    @db.Uuid
+  reservation_id     String?                    @db.Uuid
+  allocation_details Json?
+  status             ChangeRequestStatus        @default(solicitada)
+  reviewed_by_id     String?                    @db.Uuid
+  reviewed_at        DateTime?
+  response_note      String?
+  dedupe_key         String?                    @unique
+  created_at         DateTime                   @default(now())
+  updated_at         DateTime                   @updatedAt
+
+  company     Company?     @relation("ChangeRequestCompany", fields: [company_id], references: [id])
+  reservation Reservation? @relation(fields: [reservation_id], references: [id])
+  reviewed_by User?        @relation("ChangeRequestReviewedBy", fields: [reviewed_by_id], references: [id])
+
+  @@map("change_requests")
+}
+
+model Alert {
+  id              String         @id @default(uuid()) @db.Uuid
+  type            AlertType
+  severity        AlertSeverity  @default(info)
+  message         String
+  entity_ref_type EntityRefType?
+  entity_ref_id   String?        @db.Uuid
+  persistent      Boolean        @default(false)
+  archived        Boolean        @default(false)
+  archived_at     DateTime?
+  archived_by_id  String?        @db.Uuid
+  dedupe_key      String?        @unique
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+
+  archived_by User? @relation("AlertArchivedBy", fields: [archived_by_id], references: [id])
+
+  @@map("alerts")
+}
+
+model PortalNotification {
+  id              String                 @id @default(uuid()) @db.Uuid
+  user_id         String                 @db.Uuid
+  type            PortalNotificationType
+  message         String
+  read            Boolean                @default(false)
+  read_at         DateTime?
+  entity_ref_type EntityRefType?
+  entity_ref_id   String?                @db.Uuid
+  created_at      DateTime               @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("portal_notifications")
+}
+
+// Append-only: nenhum UPDATE/DELETE físico é permitido (ver migração
+// 0002_append_only_audit_log). O catálogo completo de >50 ações não foi
+// enumerado na especificação (apenas exemplos) — "action" fica como String
+// livre em vez de enum fechado, para não inventar as ações faltantes.
+model AuditLog {
+  id          String        @id @default(uuid()) @db.Uuid
+  actor_id    String?       @db.Uuid
+  action      String
+  entity_type EntityRefType
+  entity_id   String?       @db.Uuid
+  metadata    Json?
+  created_at  DateTime      @default(now())
+
+  actor User? @relation("AuditLogActor", fields: [actor_id], references: [id])
+
+  @@map("audit_logs")
+}
+
+model ServiceExpense {
+  id               String               @id @default(uuid()) @db.Uuid
+  service_id       String               @db.Uuid
+  driver_id        String               @db.Uuid
+  category_id      String               @db.Uuid // CatalogItem (categoria_despesa)
+  amount           Decimal              @db.Decimal(12, 2)
+  receipt_url      String?
+  status           ServiceExpenseStatus @default(pendente)
+  reviewed_by_id   String?              @db.Uuid
+  reviewed_at      DateTime?
+  rejection_reason String?
+  finance_entry_id String?              @unique @db.Uuid
+  created_at       DateTime             @default(now())
+  updated_at       DateTime             @updatedAt
+
+  service     Service     @relation(fields: [service_id], references: [id])
+  driver      Driver      @relation(fields: [driver_id], references: [id])
+  category    CatalogItem @relation("ServiceExpenseCategory", fields: [category_id], references: [id])
+  reviewed_by User?       @relation("ServiceExpenseReviewedBy", fields: [reviewed_by_id], references: [id])
+
+  @@map("service_expenses")
+}
+
+// =========================================================================
+// 8. COMUNICAÇÃO E DOCUMENTOS
+// =========================================================================
+
+model Communication {
+  id              String              @id @default(uuid()) @db.Uuid
+  template_key    String
+  category        String
+  recipient_type  RecipientType
+  recipient_email String
+  variables       Json?
+  status          CommunicationStatus @default(pendente)
+  attempts        Int                 @default(0)
+  last_error      String?
+  sent_at         DateTime?
+  idempotency_key String              @unique
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
+
+  template EmailTemplate? @relation(fields: [template_key], references: [key])
+
+  @@map("communications")
+}
+
+model EmailTemplate {
+  key               String   @id
+  name              String
+  subject           String
+  body              String
+  category          String
+  auto_send         Boolean  @default(false)
+  allowed_variables Json?
+  active            Boolean  @default(true)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  communications Communication[]
+
+  @@map("email_templates")
+}
+
+model ContractClause {
+  id         String   @id @default(uuid()) @db.Uuid
+  category   String
+  order      Int      @default(0)
+  title      String
+  content    String
+  active     Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("contract_clauses")
+}
+
+model Setting {
+  key        String   @id
+  value      Json
+  category   String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("settings")
+}
