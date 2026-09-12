@@ -9,6 +9,8 @@ import {
   confirmDirectCollectionNotReceived,
   confirmDirectCollectionReceived,
 } from "@/lib/finance/direct-collection";
+import { submitChangeRequest } from "@/lib/change-requests/submit";
+import { alertChangeRequestNeedsReview } from "@/lib/alerts/detectors";
 
 export type DirectCollectionState = { error: string | null };
 
@@ -191,6 +193,212 @@ export async function registerVehiclePortal(
     action: "veiculo_cadastrado_pelo_portal",
     entityType: "vehicle",
     entityId: vehicle.id,
+  });
+
+  revalidatePath("/portal/empresa");
+  return { error: null };
+}
+
+export type ChangeRequestFormState = { error: string | null };
+
+const novaReservaSchema = z.object({
+  dedupe_key: z.string().min(1),
+  cliente_nome: z.string().min(1, "Informe o nome do cliente."),
+  descricao: z.string().min(1, "Descreva a reserva desejada."),
+});
+
+// Requisito adicional pós-Fase 1 (item 1 do spec original): o parceiro
+// pede uma nova reserva pelo portal — não é a reserva já pronta (isso o
+// admin monta em /admin/reservas/novo depois de revisar o pedido), é o
+// protocolo de solicitação (spec seção 7).
+export async function submitNovaReservaRequest(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await getCurrentUser();
+  if (!user || !user.linked_company_id || !user.linked_company?.roles.includes("parceiro")) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const parsed = novaReservaSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"),
+    cliente_nome: formData.get("cliente_nome"),
+    descricao: formData.get("descricao"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const changeRequest = await submitChangeRequest({
+    type: "nova_reserva",
+    requesterType: "company",
+    requesterId: user.linked_company_id,
+    companyId: user.linked_company_id,
+    allocationDetails: { cliente_nome: parsed.data.cliente_nome, descricao: parsed.data.descricao },
+    dedupeKey: parsed.data.dedupe_key,
+  });
+
+  await logAudit({
+    actorId: user.id,
+    action: "solicitacao_nova_reserva_criada",
+    entityType: "change_request",
+    entityId: changeRequest.id,
+  });
+
+  revalidatePath("/portal/empresa");
+  return { error: null };
+}
+
+const alteracaoSchema = z.object({
+  dedupe_key: z.string().min(1),
+  reservation_id: z.string().uuid("Selecione a reserva."),
+  descricao: z.string().min(1, "Descreva a alteração desejada."),
+});
+
+export async function submitAlteracaoRequest(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await getCurrentUser();
+  if (!user || !user.linked_company_id) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const parsed = alteracaoSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"),
+    reservation_id: formData.get("reservation_id"),
+    descricao: formData.get("descricao"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const reservation = await prisma.reservation.findUnique({ where: { id: parsed.data.reservation_id } });
+  if (!reservation || reservation.origin_partner_id !== user.linked_company_id) {
+    return { error: "Reserva não encontrada." };
+  }
+
+  const changeRequest = await submitChangeRequest({
+    type: "alteracao",
+    requesterType: "company",
+    requesterId: user.linked_company_id,
+    companyId: user.linked_company_id,
+    reservationId: reservation.id,
+    allocationDetails: { descricao: parsed.data.descricao },
+    dedupeKey: parsed.data.dedupe_key,
+  });
+
+  await alertChangeRequestNeedsReview({
+    changeRequestId: changeRequest.id,
+    protocol: changeRequest.protocol,
+    type: "alteracao",
+  });
+
+  await logAudit({
+    actorId: user.id,
+    action: "solicitacao_alteracao_criada",
+    entityType: "change_request",
+    entityId: changeRequest.id,
+  });
+
+  revalidatePath("/portal/empresa");
+  return { error: null };
+}
+
+const cancelamentoSchema = z.object({
+  dedupe_key: z.string().min(1),
+  reservation_id: z.string().uuid("Selecione a reserva."),
+  motivo: z.string().min(1, "Informe o motivo do cancelamento."),
+});
+
+export async function submitCancelamentoRequest(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await getCurrentUser();
+  if (!user || !user.linked_company_id) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const parsed = cancelamentoSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"),
+    reservation_id: formData.get("reservation_id"),
+    motivo: formData.get("motivo"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const reservation = await prisma.reservation.findUnique({ where: { id: parsed.data.reservation_id } });
+  if (!reservation || reservation.origin_partner_id !== user.linked_company_id) {
+    return { error: "Reserva não encontrada." };
+  }
+
+  const changeRequest = await submitChangeRequest({
+    type: "cancelamento",
+    requesterType: "company",
+    requesterId: user.linked_company_id,
+    companyId: user.linked_company_id,
+    reservationId: reservation.id,
+    allocationDetails: { motivo: parsed.data.motivo },
+    dedupeKey: parsed.data.dedupe_key,
+  });
+
+  await alertChangeRequestNeedsReview({
+    changeRequestId: changeRequest.id,
+    protocol: changeRequest.protocol,
+    type: "cancelamento",
+  });
+
+  await logAudit({
+    actorId: user.id,
+    action: "solicitacao_cancelamento_criada",
+    entityType: "change_request",
+    entityId: changeRequest.id,
+  });
+
+  revalidatePath("/portal/empresa");
+  return { error: null };
+}
+
+const repasseSchema = z.object({
+  dedupe_key: z.string().min(1),
+  entry_ids: z.array(z.string().uuid()).optional(),
+  nota: z.string().optional(),
+});
+
+export async function submitRepasseRequestEmpresa(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await getCurrentUser();
+  if (!user || !user.linked_company_id) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const parsed = repasseSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"),
+    entry_ids: formData.getAll("entry_ids"),
+    nota: formData.get("nota") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const changeRequest = await submitChangeRequest({
+    type: "repasse_nativos",
+    requesterType: "company",
+    requesterId: user.linked_company_id,
+    companyId: user.linked_company_id,
+    allocationDetails: { entry_ids: parsed.data.entry_ids ?? [], nota: parsed.data.nota ?? null },
+    dedupeKey: parsed.data.dedupe_key,
+  });
+
+  await logAudit({
+    actorId: user.id,
+    action: "solicitacao_repasse_criada",
+    entityType: "change_request",
+    entityId: changeRequest.id,
   });
 
   revalidatePath("/portal/empresa");

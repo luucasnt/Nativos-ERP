@@ -10,10 +10,20 @@ import { DriverRegistrationForm } from "@/components/portal/driver-registration-
 import { VehicleRegistrationForm } from "@/components/portal/vehicle-registration-form";
 import { FinanceExtractTable } from "@/components/portal/finance-extract-table";
 import { NotificationBell } from "@/components/portal/notification-bell";
+import { NovaReservaRequestForm } from "@/components/portal/nova-reserva-request-form";
+import { ReservationRequestForm } from "@/components/portal/reservation-request-form";
+import { RepasseRequestForm } from "@/components/portal/repasse-request-form";
+import { ChangeRequestsTable } from "@/components/portal/change-requests-table";
 import { getUnreadNotifications } from "@/lib/notifications";
 import { getPartyFinanceExtract } from "@/lib/finance/party-extract";
 import { RESERVATION_STATUS_LABEL } from "@/lib/reservations/status-labels";
-import { confirmNotReceivedPortalEmpresa, confirmReceivedPortalEmpresa } from "./actions";
+import {
+  confirmNotReceivedPortalEmpresa,
+  confirmReceivedPortalEmpresa,
+  submitAlteracaoRequest,
+  submitCancelamentoRequest,
+  submitRepasseRequestEmpresa,
+} from "./actions";
 
 export default async function PortalEmpresaHomePage() {
   const user = await getCurrentUser();
@@ -41,6 +51,8 @@ export default async function PortalEmpresaHomePage() {
     vehicleCategories,
     extract,
     reservationsAsPartner,
+    changeRequests,
+    repasseEligibleEntries,
   ] = await Promise.all([
     getUnreadNotifications(user.id),
     isFornecedor
@@ -98,7 +110,23 @@ export default async function PortalEmpresaHomePage() {
           take: 50,
         })
       : Promise.resolve([]),
+    prisma.changeRequest.findMany({
+      where: { requester_type: "company", requester_id: company.id },
+      orderBy: { created_at: "desc" },
+      take: 30,
+    }),
+    isFornecedor
+      ? prisma.financeEntry.findMany({
+          where: { party_type: "fornecedor", party_id: company.id, status: "pendente", payment_eligible: true },
+          orderBy: { created_at: "desc" },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const dedupeKeyNovaReserva = crypto.randomUUID();
+  const dedupeKeyAlteracao = crypto.randomUUID();
+  const dedupeKeyCancelamento = crypto.randomUUID();
+  const dedupeKeyRepasse = crypto.randomUUID();
 
   return (
     <AppShell
@@ -136,6 +164,29 @@ export default async function PortalEmpresaHomePage() {
               </tbody>
             </table>
           )}
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Solicitar nova reserva</h2>
+          <NovaReservaRequestForm dedupeKey={dedupeKeyNovaReserva} />
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Solicitar alteração</h2>
+          <ReservationRequestForm
+            dedupeKey={dedupeKeyAlteracao}
+            reservations={reservationsAsPartner}
+            action={submitAlteracaoRequest}
+            reasonFieldName="descricao"
+            reasonLabel="O que precisa mudar?"
+            submitLabel="Solicitar alteração"
+          />
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Solicitar cancelamento</h2>
+          <ReservationRequestForm
+            dedupeKey={dedupeKeyCancelamento}
+            reservations={reservationsAsPartner}
+            action={submitCancelamentoRequest}
+            reasonFieldName="motivo"
+            reasonLabel="Motivo do cancelamento"
+            submitLabel="Solicitar cancelamento"
+          />
         </>
       )}
 
@@ -295,11 +346,24 @@ export default async function PortalEmpresaHomePage() {
             </table>
           )}
           <VehicleRegistrationForm categories={vehicleCategories} />
+
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Solicitar repasse</h2>
+          <RepasseRequestForm
+            dedupeKey={dedupeKeyRepasse}
+            entries={repasseEligibleEntries.map((e) => ({
+              id: e.id,
+              label: `${e.category} — R$ ${Number(e.amount).toFixed(2)}`,
+            }))}
+            action={submitRepasseRequestEmpresa}
+          />
         </>
       )}
 
       {(isFornecedor || isParceiro) && (
         <>
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Minhas solicitações</h2>
+          <ChangeRequestsTable requests={changeRequests} />
+
           <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Extrato financeiro</h2>
           <FinanceExtractTable entries={extract} />
         </>

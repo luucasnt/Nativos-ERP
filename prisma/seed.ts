@@ -14,6 +14,9 @@ import { generateServiceFinanceEntries, markServiceFinanceEntriesEligible } from
 import { markReservationCommissionsEligible, recalculateReservationCommissions } from "../src/lib/finance/commissions";
 import { createPayment } from "../src/lib/finance/ledger";
 import { confirmDirectCollectionReceived } from "../src/lib/finance/direct-collection";
+import { submitChangeRequest } from "../src/lib/change-requests/submit";
+import { reviewChangeRequest } from "../src/lib/change-requests/review";
+import { alertPendingExpense } from "../src/lib/alerts/detectors";
 
 const prisma = new PrismaClient();
 
@@ -758,6 +761,62 @@ async function seedPortalExamples() {
   // direta): idempotente por idempotency_key, então rodar de novo não
   // duplica.
   await confirmDirectCollectionReceived("60000000-0000-0000-0000-000000000002");
+
+  // Alerta de despesa pendente (spec seção 7) — mesma condição que o
+  // portal do motorista dispara de verdade ao registrar a despesa acima.
+  await alertPendingExpense({
+    expenseId: "90000000-0000-0000-0000-000000000001",
+    serviceId: "60000000-0000-0000-0000-000000000001",
+    driverName: "Carlos Andrade",
+    serviceType: "transfer_chegada",
+  });
+}
+
+// Fase 6 (fluxo de aprovação + alertas): duas solicitações de exemplo —
+// uma ainda aberta (para aparecer em /admin/solicitacoes com o prazo de
+// SLA correndo) e uma já revisada (para mostrar a notificação de volta ao
+// portal) — via as funções reais (submitChangeRequest/reviewChangeRequest),
+// nunca linhas hardcoded.
+async function seedApprovalWorkflowExamples() {
+  const reviewer = await prisma.user.upsert({
+    where: { id: "40000000-0000-0000-0000-000000000001" },
+    update: {},
+    create: {
+      id: "40000000-0000-0000-0000-000000000001",
+      auth_user_id: "40000000-0000-0000-0000-0000000000aa",
+      email: "seed-revisor@nativos-interno.seed",
+      account_type: "internal",
+      internal_role: "operacional",
+    },
+  });
+
+  const alteracaoRequest = await submitChangeRequest({
+    type: "alteracao",
+    requesterType: "company",
+    requesterId: "10000000-0000-0000-0000-000000000001", // parceiroHotel
+    companyId: "10000000-0000-0000-0000-000000000001",
+    reservationId: "50000000-0000-0000-0000-000000000004",
+    allocationDetails: { descricao: "Adiantar o horário do transfer interno em 1h." },
+    dedupeKey: "seed-change-request-alteracao-r4",
+  });
+  await reviewChangeRequest({
+    id: alteracaoRequest.id,
+    status: "aprovada",
+    reviewerId: reviewer.id,
+    responseNote: "Horário ajustado na reserva.",
+  });
+
+  // Esta fica em aberto de propósito — para o painel mostrar o prazo de
+  // SLA correndo (operacional: 30min desde a criação).
+  await submitChangeRequest({
+    type: "cancelamento",
+    requesterType: "company",
+    requesterId: "10000000-0000-0000-0000-000000000001",
+    companyId: "10000000-0000-0000-0000-000000000001",
+    reservationId: "50000000-0000-0000-0000-000000000006",
+    allocationDetails: { motivo: "Cliente remarcou a viagem." },
+    dedupeKey: "seed-change-request-cancelamento-r6",
+  });
 }
 
 async function main() {
@@ -793,6 +852,9 @@ async function main() {
 
   console.log("Seed: exemplos de portal (despesa de motorista, recebimento direto)…");
   await seedPortalExamples();
+
+  console.log("Seed: exemplos de fluxo de aprovação (solicitações, alertas)…");
+  await seedApprovalWorkflowExamples();
 
   const hasSupabaseCredentials =
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;

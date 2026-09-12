@@ -297,6 +297,65 @@ com aprovação e SLA) fica inteiramente para a Fase 6, junto com o resto do
   o DELETE físico continuar bloqueado. `tests/notifications.test.ts` (5
   testes) cobre o sino ponta a ponta.
 
+## O que existe na Fase 6
+
+Fluxo de aprovação + alertas + auditoria (item 6 do plano) — os quatro
+pontos que ficaram pendentes da Fase 5.
+
+- **`ChangeRequest` completo para os 3 portais**
+  (`src/lib/change-requests/`): formulários de solicitar nova reserva,
+  alteração e cancelamento (portal do parceiro) e solicitar repasse
+  (portal do fornecedor e do motorista). `submit.ts` gera o protocolo
+  (`SOL-{ano}-{sequencial}`) e é idempotente por `dedupe_key` — gerado uma
+  vez por carregamento do formulário (`crypto.randomUUID()` no componente
+  de servidor), não a cada clique, então um duplo clique ou um retry de
+  rede nunca cria protocolo duplicado. `sla.ts` calcula o prazo de
+  resposta (operacional = 30min, financeiro = 2h) puramente a partir de
+  `created_at` + categoria — não existe campo de deadline gravado no
+  banco. `/admin/solicitacoes`: lista tudo com o prazo (e um selo "fora do
+  prazo" quando estourado), e uma revisão genérica (mudar status + nota de
+  resposta) que **não** aciona nenhuma automação sobre reserva/serviço/
+  financeiro — aprovar uma alteração/cancelamento/repasse só registra a
+  decisão; a mudança de fato continua sendo feita pelo admin nas telas já
+  existentes (Fases 3/4), com toda a validação que elas já têm.
+- **Botão "rejeitar reserva inteira"** (`src/lib/reservations/rejection.ts`):
+  finalmente implementado, adiado desde a Fase 3. `status = rejeitado` é
+  uma ação manual fora do algoritmo automático — `computeReservationStatus`
+  nunca produz nem desfaz esse valor sozinho, e `recalculateReservationStatus`
+  agora verifica isso primeiro: uma vez rejeitada, editar os serviços da
+  reserva não a reabre silenciosamente. Cancela (nunca apaga) os
+  lançamentos ainda não pagos de cada serviço.
+- **`AuditLog` append-only via trigger de banco**: já estava pronto desde
+  a Fase 1 (`prisma/migrations/20260912150700_financial_integrity_triggers`,
+  testado em `tests/db/financial-integrity-triggers.test.ts`) — nenhum
+  trabalho novo aqui, só confirmando que a suite continua passando.
+- **`Alert`** (`src/lib/alerts.ts`, `src/lib/alerts/detectors.ts`):
+  idempotente por `dedupe_key` — a mesma condição nunca duplica; se o
+  alerta já foi arquivado manualmente e a condição volta a acontecer,
+  reabre em vez de colidir com a constraint (ver item 22 abaixo).
+  `/admin/alertas` lista os ativos com severidade e um botão de arquivar
+  manual — nenhuma condição se resolve sozinha. Dos 17 tipos catalogados,
+  5 têm detecção automática, todos sem inventar limite/threshold nem
+  depender de um job agendado (que este projeto ainda não tem):
+  `despesa_motorista_pendente` (toda despesa registrada pelo portal),
+  `solicitacao_alteracao`/`solicitacao_cancelamento` (todo `ChangeRequest`
+  desses tipos), `fornecedor_recusou_sem_aceite` (toda recusa de serviço),
+  `conflito_motorista_veiculo` (mesmo motorista/veículo, mesma data e
+  mesmo horário exato em dois serviços) e `parceiro_acima_limite`
+  (saldo em aberto ≥ `Company.billing_limit`, campo que já existe no
+  schema). Os outros 12 ficam catalogados no enum, sem gatilho — ver item
+  23.
+- **Suite de integridade**: `tests/change-requests/sla.test.ts` (8 testes,
+  puro) cobre a classificação por categoria e o cálculo de prazo/atraso.
+  `tests/change-requests/lifecycle.test.ts` (4 testes, Postgres real)
+  cobre protocolo sequencial, idempotência por `dedupe_key`, e a
+  notificação certa ao requerente (empresa ou motorista) em cada decisão.
+  `tests/alerts.test.ts` (3 testes) e `tests/alerts/detectors.test.ts` (4
+  testes) cobrem idempotência/reabertura de alerta e os 2 detectores mais
+  não-triviais (conflito de agenda, limite de faturamento).
+  `tests/reservations/rejection.test.ts` (3 testes) cobre a rejeição de
+  reserva inteira e a blindagem contra reabertura automática.
+
 ## Arquitetura de autorização
 
 O backend fala com o Postgres via Prisma usando a role dona das tabelas —
@@ -591,17 +650,68 @@ devem ser revisadas:
     foram forçados a disparar de algum jeito aproximado só para "usar o
     enum inteiro".
 
+21. **`ChangeRequest.allocation_details` reaproveitado como campo de
+    descrição livre**: o schema não tem um campo de "mensagem"/"motivo"
+    para a solicitação — só `allocation_details` (Json), descrito na spec
+    como "para repasses multi-pendência". Na falta de outro lugar para o
+    requerente explicar o pedido, esse campo virou o destino de qualquer
+    detalhe livre (descrição, motivo, ids de lançamento referenciados),
+    não só repasse — documentado em `src/lib/change-requests/submit.ts`.
+22. **`ChangeRequest`/`ChangeRequestCategory` por tipo**: a spec só diz
+    "operacional = 30min; financeiro = 2h", sem listar qual categoria cada
+    um dos 12 tipos tem. Adotado: tudo que envolve dinheiro (repasse,
+    pagamento de fatura, contestação de valor, antecipação de fatura) é
+    financeiro; o resto (reserva, alteração, cancelamento, cadastro,
+    correção) é operacional — ver `src/lib/change-requests/sla.ts`.
+23. **Aprovar um `ChangeRequest` não aciona nenhuma automação**: aprovar
+    uma alteração/cancelamento/repasse só muda o status do protocolo e
+    notifica o requerente — não edita a reserva, não cancela o serviço,
+    não registra pagamento. Automatizar isso arriscaria aplicar a mudança
+    errada sem revisão humana (qual serviço cancelar? qual lançamento
+    pagar, já que `allocation_details` pode listar vários?). O admin
+    continua fazendo a mudança de fato nas telas já existentes e só então
+    marca o protocolo como concluído.
+24. **`Alert` reabre em vez de colidir com a constraint de `dedupe_key`**:
+    um alerta arquivado manualmente cuja condição volta a acontecer (ex.:
+    o mesmo parceiro passa do limite de novo, meses depois) reabre
+    (`archived: false`) em vez de tentar criar um segundo registro com o
+    mesmo `dedupe_key` (que violaria a constraint UNIQUE). A spec não
+    define esse comportamento explicitamente; é a leitura mais coerente
+    com "idempotente" + "UNIQUE" coexistindo com uma condição que pode se
+    repetir depois de resolvida.
+25. **Só 5 dos 17 tipos de `Alert` têm detecção automática**: os
+    listados na Fase 6 acima. Os outros 12
+    (`overbooking`, `reserva_sem_recursos`, `parceiro_proximo_limite`,
+    `fatura_vencida`, `conta_vencida`, `financeiro_inconsistente`,
+    `servico_atrasado`, `servico_nao_iniciado`, `sem_motorista`,
+    `sem_veiculo`, `bagagem_incompativel`, `passageiros_acima_capacidade`)
+    ficaram de fora por dois motivos, nunca por preguiça de implementar:
+    (a) exigiriam inventar um limite/threshold que a spec não define
+    (ex.: quantos % antes do limite conta como "próximo"; quantos
+    passageiros a mais é "acima da capacidade" já que o schema não liga
+    bagagem/capacidade a uma validação); ou (b) exigem notar que "o tempo
+    passou" (atraso, vencimento) sem nenhum evento de aplicação disparando
+    — isso precisa de um job agendado/outbox, que só chega na Fase 7. Nenhum
+    threshold foi chutado só para preencher o catálogo inteiro.
+26. **Reviewer de exemplo no seed**: `seedApprovalWorkflowExamples` cria um
+    `User` interno fixo (`seed-revisor@nativos-interno.seed`) só para
+    servir de `reviewed_by_id` nos 2 `ChangeRequest` de exemplo — ele não
+    tem um `auth_user_id` real do Supabase (é um UUID qualquer), então não
+    é um login funcional, só um dado de referência para o seed não
+    depender de um projeto Supabase configurado.
+
 ## Próximas fases
 
-Conforme o plano de construção, a Fase 6 (fluxo de aprovação + alertas +
-auditoria — incluindo o modelo `ChangeRequest` para solicitações de
-portal, o botão manual de rejeitar reserva inteira adiado da Fase 3, e o
-painel de `Alert`) só deve começar após confirmação de que a Fase 5 está
-correta. A Fase 5 deixou os 3 portais externos funcionais dentro do
-escopo combinado com o cliente (item 16 da seção anterior): parceiro
-(reservas + extrato), fornecedor (aceite/execução de serviço, cadastro de
-motorista/veículo, confirmação de recebimento direto, extrato) e
-motorista (execução de serviço, despesa, confirmação de recebimento
-direto, extrato), todos com o sino de notificação — mas nenhuma
-solicitação de portal ainda passa por um fluxo de aprovação formal com
-SLA; isso é exatamente o que a Fase 6 constrói.
+Conforme o plano de construção, a Fase 7 (documentos PDF + comunicação —
+outbox de e-mail real com job assíncrono, Supabase Storage para
+comprovantes/contratos, geração de todos os templates de documento na
+identidade da marca) só deve começar após confirmação de que a Fase 6 está
+correta. A Fase 6 deixou pronto o fluxo de aprovação: `ChangeRequest`
+completo para os 3 portais com protocolo e SLA, o botão de rejeitar
+reserva inteira (adiado desde a Fase 3), e o painel de `Alert` com 5
+detectores automáticos determinísticos — mas nenhuma automação por tempo
+(despesa/serviço atrasado, fatura vencida) existe ainda, porque isso
+depende da infraestrutura de job agendado que só a Fase 7 constrói (o
+outbox de e-mail tem exatamente o mesmo requisito). `allocation_details`
+do `ChangeRequest` também não tem um formulário rígido — fica como JSON
+livre até haver um caso de uso que exija mais estrutura.

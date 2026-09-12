@@ -13,6 +13,7 @@ import { acceptService, rejectService } from "@/lib/reservations/acceptance";
 import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
 import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
+import { checkPartnerBillingLimit, detectDriverVehicleConflict } from "@/lib/alerts/detectors";
 
 const decimalField = z
   .string()
@@ -173,9 +174,16 @@ async function afterServiceMutation(reservationId: string, serviceId: string) {
     await generateServiceFinanceEntries(serviceId);
   }
 
+  await detectDriverVehicleConflict(serviceId);
+
   await recalculateReservationStatus(reservationId);
   await recalculateReservationTax(reservationId);
   await recalculateReservationCommissions(reservationId);
+
+  const reservation = await prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+  if (reservation.origin_partner_id) {
+    await checkPartnerBillingLimit(reservation.origin_partner_id);
+  }
 }
 
 export async function createService(

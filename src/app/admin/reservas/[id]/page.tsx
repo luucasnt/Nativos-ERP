@@ -5,6 +5,7 @@ import { updateReservation } from "../actions";
 import { ReservationForm } from "../reservation-form";
 import { buttonClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
 import { RESERVATION_STATUS_LABEL } from "@/lib/reservations/status-labels";
+import { RejectReservationButton } from "@/components/admin/reject-reservation-button";
 
 const acceptanceLabel: Record<string, string> = {
   aguardando_aceite: "Aguardando aceite",
@@ -70,6 +71,11 @@ export default async function ReservaDetailPage({
               </>
             )}
           </p>
+        )}
+        {reservation.status !== "rejeitado" && (
+          <div className="mt-3">
+            <RejectReservationButton reservationId={reservation.id} />
+          </div>
         )}
       </div>
 

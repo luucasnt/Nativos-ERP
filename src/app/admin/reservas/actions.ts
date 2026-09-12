@@ -10,6 +10,7 @@ import { generateNextReservationCode } from "@/lib/reservations/code";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
 import { generateServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
+import { rejectReservationEntirely as rejectReservationEntirelyLib } from "@/lib/reservations/rejection";
 
 // Campos da reserva (collection_mode, is_cortesia, origin_partner) entram
 // na fórmula de liquidação de cada serviço — mudar algum deles exige
@@ -166,4 +167,21 @@ export async function updateReservation(
   revalidatePath("/admin/reservas");
   revalidatePath(`/admin/reservas/${id}`);
   redirect(`/admin/reservas/${id}`);
+}
+
+export async function rejectReservationEntirely(reservationId: string, reason: string) {
+  const user = await requireInternalUser();
+
+  await rejectReservationEntirelyLib(reservationId, reason);
+
+  await logAudit({
+    actorId: user.id,
+    action: "reserva_rejeitada",
+    entityType: "reservation",
+    entityId: reservationId,
+    metadata: { reason },
+  });
+
+  revalidatePath("/admin/reservas");
+  revalidatePath(`/admin/reservas/${reservationId}`);
 }

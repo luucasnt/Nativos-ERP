@@ -8,10 +8,12 @@ import { DirectCollectionActions } from "@/components/portal/direct-collection-a
 import { ExpenseForm } from "@/components/portal/expense-form";
 import { FinanceExtractTable } from "@/components/portal/finance-extract-table";
 import { NotificationBell } from "@/components/portal/notification-bell";
+import { RepasseRequestForm } from "@/components/portal/repasse-request-form";
+import { ChangeRequestsTable } from "@/components/portal/change-requests-table";
 import { getUnreadNotifications } from "@/lib/notifications";
 import { getPartyFinanceExtract } from "@/lib/finance/party-extract";
 import { SERVICE_EXPENSE_STATUS_LABEL } from "@/lib/finance/labels";
-import { confirmNotReceivedPortal, confirmReceivedPortal } from "./actions";
+import { confirmNotReceivedPortal, confirmReceivedPortal, submitRepasseRequestMotorista } from "./actions";
 
 export default async function PortalMotoristaHomePage() {
   const user = await getCurrentUser();
@@ -30,6 +32,8 @@ export default async function PortalMotoristaHomePage() {
     expenseCategories,
     expenses,
     extract,
+    changeRequests,
+    repasseEligibleEntries,
   ] = await Promise.all([
     getUnreadNotifications(user.id),
     prisma.service.findMany({
@@ -59,6 +63,15 @@ export default async function PortalMotoristaHomePage() {
       take: 20,
     }),
     getPartyFinanceExtract("motorista", driver.id),
+    prisma.changeRequest.findMany({
+      where: { requester_type: "driver", requester_id: driver.id },
+      orderBy: { created_at: "desc" },
+      take: 30,
+    }),
+    prisma.financeEntry.findMany({
+      where: { party_type: "motorista", party_id: driver.id, status: "pendente", payment_eligible: true },
+      orderBy: { created_at: "desc" },
+    }),
   ]);
 
   const completedServicesForExpense = await prisma.service.findMany({
@@ -67,6 +80,8 @@ export default async function PortalMotoristaHomePage() {
     orderBy: { scheduled_date: "desc" },
     take: 30,
   });
+
+  const dedupeKeyRepasse = crypto.randomUUID();
 
   return (
     <AppShell
@@ -183,6 +198,19 @@ export default async function PortalMotoristaHomePage() {
         }))}
         categories={expenseCategories}
       />
+
+      <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Solicitar repasse</h2>
+      <RepasseRequestForm
+        dedupeKey={dedupeKeyRepasse}
+        entries={repasseEligibleEntries.map((e) => ({
+          id: e.id,
+          label: `${e.category} — R$ ${Number(e.amount).toFixed(2)}`,
+        }))}
+        action={submitRepasseRequestMotorista}
+      />
+
+      <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Minhas solicitações</h2>
+      <ChangeRequestsTable requests={changeRequests} />
 
       <h2 className="mt-8 mb-3 font-serif text-xl text-forest">Extrato financeiro</h2>
       <FinanceExtractTable entries={extract} />

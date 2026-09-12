@@ -9,6 +9,8 @@ import {
   confirmDirectCollectionNotReceived,
   confirmDirectCollectionReceived,
 } from "@/lib/finance/direct-collection";
+import { submitChangeRequest } from "@/lib/change-requests/submit";
+import { alertPendingExpense } from "@/lib/alerts/detectors";
 
 const expenseSchema = z.object({
   service_id: z.string().uuid("Selecione o serviço."),
@@ -49,7 +51,7 @@ export async function submitServiceExpense(
     return { error: "Você não tem permissão para registrar despesa neste serviço." };
   }
 
-  await prisma.serviceExpense.create({
+  const expense = await prisma.serviceExpense.create({
     data: {
       service_id: parsed.data.service_id,
       driver_id: user.linked_driver_id,
@@ -59,11 +61,63 @@ export async function submitServiceExpense(
     },
   });
 
+  await alertPendingExpense({
+    expenseId: expense.id,
+    serviceId: service.id,
+    driverName: user.linked_driver?.name ?? "Motorista",
+    serviceType: service.type,
+  });
+
   await logAudit({
     actorId: user.id,
     action: "despesa_registrada_pelo_motorista",
     entityType: "service",
     entityId: parsed.data.service_id,
+  });
+
+  revalidatePath("/portal/motorista");
+  return { error: null };
+}
+
+const repasseSchema = z.object({
+  dedupe_key: z.string().min(1),
+  entry_ids: z.array(z.string().uuid()).optional(),
+  nota: z.string().optional(),
+});
+
+export type ChangeRequestFormState = { error: string | null };
+
+export async function submitRepasseRequestMotorista(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await getCurrentUser();
+  if (!user || !user.linked_driver_id) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const parsed = repasseSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"),
+    entry_ids: formData.getAll("entry_ids"),
+    nota: formData.get("nota") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const changeRequest = await submitChangeRequest({
+    type: "repasse_nativos",
+    requesterType: "driver",
+    requesterId: user.linked_driver_id,
+    allocationDetails: { entry_ids: parsed.data.entry_ids ?? [], nota: parsed.data.nota ?? null },
+    dedupeKey: parsed.data.dedupe_key,
+  });
+
+  await logAudit({
+    actorId: user.id,
+    action: "solicitacao_repasse_criada",
+    entityType: "change_request",
+    entityId: changeRequest.id,
   });
 
   revalidatePath("/portal/motorista");
