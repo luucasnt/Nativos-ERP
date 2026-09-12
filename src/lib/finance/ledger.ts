@@ -16,6 +16,7 @@ import type {
   DirectCollectionReceiverType,
   FinanceEntryCategory,
   FinanceEntryOriginType,
+  FinanceEntryStatus,
   FinancePartyType,
   FinancialResponsibleType,
   PaymentMethod,
@@ -36,6 +37,12 @@ type CreateFinanceEntryInput = {
   description?: string | null;
   due_date?: Date | null;
   auto_key: string;
+  // Regra geral: todo lançamento nasce "programado" (rascunho, editável até
+  // um marco operacional o tornar elegível). A única exceção é um registro
+  // de rastreio que já nasce fechado por não haver nada a cobrar/pagar de
+  // fato (ex.: FinanceEntryCategory.cortesia) — nesse caso, e só nesse
+  // caso, quem chama pode pedir o status final diretamente.
+  status?: Extract<FinanceEntryStatus, "programado" | "pago">;
 };
 
 // Idempotente: chamar de novo com o mesmo auto_key devolve o lançamento já
@@ -50,7 +57,7 @@ export async function createFinanceEntry(input: CreateFinanceEntryInput) {
     data: {
       type: input.type,
       category: input.category,
-      status: "programado",
+      status: input.status ?? "programado",
       payment_eligible: false,
       amount: input.amount,
       party_type: input.party_type,

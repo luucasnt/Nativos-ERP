@@ -285,3 +285,175 @@ describe("regras não-negociáveis (spec seção 6) via motor, não só via SQL 
     }
   });
 });
+
+async function createOwnDriver(
+  paymentType: "diaria" | "salario_mensal" | "mesclado",
+  overrides: { daily_rate?: number; salario_mensal?: number; commission?: number } = {},
+) {
+  return prisma.driver.create({
+    data: {
+      name: `Motorista Lifecycle ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      owner_type: "proprio",
+      payment_type: paymentType,
+      daily_rate: overrides.daily_rate,
+      salario_mensal: overrides.salario_mensal,
+      commission: overrides.commission,
+    },
+  });
+}
+
+async function completeAt(serviceId: string, date: Date) {
+  await prisma.service.update({
+    where: { id: serviceId },
+    data: { execution_status: "concluido", completed_at: date },
+  });
+}
+
+// Decisão do cliente na revisão da Fase 4: diária/salário mensal deixam de
+// ser manuais — um lançamento por motorista por período (dia/mês),
+// disparado na conclusão do primeiro serviço daquele período.
+describe("motorista próprio: diária/salário mensal/mesclado (correção pós-revisão da Fase 4)", () => {
+  it("diária: um lançamento por motorista por dia — o segundo serviço do mesmo dia não duplica", async () => {
+    const driver = await createOwnDriver("diaria", { daily_rate: 200 });
+    const day = new Date("2026-05-10T12:00:00Z");
+    const a = await seedReservationWithService({ driver_id: driver.id });
+    const b = await seedReservationWithService({ driver_id: driver.id });
+
+    try {
+      await generateServiceFinanceEntries(a.service.id);
+      await generateServiceFinanceEntries(b.service.id);
+
+      await completeAt(a.service.id, day);
+      await markServiceFinanceEntriesEligible(a.service.id);
+
+      await completeAt(b.service.id, day);
+      await markServiceFinanceEntriesEligible(b.service.id);
+
+      const dailyEntries = await prisma.financeEntry.findMany({
+        where: { party_id: driver.id, auto_key: { startsWith: `driver_daily:${driver.id}:` } },
+      });
+      expect(dailyEntries).toHaveLength(1);
+      expect(dailyEntries[0].amount.toString()).toBe("200");
+      expect(dailyEntries[0].category).toBe("repasse_motorista");
+      expect(dailyEntries[0].type).toBe("despesa");
+      expect(dailyEntries[0].payment_eligible).toBe(true);
+      expect(dailyEntries[0].status).toBe("pendente");
+    } finally {
+      await cleanup({ clientId: a.client.id, reservationId: a.reservation.id, serviceId: a.service.id });
+      await cleanup({ clientId: b.client.id, reservationId: b.reservation.id, serviceId: b.service.id });
+      await prisma.driver.delete({ where: { id: driver.id } }).catch(() => {});
+    }
+  });
+
+  it("salário mensal: um lançamento por motorista por mês", async () => {
+    const driver = await createOwnDriver("salario_mensal", { salario_mensal: 3000 });
+    const day = new Date("2026-06-05T12:00:00Z");
+    const { client, reservation, service } = await seedReservationWithService({ driver_id: driver.id });
+
+    try {
+      await generateServiceFinanceEntries(service.id);
+      await completeAt(service.id, day);
+      await markServiceFinanceEntriesEligible(service.id);
+
+      const monthlyEntries = await prisma.financeEntry.findMany({
+        where: { party_id: driver.id, auto_key: { startsWith: `driver_monthly:${driver.id}:` } },
+      });
+      expect(monthlyEntries).toHaveLength(1);
+      expect(monthlyEntries[0].amount.toString()).toBe("3000");
+      expect(monthlyEntries[0].auto_key).toBe(`driver_monthly:${driver.id}:2026-06`);
+    } finally {
+      await cleanup({ clientId: client.id, reservationId: reservation.id, serviceId: service.id });
+      await prisma.driver.delete({ where: { id: driver.id } }).catch(() => {});
+    }
+  });
+
+  it("mesclado: soma o repasse por comissão POR SERVIÇO ao repasse por dia, como dois lançamentos distintos", async () => {
+    const driver = await createOwnDriver("mesclado", { daily_rate: 150, commission: 20 });
+    const day = new Date("2026-07-01T12:00:00Z");
+    const { client, reservation, service } = await seedReservationWithService({ driver_id: driver.id });
+
+    try {
+      await generateServiceFinanceEntries(service.id);
+      await completeAt(service.id, day);
+      await markServiceFinanceEntriesEligible(service.id);
+
+      const perServiceCommission = await prisma.financeEntry.findUnique({
+        where: { auto_key: `svc:${service.id}:repasse_motorista` },
+      });
+      expect(perServiceCommission).not.toBeNull();
+      expect(perServiceCommission!.amount.toString()).toBe("200"); // 1000 * 20%
+
+      const dailyLump = await prisma.financeEntry.findUnique({
+        where: { auto_key: `driver_daily:${driver.id}:2026-07-01` },
+      });
+      expect(dailyLump).not.toBeNull();
+      expect(dailyLump!.amount.toString()).toBe("150");
+    } finally {
+      await cleanup({ clientId: client.id, reservationId: reservation.id, serviceId: service.id });
+      await prisma.driver.delete({ where: { id: driver.id } }).catch(() => {});
+    }
+  });
+});
+
+// Decisão do cliente na revisão da Fase 4: cortesia + cobrança direta +
+// fornecedor retendo custo deixa de gerar zero lançamentos — passa a gerar
+// um registro de rastreio (amount=0, category=cortesia) já fechado.
+describe("cortesia + cobrança direta + fornecedor retém custo: registro de rastreio (correção pós-revisão da Fase 4)", () => {
+  it("gera um FinanceEntry amount=0, category=cortesia, já pago, sem nunca precisar de Payment", async () => {
+    const supplier = await prisma.company.create({
+      data: {
+        name: `Fornecedor Cortesia Lifecycle ${Date.now()}`,
+        roles: ["fornecedor"],
+        recebe_pagamento_direto: true,
+        direct_collection_settlement_mode: "retain_supplier_cost",
+      },
+    });
+    const client = await prisma.client.create({
+      data: { name: `Cliente Cortesia Lifecycle ${Date.now()}`, origin: "proprio" },
+    });
+    const reservation = await prisma.reservation.create({
+      data: {
+        code: `LIFE-CORTESIA-${Date.now()}`,
+        client_id: client.id,
+        collection_mode: "direto",
+        is_cortesia: true,
+      },
+    });
+    const service = await prisma.service.create({
+      data: {
+        reservation_id: reservation.id,
+        type: "transfer_chegada",
+        execution_type: "fornecedor",
+        supplier_id: supplier.id,
+        supplier_cost: 700,
+        original_price: 1000,
+        price: 1000,
+        acceptance_status: "aceito",
+      },
+    });
+
+    try {
+      await generateServiceFinanceEntries(service.id);
+
+      const entries = await prisma.financeEntry.findMany({ where: { service_id: service.id } });
+      expect(entries).toHaveLength(1);
+      expect(entries[0].category).toBe("cortesia");
+      expect(entries[0].amount.toString()).toBe("0");
+      expect(entries[0].status).toBe("pago");
+      expect(entries[0].payment_eligible).toBe(false);
+
+      // Regenerar (ex.: reservation editada de novo) não duplica nem
+      // reabre o registro já fechado.
+      await generateServiceFinanceEntries(service.id);
+      const afterRegenerate = await prisma.financeEntry.findMany({ where: { service_id: service.id } });
+      expect(afterRegenerate).toHaveLength(1);
+      expect(afterRegenerate[0].id).toBe(entries[0].id);
+
+      const payments = await prisma.payment.findMany({ where: { finance_entry_id: entries[0].id } });
+      expect(payments).toHaveLength(0);
+    } finally {
+      await cleanup({ clientId: client.id, reservationId: reservation.id, serviceId: service.id });
+      await prisma.company.delete({ where: { id: supplier.id } }).catch(() => {});
+    }
+  });
+});

@@ -57,7 +57,7 @@ describe("execução própria", () => {
     });
   });
 
-  it("motorista com payment_type diaria => nenhum repasse automático (INFERIDO, ver README)", () => {
+  it("motorista com payment_type diaria => nenhum repasse POR SERVIÇO (o repasse por dia é gerado à parte, ver tests/finance/lifecycle.test.ts)", () => {
     const entries = computeServiceSettlementEntries(
       baseInput({
         driver_id: DRIVER_ID,
@@ -181,7 +181,7 @@ describe("execução por fornecedor", () => {
     expect(amountsByCategory(entries)).toEqual({ "despesa:pagamento_fornecedor": "700" });
   });
 
-  it("cortesia + cobrança direta + retém custo => nenhum lançamento (fornecedor absorve, sem cobrança nem repasse)", () => {
+  it("cortesia + cobrança direta + retém custo => registro de rastreio amount=0, category=cortesia, já fechado (nunca gera Payment)", () => {
     const entries = computeServiceSettlementEntries(
       baseInput({
         execution_type: "fornecedor",
@@ -192,7 +192,10 @@ describe("execução por fornecedor", () => {
         supplier_settlement_mode: "retain_supplier_cost",
       }),
     );
-    expect(entries).toEqual([]);
+    expect(amountsByCategory(entries)).toEqual({ "receita:cortesia": "0" });
+    expect(entries[0].finalized).toBe(true);
+    expect(entries[0].party_type).toBe("fornecedor");
+    expect(entries[0].party_id).toBe(SUPPLIER_ID);
   });
 
   it("cortesia + cobrança direta + repassa bruto => Nativos ainda paga o custo ao fornecedor", () => {

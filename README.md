@@ -223,14 +223,17 @@ do serviço), pelos mesmos caminhos usados pelo admin e pelos portais.
   motor, o que a spec proíbe fora de uma reversão formal.
 - **Suite de integridade obrigatória**: `tests/finance/settlement.test.ts`
   (17 testes, puro) cobre a combinatória das 3 variáveis comerciais.
-  `tests/finance/lifecycle.test.ts` (9 testes, contra Postgres real) prova,
+  `tests/finance/lifecycle.test.ts` (13 testes, contra Postgres real) prova,
   através do motor — não só via SQL cru — que: nenhum lançamento existe
   antes do aceite; `payment_eligible` só vira `true` depois do marco de
   conclusão; cancelar um serviço cancela (nunca apaga) seus lançamentos;
   recusa não gera lançamento; regenerar é idempotente e nunca sobrescreve
   um valor já elegível/pago; o DELETE físico continua bloqueado mesmo para
   um lançamento criado pelo motor; `reverseFinanceEntry` e `createPayment`
-  são idempotentes e nunca apagam nada.
+  são idempotentes e nunca apagam nada; o repasse por diária/salário
+  mensal é deduplicado por motorista/período mesmo com vários serviços
+  concluídos no mesmo dia/mês; e o registro de rastreio de cortesia nasce
+  fechado e nunca duplica numa regeneração posterior.
 
 ## Arquitetura de autorização
 
@@ -414,17 +417,23 @@ devem ser revisadas:
    a guarda não agregava proteção real e custava testabilidade. Os módulos
    realmente sensíveis (`admin.ts` com a service role key,
    `provision-user.ts`, `get-current-user.ts`) continuam guardados.
-10. **Escopo do repasse automático ao motorista próprio** (Fase 4): a spec
-    diz que motoristas podem ser pagos por `comissao`, `diaria`,
-    `salario_mensal` ou `mesclado`, mas só descreve a fórmula para
-    `comissao` (percentual sobre o serviço). Só `comissao`/`mesclado` geram
-    um `repasse_motorista` automático por serviço concluído
-    (`src/lib/finance/settlement.ts::computeOwnDriverCommissionPay`).
-    `diaria`/`salario_mensal` não geram nenhum lançamento automático —
-    inventar um rateio por dia/mês sem um algoritmo explícito da spec
-    arriscaria contar o mesmo pagamento duas vezes entre serviços do mesmo
-    dia. Fica como trabalho manual (ou de uma fase futura, se o cliente
-    quiser especificar o rateio) até então.
+10. **Repasse automático ao motorista próprio — `diaria`/`salario_mensal`**
+    (Fase 4): a primeira versão não gerava nenhum lançamento automático
+    para esses dois tipos, por não haver na spec uma fórmula de rateio
+    entre múltiplos serviços do mesmo dia/mês. **Resolvido e definido pelo
+    cliente** na revisão da Fase 4: `diaria` gera um `FinanceEntry`
+    (`repasse_motorista`, despesa) por motorista por DIA (dedupe por
+    `driver_id` + data, `auto_key = driver_daily:<driverId>:<AAAA-MM-DD>`),
+    valor = `Driver.daily_rate`, disparado na conclusão do primeiro serviço
+    daquele motorista naquele dia — outros serviços do mesmo motorista
+    concluídos no mesmo dia não duplicam. `salario_mensal` segue a mesma
+    lógica por MÊS (`auto_key = driver_monthly:<driverId>:<AAAA-MM>`,
+    valor = `Driver.salario_mensal`). `mesclado` = as duas coisas em
+    paralelo: mantém o repasse por comissão já existente POR SERVIÇO
+    (`computeOwnDriverCommissionPay`) e soma o repasse por dia da regra da
+    diária, como dois lançamentos distintos
+    (`src/lib/finance/settlement.ts::generateOwnDriverPeriodEntries`,
+    testado em `tests/finance/lifecycle.test.ts`).
 11. **Cobrança direta pelo motorista próprio, sem modo de acerto dedicado**:
     a spec descreve `direct_collection_settlement_mode`
     (`retain_supplier_cost`/`gross_repass`) só para fornecedores. Para
@@ -439,14 +448,17 @@ devem ser revisadas:
     `comissao_parceiro`. Tratado como bloqueio para as duas, já que "tarifa
     líquida" descreve o valor que a Nativos recebe sem margem para
     comissionar ninguém sobre ele.
-13. **Cortesia + cobrança direta + fornecedor retendo custo = zero
-    lançamentos** (`tests/finance/settlement.test.ts`, cenário "cortesia +
-    cobrança direta + retém custo"): nada foi cobrado do passageiro e o
-    fornecedor absorve o próprio custo (mesma lógica de uma cortesia
-    comum), então nenhum lançamento nasce para esse serviço — nem receita
-    nem despesa. Vale a pena o cliente confirmar que este é o
-    comportamento esperado, já que é o único cenário testado em que um
-    serviço de fornecedor não gera absolutamente nenhum registro.
+13. **Cortesia + cobrança direta + fornecedor retendo custo**: a primeira
+    versão não gerava nenhum lançamento neste cenário (nada foi cobrado do
+    passageiro, o fornecedor absorve o próprio custo). **Corrigido a pedido
+    do cliente** na revisão da Fase 4: agora gera um `FinanceEntry` de
+    rastreio/relatório — categoria nova `FinanceEntryCategory.cortesia`,
+    `amount = 0`, já nasce com `status = pago` (nunca vira `Payment`, não
+    há nada a cobrar) — vinculado ao serviço via `origin_type`/`origin_id`
+    e nunca reescrito por uma regeneração posterior (mesma regra de "uma
+    vez fechado, só reversão formal muda"). Ver
+    `src/lib/finance/settlement.ts::computeServiceSettlementEntries` e
+    `tests/finance/lifecycle.test.ts`.
 14. **Fora do escopo da Fase 4** (deixado explicitamente para depois, sem
     inventar automação sem uma regra clara na spec): `FinanceEntry`
     automático para `hora_extra`/`km_extra`/`imposto`; uma ferramenta geral

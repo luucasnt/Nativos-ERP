@@ -44,15 +44,18 @@ export type EntrySpec = {
   amount: Prisma.Decimal;
   party_type: FinancePartyType;
   party_id: string | null;
+  // Só usado pelo registro de rastreio de cortesia (ver mais abaixo): nasce
+  // direto como "pago" (nada a cobrar) em vez do fluxo normal
+  // programado -> elegível, e nunca é reescrito por uma regeneração
+  // posterior — mesma regra de "uma vez fechado, só reversão formal muda".
+  finalized?: boolean;
 };
 
-// INFERIDO (Fase 4): só há uma fórmula clara e determinística para
-// remuneração do motorista próprio por serviço quando payment_type é
-// "comissao" ou "mesclado" (percentual sobre o price). Para "diaria" e
-// "salario_mensal" não há, na especificação, uma regra de como isso se
-// divide entre múltiplos serviços do mesmo dia/mês — em vez de inventar
-// um rateio, este motor não gera lançamento automático nesses dois casos
-// (ver README, seção de pendências).
+// Fórmula por SERVIÇO (percentual sobre o price) — só se aplica a
+// "comissao"/"mesclado". "diaria"/"salario_mensal" não têm fórmula por
+// serviço: são um lançamento por PERÍODO (dia/mês), gerado separadamente
+// por generateOwnDriverPeriodEntries quando o serviço conclui (ver mais
+// abaixo) — decisão do cliente na revisão da Fase 4.
 function computeOwnDriverCommissionPay(
   price: Prisma.Decimal,
   paymentType: DriverPaymentType | null,
@@ -151,6 +154,30 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
     }
   }
 
+  // Decisão do cliente (correção pós-revisão da Fase 4): cortesia +
+  // cobrança direta + fornecedor retendo o próprio custo não gera nenhum
+  // lançamento de receita/despesa (ninguém cobra nem repassa nada de
+  // fato) — mas o serviço deve ficar visível no razão mesmo assim, só
+  // para rastreio/relatório. amount=0, já fechado (nunca vira Payment).
+  if (
+    entries.length === 0 &&
+    input.is_cortesia &&
+    input.execution_type === "fornecedor" &&
+    collectionActor === "fornecedor" &&
+    !isGross &&
+    input.supplier_id
+  ) {
+    entries.push({
+      key: "cortesia",
+      type: "receita",
+      category: "cortesia",
+      amount: new Prisma.Decimal(0),
+      party_type: "fornecedor",
+      party_id: input.supplier_id,
+      finalized: true,
+    });
+  }
+
   return entries;
 }
 
@@ -203,7 +230,14 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
       origin_type: "service_settlement",
       origin_id: serviceId,
       auto_key: autoKey,
+      status: spec.finalized ? "pago" : "programado",
     });
+  }
+
+  // Um registro de rastreio "finalized" (ex.: cortesia, amount=0) já nasce
+  // fechado e nunca é reescrito por uma regeneração posterior.
+  if (spec.finalized) {
+    return existing;
   }
 
   // Só um lançamento ainda em rascunho (programado, nunca revertido) pode
@@ -256,6 +290,85 @@ export async function markServiceFinanceEntriesEligible(serviceId: string) {
   }
 
   await compensateGrossRepassPairIfPresent(serviceId);
+  await generateOwnDriverPeriodEntries(serviceId);
+}
+
+function dailyDriverKey(driverId: string, referenceDate: Date) {
+  return `driver_daily:${driverId}:${referenceDate.toISOString().slice(0, 10)}`;
+}
+
+function monthlyDriverKey(driverId: string, referenceDate: Date) {
+  return `driver_monthly:${driverId}:${referenceDate.toISOString().slice(0, 7)}`;
+}
+
+// Cria (se ainda não existir) um lançamento já elegível para o auto_key
+// dado. O dedupe é o próprio auto_key: se já existe, não faz nada — nem
+// recria, nem reabre um que já foi pago. Só a criação inicial passa por
+// markFinanceEntryEligible; nunca um lançamento pré-existente, que pode já
+// estar em qualquer estado (inclusive pago).
+async function createEligibleDriverPeriodEntry(params: {
+  serviceId: string;
+  driverId: string;
+  amount: Prisma.Decimal.Value;
+  autoKey: string;
+}) {
+  const existing = await prisma.financeEntry.findUnique({ where: { auto_key: params.autoKey } });
+  if (existing) {
+    return existing;
+  }
+
+  const entry = await createFinanceEntry({
+    type: "despesa",
+    category: "repasse_motorista",
+    amount: params.amount,
+    party_type: "motorista",
+    party_id: params.driverId,
+    origin_type: "service_settlement",
+    origin_id: params.serviceId,
+    auto_key: params.autoKey,
+  });
+
+  return markFinanceEntryEligible(entry.id);
+}
+
+// Decisão do cliente (correção pós-revisão da Fase 4): diaria/salario_mensal
+// deixam de ser manuais. Um lançamento por motorista por dia (diaria) ou
+// por motorista por mês (salario_mensal), disparado na conclusão do
+// PRIMEIRO serviço daquele motorista naquele período — o dedupe por
+// auto_key garante que a conclusão de outros serviços do mesmo motorista
+// no mesmo período não duplica. "mesclado" soma o lançamento por dia
+// (mesma regra da diária) ao repasse por comissão que já é gerado por
+// serviço em computeServiceSettlementEntries.
+async function generateOwnDriverPeriodEntries(serviceId: string) {
+  const service = await prisma.service.findUniqueOrThrow({
+    where: { id: serviceId },
+    include: { driver: true },
+  });
+
+  const driver = service.driver;
+  if (!driver || driver.owner_type !== "proprio") {
+    return;
+  }
+
+  const referenceDate = service.completed_at ?? new Date();
+
+  if ((driver.payment_type === "diaria" || driver.payment_type === "mesclado") && driver.daily_rate) {
+    await createEligibleDriverPeriodEntry({
+      serviceId,
+      driverId: driver.id,
+      amount: driver.daily_rate,
+      autoKey: dailyDriverKey(driver.id, referenceDate),
+    });
+  }
+
+  if (driver.payment_type === "salario_mensal" && driver.salario_mensal) {
+    await createEligibleDriverPeriodEntry({
+      serviceId,
+      driverId: driver.id,
+      amount: driver.salario_mensal,
+      autoKey: monthlyDriverKey(driver.id, referenceDate),
+    });
+  }
 }
 
 // Único par de compensação automática implementado nesta fase: quando o

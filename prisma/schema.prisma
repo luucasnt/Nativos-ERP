@@ -229,6 +229,12 @@ enum FinanceEntryCategory {
   estorno
   transferencia_interna
   imposto
+  // INFERIDO (Fase 4, a pedido do cliente): registro de rastreio/relatório
+  // para um serviço de fornecedor em cortesia + cobrança direta + retenção
+  // de custo — cenário em que ninguém cobra nem repassa nada de fato
+  // (nem receita nem despesa), mas o cliente quer o serviço visível no
+  // razão mesmo assim. Ver settlement.ts::computeServiceSettlementEntries.
+  cortesia
   outro
 }
 
