@@ -404,10 +404,13 @@ escopo.
   `idempotency_key`, exige um `EmailTemplate` ativo); `processOutboxOnce`
   é quem manda de verdade pelo Resend, com retry por `attempts` (limite 5)
   — nunca chamado inline no mesmo request que enfileira. Disparado por
-  `POST/GET /api/outbox/process` (protegido por `CRON_SECRET`), agendado a
-  cada 5min via `vercel.json` (Vercel Cron) em produção, e por um botão
-  manual em `/admin/configuracoes/outbox` (que também lista o log
-  completo: status, tentativas, último erro). Sem `RESEND_API_KEY`
+  `POST/GET /api/outbox/process` (protegido por `CRON_SECRET`), agendado
+  via `vercel.json` (Vercel Cron) em produção — hoje 1x/dia (`0 3 * * *`),
+  por causa do limite do plano Hobby (só 1 execução/dia por cron); revisar
+  para `*/5 * * * *` quando houver upgrade para o plano Pro — e por um
+  botão manual em `/admin/configuracoes/outbox` (que também lista o log
+  completo: status, tentativas, último erro), que é o caminho principal
+  de disparo enquanto o cron só roda 1x/dia. Sem `RESEND_API_KEY`
   configurada nesta sessão de desenvolvimento (mesma situação do Supabase
   em fases anteriores), todo envio real falha com um erro claro — a fila e
   o retry funcionam de verdade, só o envio de fato depende de uma conta
@@ -830,8 +833,9 @@ deve começar após confirmação de que a Fase 7 está correta. A Fase 7
 deixou pronta a geração de 5 documentos (voucher, ordem de serviço,
 recibo, contrato, orçamento) mais a plaquinha de recepção, todos na
 identidade da marca, e um outbox de e-mail real via Resend (fila com
-retry, processado por cron a cada 5 minutos ou por botão manual — nunca
-disparo direto). Duas coisas ficaram deliberadamente de fora do escopo,
+retry, processado por cron — 1x/dia por enquanto, limite do plano Hobby
+da Vercel — ou por botão manual; nunca disparo direto). Duas coisas
+ficaram deliberadamente de fora do escopo,
 por decisão do cliente: fatura parcial e fatura mensal fechada, que
 dependem de um `BillingCycle` que ainda não existe em nenhuma fase (é
 decisão de modelo de negócio que merece fase própria — o cliente pediu
