@@ -127,6 +127,36 @@ async function seedSettings() {
       value: { percentual: 6 },
     },
   });
+
+  // Requisito adicional pós-Fase 1 (itens 2, 3 e 4): padrão global de
+  // exibição de valor em documentos — cada reserva/serviço pode substituir
+  // este padrão individualmente (voucher_show_price / os_show_price).
+  await prisma.setting.upsert({
+    where: { key: "documentos_exibicao_valor" },
+    update: {},
+    create: {
+      key: "documentos_exibicao_valor",
+      category: "documentos",
+      value: { voucher_default: false, os_default: false },
+    },
+  });
+}
+
+async function seedCommissionDefaults() {
+  const defaults = [
+    { target: "company" as const, category_key: "hotel", commission_percent: 10 },
+    { target: "company" as const, category_key: "agencia", commission_percent: 12 },
+    { target: "company" as const, category_key: "imobiliaria", commission_percent: 8 },
+    { target: "driver" as const, category_key: "terceirizado", commission_percent: 20 },
+  ];
+
+  for (const d of defaults) {
+    await prisma.commissionDefault.upsert({
+      where: { target_category_key: { target: d.target, category_key: d.category_key } },
+      update: {},
+      create: d,
+    });
+  }
 }
 
 async function seedEmailTemplates() {
@@ -715,6 +745,9 @@ async function main() {
 
   console.log("Seed: configurações…");
   await seedSettings();
+
+  console.log("Seed: regras de comissão padrão…");
+  await seedCommissionDefaults();
 
   console.log("Seed: templates de e-mail…");
   await seedEmailTemplates();

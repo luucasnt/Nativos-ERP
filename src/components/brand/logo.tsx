@@ -1,37 +1,69 @@
-// Nenhum arquivo de logo foi de fato anexado a esta sessão (o prompt
-// original menciona "vou te passar o arquivo da logo", mas nenhum arquivo
-// chegou). Este é um placeholder tipográfico fiel à descrição — monograma
-// "n" itálico, Cormorant Garamond — até o arquivo real da marca ser
-// fornecido e usado no lugar deste componente.
+// Reprodução do wordmark "nativos" enviado pelo usuário (fundo verde-floresta
+// #233b35, texto creme #f8f5ee, itálico serifado, com o ponto do "i"
+// estilizado como um círculo maior, centralizado acima da palavra).
+//
+// Nenhum arquivo da logo foi de fato recebido nesta sessão — a imagem
+// chegou apenas como conteúdo visual da conversa, sem um arquivo salvo em
+// disco para copiar bit a bit. Este componente é uma reprodução fiel via
+// texto real (Cormorant Garamond, já carregada no projeto) + um círculo
+// decorativo posicionado em unidades `em` (por isso escala corretamente em
+// qualquer tamanho). Se a fidelidade pixel-a-pixel ao arquivo original
+// importar, troque por um `<Image>` apontando para o arquivo real assim
+// que ele for anexado como arquivo (não apenas colado na conversa).
 
-type LogoProps = {
-  size?: number;
-  tone?: "gold-on-forest" | "forest-on-cream";
+type WordmarkProps = {
+  size?: number; // font-size em px
+  tone?: "cream-on-forest" | "forest-on-cream";
   className?: string;
 };
 
-export function Logo({
-  size = 40,
-  tone = "gold-on-forest",
+export function Wordmark({
+  size = 32,
+  tone = "cream-on-forest",
   className = "",
-}: LogoProps) {
-  const isGoldOnForest = tone === "gold-on-forest";
+}: WordmarkProps) {
+  const isCreamOnForest = tone === "cream-on-forest";
 
   return (
     <span
-      aria-label="Nativos"
+      aria-label="nativos"
       role="img"
-      className={`inline-flex items-center justify-center rounded-full font-serif italic select-none ${
-        isGoldOnForest ? "bg-forest text-gold" : "bg-transparent text-forest"
+      className={`relative inline-flex items-baseline font-serif italic select-none ${
+        isCreamOnForest ? "text-cream" : "text-forest"
       } ${className}`}
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.62,
-        lineHeight: 1,
-      }}
+      style={{ fontSize: size, lineHeight: 1 }}
     >
-      n
+      nativos
+      <span
+        aria-hidden="true"
+        className={`absolute rounded-full ${
+          isCreamOnForest ? "bg-cream" : "bg-forest"
+        }`}
+        style={{
+          width: "0.15em",
+          height: "0.15em",
+          left: "0.47em",
+          top: "-0.46em",
+        }}
+      />
+    </span>
+  );
+}
+
+type LogoTileProps = {
+  size?: number; // px, sempre quadrado
+  className?: string;
+};
+
+// Versão em selo quadrado (fundo verde-floresta) — para contextos de ícone
+// compacto, como no cabeçalho do painel/portais.
+export function LogoTile({ size = 40, className = "" }: LogoTileProps) {
+  return (
+    <span
+      className={`inline-flex items-center justify-center bg-forest ${className}`}
+      style={{ width: size, height: size }}
+    >
+      <Wordmark size={size * 0.32} tone="cream-on-forest" />
     </span>
   );
 }

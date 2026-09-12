@@ -607,6 +607,32 @@ model CatalogItem {
   @@map("catalog_items")
 }
 
+// INFERIDO (requisito adicional pós-Fase 1, item 4 — "regras de comissão
+// padrão por tipo de cadastro"): regra de comissão padrão usada só para
+// pré-preencher o campo de comissão de uma nova Company/Driver no momento
+// do cadastro — nunca sobrescreve um valor já definido individualmente
+// (a especificação continua exigindo que comissões sejam definidas por
+// cadastro, nunca por valor global aplicado automaticamente depois).
+enum CommissionDefaultTarget {
+  company
+  driver
+}
+
+model CommissionDefault {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  target             CommissionDefaultTarget
+  // Company: chave de CatalogItem (categoria_fornecedor_parceiro).
+  // Driver: "proprio" / "terceirizado" (owner_type) ou o payment_type.
+  category_key       String
+  commission_percent Decimal                 @db.Decimal(5, 2)
+  active             Boolean                 @default(true)
+  created_at         DateTime                @default(now())
+  updated_at         DateTime                @updatedAt
+
+  @@unique([target, category_key])
+  @@map("commission_defaults")
+}
+
 // =========================================================================
 // 5. OPERACIONAL
 // =========================================================================
@@ -631,8 +657,14 @@ model Reservation {
   tax_amount                 Decimal?                 @db.Decimal(12, 2)
   nf_value                   Decimal?                 @db.Decimal(12, 2)
   status                     ReservationStatus        @default(aguardando_confirmacao)
-  created_at                 DateTime                 @default(now())
-  updated_at                 DateTime                 @updatedAt
+
+  // Opções de exibição de documento (requisito adicional pós-Fase 1):
+  // null = usa o padrão global definido em Setting ("documentos_exibicao_valor");
+  // true/false = substitui o padrão só para esta reserva.
+  voucher_show_price Boolean?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   client         Client   @relation(fields: [client_id], references: [id])
   origin_partner Company? @relation("ReservationOriginPartner", fields: [origin_partner_id], references: [id])
@@ -700,6 +732,18 @@ model Service {
   // Pagamento direto
   driver_can_receive_payment Boolean @default(false)
   supplier_payment_confirmed Boolean @default(false)
+
+  // Opções de exibição de documento (requisito adicional pós-Fase 1):
+  // null = usa o padrão global definido em Setting ("documentos_exibicao_valor").
+  os_show_price Boolean?
+
+  // Plaquinha de recepção (requisito adicional pós-Fase 1): opcional por
+  // serviço, não obrigatória — o admin/operacional decide quando gerar.
+  reception_sign_enabled   Boolean @default(false)
+  reception_passenger_name String?
+
+  started_at   DateTime?
+  completed_at DateTime?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

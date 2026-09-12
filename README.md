@@ -3,9 +3,11 @@
 Sistema de gestão da Nativos Experiences (turismo de luxo em Trancoso, BA).
 
 Este repositório está sendo construído por fases, conforme o plano definido
-na especificação funcional. **Este README reflete o estado da Fase 1 —
-Fundação.** Não avance para os módulos das fases seguintes sem confirmação
-explícita de que esta fase está correta.
+na especificação funcional. **Este README reflete o estado ao final da
+Fase 2 — Cadastros**, já incorporando 6 requisitos adicionais pedidos pelo
+cliente após a confirmação da Fase 1 (ver seção "Requisitos adicionais
+pós-Fase 1"). Não avance para os módulos das fases seguintes sem
+confirmação explícita de que esta fase está correta.
 
 ## Stack
 
@@ -56,6 +58,57 @@ explícita de que esta fase está correta.
 - **Testes de integridade** (`tests/db/financial-integrity-triggers.test.ts`)
   que provam, contra um Postgres real, que as regras de DELETE bloqueado,
   append-only e UNIQUE de idempotência realmente funcionam no banco.
+
+## O que existe na Fase 2
+
+- **CRUD administrativo completo** para Clientes, Empresas (parceiro e/ou
+  fornecedor), Motoristas e Veículos (`src/app/admin/*`), com validação via
+  Zod e trilha de auditoria (`logAudit`) em toda criação/edição.
+- **Fluxo de aprovação de cadastro vindo de portal**: motoristas/veículos
+  criados por um fornecedor pelo portal nascem com `approval_status:
+  pendente`; `/admin/aprovacoes` lista tudo pendente e cada tela de edição
+  tem os botões Aprovar/Rejeitar.
+- **Painel de Configurações** (`/admin/configuracoes`): catálogo (as 9
+  taxonomias de `CatalogItem`, com abas), templates de e-mail, cláusulas de
+  contrato, padrão de exibição de valor em documentos, comissões padrão por
+  categoria de cadastro e usuários internos — tudo editável sem alterar
+  código.
+
+## Requisitos adicionais pós-Fase 1
+
+Depois de confirmar a Fase 1, o cliente pediu 6 acréscimos, já incorporados
+nesta fase:
+
+1. **Plaquinha de recepção**: `Service.reception_sign_enabled` (opcional,
+   por serviço) + `Service.reception_passenger_name`. A geração do PDF em
+   si é Fase 7 (documentos); o campo de configuração já existe no schema.
+2. **Voucher com valor opcional**: `Reservation.voucher_show_price`
+   (`Boolean?` — `null` usa o padrão global). Padrão global em
+   `Setting["documentos_exibicao_valor"].voucher_default`, editável em
+   `/admin/configuracoes/documentos` (padrão: `false`, sem valor visível).
+3. **Ordem de serviço com valor opcional**: mesma lógica do item 2, só que
+   por serviço — `Service.os_show_price` + `os_default` na mesma
+   configuração global.
+4. **Painel de configuração geral**: módulo "Configurações" descrito acima.
+   Cobre catálogo, templates, exibição de documento e comissões padrão. Não
+   cobre uma reformulação completa de papéis/permissões além do que já
+   existia (`role`/`account_type`/`internal_role`) — ver "Pendências".
+5. **Criação de login simplificada**: um botão único ("Criar acesso ao
+   portal") nas telas de Empresa e Motorista
+   (`src/components/admin/portal-login-panel.tsx`), que chama
+   `provisionCompanyOrDriverLogin` (`src/lib/auth/provision-user.ts`). Esse
+   helper resolve sozinho o caso de dono-fornecedor que também dirige
+   (`is_company_owner_driver`): criar o acesso pelo lado da empresa ou pelo
+   lado do motorista dá exatamente no mesmo — um único login, nunca
+   duplicado.
+6. **Autonomia do dono do fornecedor sobre os serviços dos seus
+   motoristas**: `startService`/`completeService`
+   (`src/lib/services/service-execution.ts`) autorizam tanto o motorista
+   atribuído quanto qualquer usuário de portal ligado à empresa
+   fornecedora daquele serviço (`service.supplier_id`) — não só o próprio
+   motorista. Exposto no portal (`/portal/motorista` e `/portal/empresa`)
+   com uma lista mínima de serviços e botões Iniciar/Finalizar; a
+   experiência completa do portal fica para a Fase 5.
 
 ## Arquitetura de autorização
 
@@ -153,11 +206,18 @@ perguntar. As decisões abaixo foram tomadas para que o schema de fundação
 fosse utilizável, mas ficam marcadas com `// INFERIDO:` no
 `schema.prisma` e devem ser revisadas:
 
-1. **Arquivo de logo**: o prompt original menciona "vou te passar o
-   arquivo da logo", mas nenhum arquivo chegou a esta sessão. O componente
-   `src/components/brand/logo.tsx` usa um monograma "n" itálico
-   tipográfico (Cormorant Garamond) como placeholder fiel à descrição —
-   precisa ser substituído pelo arquivo real assim que ele for fornecido.
+1. **Arquivo de logo**: o cliente compartilhou uma imagem do wordmark
+   "nativos" (verde-floresta/creme, itálico serifado, com o ponto do "i"
+   estilizado como círculo) diretamente na conversa, mas nenhum arquivo
+   chegou a ser anexado à sessão (sem arquivo salvo em disco para copiar
+   bit a bit). `src/components/brand/logo.tsx` reproduz esse wordmark com
+   texto real (Cormorant Garamond) + um círculo decorativo posicionado em
+   `em`, o que escala corretamente em qualquer tamanho — mas é uma
+   reprodução visual, não o arquivo original. O favicon
+   (`src/app/icon.tsx`) usa só o monograma "n", gerado em build/request
+   time via `next/og`. Se a fidelidade pixel-a-pixel importar, troque por
+   um arquivo de imagem real assim que ele for anexado como arquivo (não
+   apenas colado na conversa).
 2. **Status de `Reservation`** (`ReservationStatus`) e **status de
    execução de `Service`** (`ServiceExecutionStatus`): a especificação diz
    que o status da reserva é "calculado automaticamente a partir dos
@@ -197,6 +257,11 @@ fosse utilizável, mas ficam marcadas com `// INFERIDO:` no
 
 ## Próximas fases
 
-Conforme o plano de construção, a Fase 2 (Cadastros: CRUD admin de
-clientes/motoristas/veículos/empresas + fluxo de aprovação vindo de portal)
-só deve começar após confirmação de que esta fundação está correta.
+Conforme o plano de construção, a Fase 3 (Operacional: reservas + serviços,
+fluxo de aceite do fornecedor, cálculo automático de status, desconto,
+imposto/nota fiscal) só deve começar após confirmação de que esta fase
+está correta. Dois pontos já sinalizados na Fase 1 seguem em aberto e
+seriam naturalmente resolvidos na Fase 3: o algoritmo de cálculo de
+`ReservationStatus`/`ServiceExecutionStatus`, e a extensão dos campos
+operacionais de `Service` (data/hora, locais, passageiros) conforme o
+fluxo completo de reserva for desenhado.

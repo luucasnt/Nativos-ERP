@@ -24,3 +24,16 @@ export async function getCurrentUser() {
 
   return user;
 }
+
+// Segunda checagem de autorização dentro da própria Server Action —
+// defesa em profundidade além do gate que já existe no layout/página, já
+// que uma Server Action pode em tese ser invocada diretamente.
+export async function requireInternalUser() {
+  const user = await getCurrentUser();
+
+  if (!user || user.account_type !== "internal" || user.status !== "ativo") {
+    throw new Error("Acesso restrito à equipe interna da Nativos.");
+  }
+
+  return user;
+}
