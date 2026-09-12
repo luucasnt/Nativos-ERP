@@ -177,6 +177,15 @@ enum ExecutionType {
   fornecedor
 }
 
+// Derivado de collection_mode (Reservation) + execution_type (Service) —
+// quem cobra o passageiro de fato (spec seção 5). Recalculado sempre que
+// um dos dois campos de origem muda; nunca definido manualmente.
+enum CollectionActor {
+  nativos
+  motorista_proprio
+  fornecedor
+}
+
 enum ServiceAcceptanceStatus {
   aguardando_aceite
   aceito
@@ -728,6 +737,10 @@ model Service {
   acceptance_reason String? // aceite_motivo
 
   execution_status ServiceExecutionStatus @default(agendado)
+
+  // Derivado de reservation.collection_mode + execution_type — nunca
+  // definido manualmente (ver enum CollectionActor).
+  collection_actor CollectionActor @default(nativos)
 
   // Pagamento direto
   driver_can_receive_payment Boolean @default(false)

@@ -7,6 +7,9 @@
 // há um projeto Supabase real, então essa parte é pulada com um aviso.
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { computeCollectionActor, computeServicePrice } from "../src/lib/reservations/pricing";
+import { recalculateReservationStatus } from "../src/lib/reservations/status";
+import { recalculateReservationTax } from "../src/lib/reservations/tax";
 
 const prisma = new PrismaClient();
 
@@ -480,7 +483,6 @@ async function seedReservationsAndServices(refs: {
       code: "RES-2026-000001",
       client_id: refs.clientePropio.id,
       collection_mode: "nativos",
-      status: "confirmada",
       services: {
         create: [
           {
@@ -490,7 +492,8 @@ async function seedReservationsAndServices(refs: {
             driver_id: refs.motoristaProprio.id,
             vehicle_id: refs.veiculoProprio.id,
             original_price: 450,
-            price: 450,
+            price: computeServicePrice(450, "nenhum", null),
+            collection_actor: computeCollectionActor("nativos", "propria"),
             acceptance_status: "aceito",
             execution_status: "concluido",
           },
@@ -510,7 +513,6 @@ async function seedReservationsAndServices(refs: {
       code: "RES-2026-000002",
       client_id: refs.clientePropio.id,
       collection_mode: "direto",
-      status: "concluida",
       services: {
         create: [
           {
@@ -524,7 +526,8 @@ async function seedReservationsAndServices(refs: {
             discount_type: "percentual",
             discount_value: 10,
             discount_reason: "Cliente recorrente",
-            price: 1080,
+            price: computeServicePrice(1200, "percentual", 10),
+            collection_actor: computeCollectionActor("direto", "propria"),
             acceptance_status: "aceito",
             execution_status: "concluido",
             driver_can_receive_payment: true,
@@ -548,7 +551,6 @@ async function seedReservationsAndServices(refs: {
       referrer_type: "company",
       referrer_id: refs.agenciaDupla.id,
       commission_percent: 8,
-      status: "confirmada",
       services: {
         create: [
           {
@@ -559,7 +561,8 @@ async function seedReservationsAndServices(refs: {
             driver_id: refs.motoristaTerceirizado1.id,
             vehicle_id: refs.veiculoTerceirizado.id,
             original_price: 500,
-            price: 500,
+            price: computeServicePrice(500, "nenhum", null),
+            collection_actor: computeCollectionActor("nativos", "fornecedor"),
             supplier_cost: 350,
             acceptance_status: "aceito",
             execution_status: "agendado",
@@ -580,7 +583,6 @@ async function seedReservationsAndServices(refs: {
       client_id: refs.clienteParceiro.id,
       origin_partner_id: refs.parceiroHotel.id,
       collection_mode: "direto",
-      status: "aguardando_confirmacao",
       services: {
         create: [
           {
@@ -590,7 +592,8 @@ async function seedReservationsAndServices(refs: {
             supplier_id: refs.fornecedorRetain.id,
             driver_id: refs.motoristaTerceirizado1.id,
             original_price: 300,
-            price: 300,
+            price: computeServicePrice(300, "nenhum", null),
+            collection_actor: computeCollectionActor("direto", "fornecedor"),
             supplier_cost: 220,
             acceptance_status: "aguardando_aceite",
             execution_status: "agendado",
@@ -614,7 +617,6 @@ async function seedReservationsAndServices(refs: {
       referrer_type: "driver",
       referrer_id: refs.motoristaDono.id,
       commission_percent: 5,
-      status: "concluida",
       services: {
         create: [
           {
@@ -624,7 +626,8 @@ async function seedReservationsAndServices(refs: {
             supplier_id: refs.fornecedorGross.id,
             driver_id: refs.motoristaDono.id,
             original_price: 800,
-            price: 800,
+            price: computeServicePrice(800, "nenhum", null),
+            collection_actor: computeCollectionActor("direto", "fornecedor"),
             supplier_cost: 600,
             acceptance_status: "aceito",
             execution_status: "concluido",
@@ -653,8 +656,6 @@ async function seedReservationsAndServices(refs: {
       referrer_name: "Ana Concierge",
       referrer_document: "222.222.222-22",
       commission_percent: 5,
-      tax_percent_snapshot: 6,
-      status: "confirmada",
       services: {
         create: [
           {
@@ -662,7 +663,8 @@ async function seedReservationsAndServices(refs: {
             type: "concierge",
             execution_type: "propria",
             original_price: 600,
-            price: 600,
+            price: computeServicePrice(600, "nenhum", null),
+            collection_actor: computeCollectionActor("faturado", "propria"),
             acceptance_status: "aceito",
             execution_status: "agendado",
           },
@@ -670,6 +672,14 @@ async function seedReservationsAndServices(refs: {
       },
     },
   });
+
+  // Deixa o motor recalcular status e imposto/NF a partir dos serviços,
+  // em vez de hardcoded — a mesma rotina usada pelas Server Actions do
+  // admin (garante que o seed e o app real ficam sempre em sincronia).
+  for (const reservation of [r1, r2, r3, r4, r5, r6]) {
+    await recalculateReservationStatus(reservation.id);
+    await recalculateReservationTax(reservation.id);
+  }
 
   return { r1, r2, r3, r4, r5, r6 };
 }

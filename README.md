@@ -4,10 +4,11 @@ Sistema de gestão da Nativos Experiences (turismo de luxo em Trancoso, BA).
 
 Este repositório está sendo construído por fases, conforme o plano definido
 na especificação funcional. **Este README reflete o estado ao final da
-Fase 2 — Cadastros**, já incorporando 6 requisitos adicionais pedidos pelo
-cliente após a confirmação da Fase 1 (ver seção "Requisitos adicionais
-pós-Fase 1"). Não avance para os módulos das fases seguintes sem
-confirmação explícita de que esta fase está correta.
+Fase 3 — Operacional**, sobre uma Fase 2 (Cadastros) que já incorporou 6
+requisitos adicionais pedidos pelo cliente após a confirmação da Fase 1
+(ver seção "Requisitos adicionais pós-Fase 1"). Não avance para os módulos
+das fases seguintes sem confirmação explícita de que esta fase está
+correta.
 
 ## Stack
 
@@ -110,6 +111,40 @@ nesta fase:
    com uma lista mínima de serviços e botões Iniciar/Finalizar; a
    experiência completa do portal fica para a Fase 5.
 
+## O que existe na Fase 3
+
+- **CRUD de Reservas + Serviços aninhados** (`/admin/reservas`): criar
+  reserva (cliente, parceiro de origem, indicação com comissão individual,
+  cortesia/NET/NF, modo de cobrança), adicionar/editar serviços dentro dela
+  (tipo, execução própria/fornecedor, motorista/veículo, agenda, bagagem,
+  cadeirinha, disposição, desconto, plaquinha de recepção, exibição de
+  valor na OS).
+- **`collection_actor`** (`src/lib/reservations/pricing.ts`): campo que
+  faltava desde a Fase 1 — a spec o descreve explicitamente ("derivado de
+  collection_mode + execution_type — quem cobra o passageiro de fato") mas
+  ele não tinha sido modelado. Adicionado com migração + backfill dos
+  dados já existentes.
+- **Sistema de desconto** (`computeServicePrice`): `original_price` nunca
+  é editado depois de definido (a UI de edição só mostra o valor, sem
+  input); só o desconto recalcula `price`. `supplier_cost` é um campo
+  totalmente independente, nunca tocado por essa função — coberto por
+  teste de integração real contra Postgres.
+- **Cálculo automático de status da reserva**
+  (`src/lib/reservations/status.ts`, `status-pure.ts`): resolve a
+  pendência da Fase 1 — algoritmo definido e testado (9 cenários) a partir
+  do estado de aceite/execução dos serviços vinculados.
+- **Cálculo de imposto/NF** (`src/lib/reservations/tax.ts`): resolve a
+  outra pendência da Fase 1 — percentual "congelado" na primeira vez que a
+  reserva com `requires_nf` é calculada (lido de
+  `Setting["imposto_padrao"]`), recalculado a cada mudança nos serviços,
+  mas sem herdar mudanças futuras no padrão global.
+- **Fluxo de aceite do fornecedor**: `aguardando_aceite -> aceito/recusado`
+  (`src/lib/reservations/acceptance.ts`), acionável tanto pelo admin
+  (registro interno, ex.: confirmação por telefone) quanto pelo próprio
+  fornecedor no portal (`/portal/empresa`, com motivo obrigatório na
+  recusa). Um serviço não pode ser iniciado (`startService`) antes de
+  aceito.
+
 ## Arquitetura de autorização
 
 O backend fala com o Postgres via Prisma usando a role dona das tabelas —
@@ -199,12 +234,13 @@ recebe `must_change_password = true` e é redirecionado para
 npm test
 ```
 
-## Pendências / decisões que precisam de confirmação antes da Fase 2
+## Pendências / decisões que precisam de confirmação
 
 A especificação instrui a nunca inventar campo ou regra de negócio sem
-perguntar. As decisões abaixo foram tomadas para que o schema de fundação
-fosse utilizável, mas ficam marcadas com `// INFERIDO:` no
-`schema.prisma` e devem ser revisadas:
+perguntar. As decisões abaixo foram tomadas para que o sistema fosse
+utilizável em cada fase, mas ficam marcadas com `// INFERIDO:` no
+`schema.prisma` (ou explicadas no código, quando é lógica e não schema) e
+devem ser revisadas:
 
 1. **Arquivo de logo**: o cliente compartilhou uma imagem do wordmark
    "nativos" (verde-floresta/creme, itálico serifado, com o ponto do "i"
@@ -218,50 +254,73 @@ fosse utilizável, mas ficam marcadas com `// INFERIDO:` no
    time via `next/og`. Se a fidelidade pixel-a-pixel importar, troque por
    um arquivo de imagem real assim que ele for anexado como arquivo (não
    apenas colado na conversa).
-2. **Status de `Reservation`** (`ReservationStatus`) e **status de
-   execução de `Service`** (`ServiceExecutionStatus`): a especificação diz
-   que o status da reserva é "calculado automaticamente a partir dos
-   serviços vinculados", mas não lista os valores possíveis nem o
-   algoritmo de cálculo. Os enums criados (`aguardando_confirmacao`,
-   `confirmada`, `em_andamento`, `concluida`, `cancelada`,
-   `parcialmente_cancelada` / `agendado`, `em_andamento`, `concluido`,
-   `cancelado`) são um ponto de partida razoável — o algoritmo de cálculo
-   fica para a Fase 3 (Operacional).
+2. **Status de `Reservation`** (`ReservationStatus`): a especificação diz
+   que o status é "calculado automaticamente a partir dos serviços
+   vinculados", mas não lista os valores possíveis nem o algoritmo.
+   Resolvido na Fase 3 — algoritmo em
+   `src/lib/reservations/status-pure.ts::computeReservationStatus`, com 9
+   cenários testados (`tests/reservations/status.test.ts`). Ordem de
+   precedência: sem serviços → aguardando_confirmacao; todos cancelados →
+   cancelada; todos os não-cancelados concluídos → concluida (ou
+   parcialmente_cancelada, se havia cancelamento no meio); algum já
+   iniciado/concluído sem que todos estejam concluídos → em_andamento;
+   algum aguardando aceite do fornecedor ou recusado → aguardando_confirmacao;
+   caso contrário → confirmada.
 3. **Campos operacionais mínimos em `Service`** (data/hora agendada,
    local de origem/destino, número de passageiros, número de voo): não
    estão itemizados na especificação (que foca em preço/desconto/bagagem/
    cadeirinha/aceite), mas são estruturalmente necessários para um
-   transfer/passeio/disposição existir. Ficam sujeitos a expansão na Fase 3.
-4. **Contraparte de `FinanceEntry`** (`party_type` / `party_id`): a
+   transfer/passeio/disposição existir. Já em uso no formulário de serviço
+   da Fase 3 (`/admin/reservas/[id]/servicos`).
+4. **Fórmula de imposto/NF** (`tax_amount`/`tax_percent_snapshot`/
+   `nf_value`): a especificação define os campos mas não a fórmula exata
+   nem o momento em que o percentual é fixado. Adotado em
+   `src/lib/reservations/tax.ts`: o percentual vem do padrão global
+   (`Setting["imposto_padrao"]`) e é "congelado" na primeira vez que uma
+   reserva com `requires_nf` é calculada — mudanças futuras no padrão
+   global não afetam reservas já calculadas, só novas. A base de cálculo é
+   a soma do `price` (já líquido de desconto) dos serviços não cancelados;
+   `nf_value` é essa base, `tax_amount` é a alíquota sobre ela.
+5. **Contraparte de `FinanceEntry`** (`party_type` / `party_id`): a
    especificação não lista explicitamente de quem é a favor/contra um
    lançamento — só descreve tipo/categoria/status/origem. Sem esse campo o
    razão não seria navegável, então foi adicionado.
-5. **`temp_password` do `User`**: a especificação menciona um campo
+6. **`temp_password` do `User`**: a especificação menciona um campo
    `temp_password`, mas armazenar senha em texto plano no banco é uma
    vulnerabilidade (OWASP). A senha temporária é gerada e devolvida uma
    única vez por `generateTemporaryPassword()`
    (`src/lib/auth/provision-user.ts`) para quem criou o cadastro comunicar
    ao usuário — só o Supabase Auth guarda a senha (com hash), e `users`
    guarda apenas o booleano `must_change_password`.
-6. **Catálogo de ações do `AuditLog`**: a especificação fala em "mais de
+7. **Catálogo de ações do `AuditLog`**: a especificação fala em "mais de
    50 tipos de ação catalogados" mas só dá ~20 exemplos. Em vez de inventar
    os ~30 restantes, `action` ficou como `String` livre (não um enum
    fechado) até o catálogo completo ser definido.
-7. **Segurança conhecida das dependências**: `npm audit` aponta 2
+8. **Segurança conhecida das dependências**: `npm audit` aponta 2
    vulnerabilidades em ferramentas de build/dev (PostCSS embutido no
    Next.js 15.x, `deepmerge-ts` embutido no `@prisma/config`) — ambas só
    afetam o processo de build/CLI, não código servido em produção, e a
    correção automática (`npm audit fix --force`) exigiria sair das versões
    fixadas pela stack obrigatória (Next.js 15 e Prisma 6). Deixadas como
    estão, documentadas aqui.
+9. **Uso de `"server-only"`**: removido de `src/lib/reservations/status.ts`
+   e `tax.ts` (que orquestram Prisma). O pacote `server-only` lança erro
+   incondicionalmente fora do runtime de Server Component do Next.js — não
+   faz checagem de `typeof window` — o que bloquearia completamente testar
+   essas funções via Vitest (que roda em Node puro, não no runtime do
+   Next.js). Como esses dois arquivos só fazem orquestração de Prisma
+   (que já não funciona em bundle de cliente por outros motivos), manter
+   a guarda não agregava proteção real e custava testabilidade. Os módulos
+   realmente sensíveis (`admin.ts` com a service role key,
+   `provision-user.ts`, `get-current-user.ts`) continuam guardados.
 
 ## Próximas fases
 
-Conforme o plano de construção, a Fase 3 (Operacional: reservas + serviços,
-fluxo de aceite do fornecedor, cálculo automático de status, desconto,
-imposto/nota fiscal) só deve começar após confirmação de que esta fase
-está correta. Dois pontos já sinalizados na Fase 1 seguem em aberto e
-seriam naturalmente resolvidos na Fase 3: o algoritmo de cálculo de
-`ReservationStatus`/`ServiceExecutionStatus`, e a extensão dos campos
-operacionais de `Service` (data/hora, locais, passageiros) conforme o
-fluxo completo de reserva for desenhado.
+Conforme o plano de construção, a Fase 4 (Motor financeiro completo, com
+suite de testes de integridade obrigatória simulando as 3 variáveis
+comerciais) só deve começar após confirmação de que esta fase está
+correta. A Fase 3 deixou pronta a base sobre a qual a Fase 4 se apoia:
+`collection_actor` já diz quem cobra o passageiro, `price`/`supplier_cost`
+já estão corretos e isolados um do outro, e o status da reserva já reflete
+o estado real da execução — mas nenhum `FinanceEntry` é criado
+automaticamente ainda (isso é o próprio motor financeiro da Fase 4).

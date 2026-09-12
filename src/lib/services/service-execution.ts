@@ -40,6 +40,10 @@ export async function startService(
   try {
     const { user, service } = await assertCanOperateService(serviceId);
 
+    if (service.acceptance_status !== "aceito") {
+      return { error: "Este serviço ainda não foi aceito pelo fornecedor." };
+    }
+
     if (service.execution_status !== "agendado") {
       return { error: "Este serviço não está aguardando início." };
     }

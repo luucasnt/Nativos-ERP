@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
 import { tableClass, tdClass, thClass } from "@/lib/ui";
 import { ServiceExecutionActions } from "@/components/portal/service-execution-actions";
+import { ServiceAcceptanceActions } from "@/components/portal/service-acceptance-actions";
 
 export default async function PortalEmpresaHomePage() {
   const user = await getCurrentUser();
@@ -19,16 +20,24 @@ export default async function PortalEmpresaHomePage() {
 
   const isFornecedor = company.roles.includes("fornecedor");
 
-  const services = isFornecedor
-    ? await prisma.service.findMany({
-        where: {
-          supplier_id: company.id,
-          execution_status: { in: ["agendado", "em_andamento"] },
-        },
-        include: { reservation: true, driver: true },
-        orderBy: { scheduled_date: "asc" },
-      })
-    : [];
+  const [pendingAcceptance, services] = isFornecedor
+    ? await Promise.all([
+        prisma.service.findMany({
+          where: { supplier_id: company.id, acceptance_status: "aguardando_aceite" },
+          include: { reservation: true, driver: true },
+          orderBy: { scheduled_date: "asc" },
+        }),
+        prisma.service.findMany({
+          where: {
+            supplier_id: company.id,
+            acceptance_status: "aceito",
+            execution_status: { in: ["agendado", "em_andamento"] },
+          },
+          include: { reservation: true, driver: true },
+          orderBy: { scheduled_date: "asc" },
+        }),
+      ])
+    : [[], []];
 
   return (
     <AppShell
@@ -40,6 +49,36 @@ export default async function PortalEmpresaHomePage() {
 
       {isFornecedor && (
         <>
+          <h2 className="mt-8 mb-3 font-serif text-xl text-forest">
+            Serviços aguardando sua confirmação
+          </h2>
+          {pendingAcceptance.length === 0 ? (
+            <p className="text-sm text-forest/60">Nenhum serviço aguardando resposta.</p>
+          ) : (
+            <table className={tableClass}>
+              <thead>
+                <tr>
+                  <th className={thClass}>Reserva</th>
+                  <th className={thClass}>Motorista</th>
+                  <th className={thClass}>Tipo</th>
+                  <th className={thClass}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingAcceptance.map((s) => (
+                  <tr key={s.id}>
+                    <td className={tdClass}>{s.reservation.code}</td>
+                    <td className={tdClass}>{s.driver?.name ?? "—"}</td>
+                    <td className={tdClass}>{s.type}</td>
+                    <td className={tdClass}>
+                      <ServiceAcceptanceActions serviceId={s.id} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
           <h2 className="mt-8 mb-3 font-serif text-xl text-forest">
             Serviços dos meus motoristas
           </h2>
