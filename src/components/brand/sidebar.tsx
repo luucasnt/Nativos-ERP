@@ -4,8 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { AdminNavItem } from "@/lib/admin-nav";
 
+// `icon` chega já renderizado (JSX), não como referência de componente —
+// uma função de componente (o que `item.icon` seria, cru) não pode
+// atravessar a fronteira Server → Client Component como valor de prop
+// (só dado serializável ou elementos React já instanciados podem). Quem
+// monta esse array é o AppShell (Server Component), via
+// `renderNavIcon()` abaixo.
+type SidebarNavItem = Pick<AdminNavItem, "href" | "label" | "badgeKey"> & {
+  icon: React.ReactNode;
+};
+
 type SidebarProps = {
-  nav: AdminNavItem[];
+  nav: SidebarNavItem[];
   badges?: Partial<Record<NonNullable<AdminNavItem["badgeKey"]>, number>>;
 };
 
@@ -24,35 +34,29 @@ export function Sidebar({ nav, badges = {} }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex w-60 shrink-0 flex-col bg-forest-dark px-3 py-6">
-      <ul className="flex flex-1 flex-col gap-0.5">
-        {nav.map((item) => {
-          const active = isActive(pathname, item.href);
-          const count = item.badgeKey ? badges[item.badgeKey] : undefined;
-          const Icon = item.icon;
+    <nav className="flex flex-col gap-px px-3 py-2.5">
+      {nav.map((item) => {
+        const active = isActive(pathname, item.href);
+        const count = item.badgeKey ? badges[item.badgeKey] : undefined;
 
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-cream/10 font-medium text-cream"
-                    : "text-cream/55 hover:bg-cream/5 hover:text-cream/85"
-                }`}
-              >
-                <Icon size={17} strokeWidth={2} aria-hidden="true" className="shrink-0" />
-                <span className="flex-1 truncate">{item.label}</span>
-                {!!count && count > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-semibold text-forest-dark">
-                    {count > 99 ? "99+" : count}
-                  </span>
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center gap-[11px] rounded-[5px] px-3 py-[9px] text-[13px] font-medium transition-colors ${
+              active ? "bg-forest-700 text-white" : "text-sage-400 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            {item.icon}
+            <span className="flex-1 truncate">{item.label}</span>
+            {!!count && count > 0 && (
+              <span className="rounded-[3px] bg-gold-500 px-1.5 py-px text-[10.5px] font-bold text-forest-900">
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

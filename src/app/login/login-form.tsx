@@ -9,10 +9,10 @@ export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signIn, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction}>
       {next && <input type="hidden" name="next" value={next} />}
-      <div className="flex flex-col gap-1">
-        <label htmlFor="email" className="text-sm text-forest/80">
+      <div className="mb-[18px]">
+        <label htmlFor="email" className="mb-1.5 block text-[12.5px] font-semibold text-ink-900">
           E-mail
         </label>
         <input
@@ -21,11 +21,12 @@ export function LoginForm({ next }: { next?: string }) {
           type="email"
           required
           autoComplete="email"
-          className="rounded-sm border border-forest/20 bg-white px-3 py-2 text-ink outline-none focus:border-gold"
+          placeholder="nome@nativosexperiences.com"
+          className="w-full rounded-[5px] border border-border bg-white px-3 py-[11px] text-sm text-ink-900 outline-none placeholder:text-ink-350 focus:border-forest-700"
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm text-forest/80">
+      <div className="mb-[18px]">
+        <label htmlFor="password" className="mb-1.5 block text-[12.5px] font-semibold text-ink-900">
           Senha
         </label>
         <input
@@ -34,14 +35,15 @@ export function LoginForm({ next }: { next?: string }) {
           type="password"
           required
           autoComplete="current-password"
-          className="rounded-sm border border-forest/20 bg-white px-3 py-2 text-ink outline-none focus:border-gold"
+          placeholder="••••••••"
+          className="w-full rounded-[5px] border border-border bg-white px-3 py-[11px] text-sm text-ink-900 outline-none placeholder:text-ink-350 focus:border-forest-700"
         />
       </div>
-      {state.error && <p className="text-sm text-red-700">{state.error}</p>}
+      {state.error && <p className="mb-3 text-[13px] font-medium text-brick-500">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 rounded-sm bg-forest px-4 py-2 text-cream transition hover:bg-forest-light disabled:opacity-60"
+        className="mt-1 w-full rounded-[5px] bg-forest-700 py-3 text-sm font-semibold text-white transition-colors hover:bg-forest-600 disabled:opacity-60"
       >
         {pending ? "Entrando…" : "Entrar"}
       </button>

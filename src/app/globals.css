@@ -1,22 +1,54 @@
 @import "tailwindcss";
 
 :root {
-  --color-forest: #233b35;
-  --color-forest-light: #33534a;
-  --color-forest-dark: #152520;
-  --color-gold: #c9a978;
-  --color-gold-light: #ddc39d;
+  /* Paleta de produto (Fase 8 — design de referência do cliente,
+     nativos-erp-design-v2.html). Nomenclatura e valores hex reproduzidos
+     exatamente do arquivo de referência; --forest-700 e --gold-500
+     coincidem em valor com a identidade de marca original (--color-forest
+     / --color-gold), então os dois nomes convivem apontando pro mesmo
+     hex. */
+  --forest-900: #14231d;
+  --forest-700: #233b35;
+  --forest-600: #2c4a42;
+  --sage-400: #a9bab0;
+  --gold-500: #c9a978;
+  --gold-700: #a3854e;
+  --gold-100: #f3ead9;
+  --gray-50: #f6f6f4;
+  --gray-100: #ececea;
+  --ink-900: #1c231f;
+  --ink-500: #616b64;
+  --ink-350: #8b948e;
+  --border: #dfded9;
+  --ochre-500: #b0731f;
+  --ochre-100: #f7ecdb;
+  --brick-500: #a13c2a;
+  --brick-100: #f5e0da;
+  --moss-500: #3d7a4a;
+  --moss-100: #e1f0e2;
+
+  /* Identidade de marca — mantida para documentos (Fase 7: voucher, OS,
+     contrato etc., que seguem verde-floresta/dourado/creme sobre papel) e
+     para o wordmark. O app operacional (admin/portais) agora usa a
+     paleta de produto acima como canvas; a marca aparece nos pontos de
+     destaque (sidebar, wordmark), não como fundo geral. */
+  --color-forest: var(--forest-700);
+  --color-forest-light: var(--forest-600);
+  --color-forest-dark: var(--forest-900);
+  --color-gold: var(--gold-500);
+  --color-gold-light: var(--gold-100);
   --color-cream: #f8f5ee;
-  --color-ink: #1c1c1a;
+  --color-ink: var(--ink-900);
 
   /* Cores semânticas de produto — usadas com propósito (status, valores
-     financeiros, alertas), nunca como decoração geral da UI. */
-  --color-success: #1f8f56;
-  --color-success-light: #e3f3ea;
-  --color-danger: #c4483a;
-  --color-danger-light: #fbe9e6;
-  --color-warning: #c8862a;
-  --color-warning-light: #faf0dd;
+     financeiros, alertas), nunca como decoração geral da UI. Valores
+     iguais aos tons moss/ochre/brick do design de referência. */
+  --color-success: var(--moss-500);
+  --color-success-light: var(--moss-100);
+  --color-danger: var(--brick-500);
+  --color-danger-light: var(--brick-100);
+  --color-warning: var(--ochre-500);
+  --color-warning-light: var(--ochre-100);
   --color-info: #2f6690;
   --color-info-light: #e6eef4;
 
@@ -27,6 +59,27 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-forest-900: var(--forest-900);
+  --color-forest-700: var(--forest-700);
+  --color-forest-600: var(--forest-600);
+  --color-sage-400: var(--sage-400);
+  --color-gold-500: var(--gold-500);
+  --color-gold-700: var(--gold-700);
+  --color-gold-100: var(--gold-100);
+  --color-gray-50: var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-ink-900: var(--ink-900);
+  --color-ink-500: var(--ink-500);
+  --color-ink-350: var(--ink-350);
+  --color-border: var(--border);
+  --color-ochre-500: var(--ochre-500);
+  --color-ochre-100: var(--ochre-100);
+  --color-brick-500: var(--brick-500);
+  --color-brick-100: var(--brick-100);
+  --color-moss-500: var(--moss-500);
+  --color-moss-100: var(--moss-100);
+
   --color-forest: var(--color-forest);
   --color-forest-light: var(--color-forest-light);
   --color-forest-dark: var(--color-forest-dark);

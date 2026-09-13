@@ -5,7 +5,7 @@ import type { AppMetadata } from "@/lib/auth/types";
 const INTERNAL_PREFIX = "/admin";
 const PORTAL_EMPRESA_PREFIX = "/portal/empresa";
 const PORTAL_MOTORISTA_PREFIX = "/portal/motorista";
-const PUBLIC_PATHS = ["/login", "/change-password", "/auth"];
+const PUBLIC_PATHS = ["/login", "/change-password", "/auth", "/recuperar-acesso"];
 
 // Nome do header interno que carrega o id do usuário já validado por
 // `getUser()` (rede) aqui no middleware, pra Server Components/Actions

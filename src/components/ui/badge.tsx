@@ -5,8 +5,8 @@ const TONE_CLASSES: Record<BadgeTone, string> = {
   danger: "bg-danger-light text-danger",
   warning: "bg-warning-light text-warning",
   info: "bg-info-light text-info",
-  neutral: "bg-forest/8 text-forest/70",
-  gold: "bg-gold/20 text-forest",
+  neutral: "bg-gray-100 text-ink-500",
+  gold: "bg-gold-100 text-gold-700",
 };
 
 type BadgeProps = {
@@ -23,7 +23,7 @@ type BadgeProps = {
 export function Badge({ tone = "neutral", children, className = "" }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${TONE_CLASSES[tone]} ${className}`}
+      className={`inline-flex items-center rounded-[3px] px-[9px] py-[3px] text-[11px] font-semibold ${TONE_CLASSES[tone]} ${className}`}
     >
       {children}
     </span>
