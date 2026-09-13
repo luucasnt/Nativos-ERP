@@ -1,5 +1,5 @@
-import { LogoTile } from "@/components/brand/logo";
-import { LoginForm } from "./login-form";
+import { LoginPattern } from "@/components/brand/login-pattern";
+import { LoginPanel } from "./login-panel";
 
 export default async function LoginPage({
   searchParams,
@@ -9,15 +9,18 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-16">
-      <div className="w-full max-w-sm">
-        <div className="mb-10 flex flex-col items-center gap-3">
-          <LogoTile size={56} />
-          <p className="text-sm text-forest/70">
-            Acesse com o e-mail cadastrado pela Nativos Experiences.
-          </p>
-        </div>
-        <LoginForm next={next} />
+    <main className="flex flex-1">
+      <div className="relative hidden w-[42%] shrink-0 overflow-hidden bg-forest lg:block">
+        <LoginPattern />
+      </div>
+      <div
+        className="flex flex-1 items-center justify-center px-6 py-16"
+        style={{
+          background:
+            "radial-gradient(120% 100% at 15% 0%, #fffdf8 0%, var(--color-cream) 55%)",
+        }}
+      >
+        <LoginPanel next={next} />
       </div>
     </main>
   );

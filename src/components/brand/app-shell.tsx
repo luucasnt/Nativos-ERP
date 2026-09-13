@@ -1,20 +1,25 @@
-import Link from "next/link";
 import { Wordmark } from "@/components/brand/logo";
-
-type NavItem = {
-  href: string;
-  label: string;
-};
+import { Sidebar } from "@/components/brand/sidebar";
+import { PageTransition } from "@/components/ui/page-transition";
+import type { AdminNavItem } from "@/lib/admin-nav";
 
 type AppShellProps = {
   title: string;
   userName: string;
-  nav?: NavItem[];
+  nav?: AdminNavItem[];
+  badges?: Partial<Record<NonNullable<AdminNavItem["badgeKey"]>, number>>;
   notifications?: React.ReactNode;
   children: React.ReactNode;
 };
 
-export function AppShell({ title, userName, nav, notifications, children }: AppShellProps) {
+export function AppShell({
+  title,
+  userName,
+  nav,
+  badges,
+  notifications,
+  children,
+}: AppShellProps) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b border-forest/10 bg-forest px-6 py-4 text-cream">
@@ -37,23 +42,10 @@ export function AppShell({ title, userName, nav, notifications, children }: AppS
         </div>
       </header>
       <div className="flex flex-1">
-        {nav && nav.length > 0 && (
-          <nav className="w-56 shrink-0 border-r border-forest/10 bg-white/60 px-3 py-6">
-            <ul className="flex flex-col gap-1">
-              {nav.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="block rounded-sm px-3 py-2 text-sm text-forest/80 transition hover:bg-forest/5 hover:text-forest"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
-        <main className="flex-1 bg-cream px-6 py-10">{children}</main>
+        {nav && nav.length > 0 && <Sidebar nav={nav} badges={badges} />}
+        <main className="flex-1 bg-cream px-6 py-10">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );

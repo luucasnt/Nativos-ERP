@@ -3,10 +3,22 @@
 :root {
   --color-forest: #233b35;
   --color-forest-light: #33534a;
+  --color-forest-dark: #152520;
   --color-gold: #c9a978;
   --color-gold-light: #ddc39d;
   --color-cream: #f8f5ee;
   --color-ink: #1c1c1a;
+
+  /* Cores semânticas de produto — usadas com propósito (status, valores
+     financeiros, alertas), nunca como decoração geral da UI. */
+  --color-success: #1f8f56;
+  --color-success-light: #e3f3ea;
+  --color-danger: #c4483a;
+  --color-danger-light: #fbe9e6;
+  --color-warning: #c8862a;
+  --color-warning-light: #faf0dd;
+  --color-info: #2f6690;
+  --color-info-light: #e6eef4;
 
   --background: var(--color-cream);
   --foreground: var(--color-ink);
@@ -17,10 +29,19 @@
   --color-foreground: var(--foreground);
   --color-forest: var(--color-forest);
   --color-forest-light: var(--color-forest-light);
+  --color-forest-dark: var(--color-forest-dark);
   --color-gold: var(--color-gold);
   --color-gold-light: var(--color-gold-light);
   --color-cream: var(--color-cream);
   --color-ink: var(--color-ink);
+  --color-success: var(--color-success);
+  --color-success-light: var(--color-success-light);
+  --color-danger: var(--color-danger);
+  --color-danger-light: var(--color-danger-light);
+  --color-warning: var(--color-warning);
+  --color-warning-light: var(--color-warning-light);
+  --color-info: var(--color-info);
+  --color-info-light: var(--color-info-light);
   --font-serif: var(--font-cormorant);
   --font-sans: var(--font-jost);
 }
