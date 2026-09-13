@@ -17,8 +17,8 @@ type MetricCardProps = {
 };
 
 const ACCENT_CLASSES: Record<NonNullable<MetricCardProps["accent"]>, string> = {
-  forest: "bg-forest/10 text-forest",
-  gold: "bg-gold/20 text-forest",
+  forest: "bg-forest/[0.07] text-forest",
+  gold: "bg-gold/15 text-[#8b6a35]",
   success: "bg-success-light text-success",
   danger: "bg-danger-light text-danger",
   warning: "bg-warning-light text-warning",
@@ -28,13 +28,9 @@ const ACCENT_CLASSES: Record<NonNullable<MetricCardProps["accent"]>, string> = {
 const TREND_TONE_CLASSES: Record<NonNullable<Trend["tone"]>, string> = {
   positive: "text-success",
   negative: "text-danger",
-  neutral: "text-forest/50",
+  neutral: "text-forest/45",
 };
 
-// Card de métrica padrão Stripe: número grande, ícone num selo colorido,
-// variação vs. período anterior quando fizer sentido, sparkline opcional
-// ao lado do número. Usado na home operacional do admin e no resumo do
-// financeiro.
 export function MetricCard({
   icon: Icon,
   label,
@@ -44,24 +40,25 @@ export function MetricCard({
   accent = "forest",
 }: MetricCardProps) {
   return (
-    <div className="rounded-lg border border-forest/10 bg-white p-5 shadow-sm shadow-forest/5">
-      <div className="flex items-start justify-between">
-        <span className={`flex h-9 w-9 items-center justify-center rounded-full ${ACCENT_CLASSES[accent]}`}>
-          <Icon size={18} strokeWidth={2} aria-hidden="true" />
+    <article className="surface-panel min-w-0 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${ACCENT_CLASSES[accent]}`}>
+          <Icon size={16} strokeWidth={1.9} aria-hidden="true" />
         </span>
         {sparkline && sparkline.length > 1 && (
-          <Sparkline data={sparkline} color={`var(--color-${accent === "forest" ? "forest" : accent})`} />
+          <Sparkline
+            data={sparkline}
+            color={`var(--color-${accent === "forest" ? "forest" : accent})`}
+          />
         )}
       </div>
-      <p className="mt-4 text-sm text-forest/60">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-serif text-3xl text-forest">{value}</span>
-      </div>
+      <p className="mt-3 truncate text-xs font-medium text-forest/52">{label}</p>
+      <p className="mt-0.5 text-[26px] font-semibold leading-tight tracking-[-0.035em] text-forest">{value}</p>
       {trend && (
-        <p className={`mt-2 text-xs font-medium ${TREND_TONE_CLASSES[trend.tone ?? "neutral"]}`}>
+        <p className={`mt-2 truncate text-[11px] font-medium ${TREND_TONE_CLASSES[trend.tone ?? "neutral"]}`}>
           {trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "•"} {trend.label}
         </p>
       )}
-    </div>
+    </article>
   );
 }

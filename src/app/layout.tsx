@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "Sistema de gestão da Nativos Experiences",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="pt-BR"

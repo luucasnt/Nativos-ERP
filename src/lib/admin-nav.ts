@@ -1,40 +1,40 @@
-import {
-  AlertTriangle,
-  Building2,
-  CalendarCheck,
-  Car,
-  CheckCircle2,
-  Inbox,
-  LayoutDashboard,
-  Receipt,
-  Settings,
-  Truck,
-  Users,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+export type NavIconName =
+  | "home"
+  | "calendar"
+  | "users"
+  | "driver"
+  | "vehicle"
+  | "building"
+  | "finance"
+  | "receipt"
+  | "requests"
+  | "approvals"
+  | "alerts"
+  | "settings"
+  | "briefcase"
+  | "documents"
+  | "team"
+  | "support";
 
 export type AdminNavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
-  // Chave usada em `badges` (passado pelo layout, que consulta o Prisma)
-  // pra mostrar um contador de pendência ao lado do item — ex.: "Alertas
-  // (3)". Itens sem badgeKey nunca mostram contador.
-  badgeKey?: "alertas" | "solicitacoes" | "despesas";
+  icon: NavIconName;
+  badgeKey?: "alertas" | "solicitacoes" | "despesas" | "operacao";
 };
 
 export const ADMIN_NAV: AdminNavItem[] = [
-  { href: "/admin", label: "Início", icon: LayoutDashboard },
-  { href: "/admin/reservas", label: "Reservas", icon: CalendarCheck },
-  { href: "/admin/clientes", label: "Clientes", icon: Users },
-  { href: "/admin/motoristas", label: "Motoristas", icon: Car },
-  { href: "/admin/veiculos", label: "Veículos", icon: Truck },
-  { href: "/admin/empresas", label: "Empresas", icon: Building2 },
-  { href: "/admin/financeiro", label: "Financeiro", icon: Wallet },
-  { href: "/admin/despesas", label: "Despesas", icon: Receipt, badgeKey: "despesas" },
-  { href: "/admin/solicitacoes", label: "Solicitações", icon: Inbox, badgeKey: "solicitacoes" },
-  { href: "/admin/aprovacoes", label: "Aprovações", icon: CheckCircle2 },
-  { href: "/admin/alertas", label: "Alertas", icon: AlertTriangle, badgeKey: "alertas" },
-  { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
+  { href: "/admin", label: "Início", icon: "home" },
+  { href: "/admin/reservas", label: "Reservas", icon: "calendar" },
+  { href: "/admin/clientes", label: "Clientes", icon: "users" },
+  { href: "/admin/motoristas", label: "Motoristas", icon: "driver" },
+  { href: "/admin/veiculos", label: "Veículos", icon: "vehicle" },
+  { href: "/admin/empresas", label: "Empresas", icon: "building" },
+  { href: "/admin/financeiro", label: "Financeiro", icon: "finance" },
+  { href: "/admin/despesas", label: "Despesas", icon: "receipt", badgeKey: "despesas" },
+  { href: "/admin/solicitacoes", label: "Solicitações", icon: "requests", badgeKey: "solicitacoes" },
+  { href: "/admin/aprovacoes", label: "Aprovações", icon: "approvals" },
+  { href: "/admin/alertas", label: "Alertas", icon: "alerts", badgeKey: "alertas" },
+  { href: "/admin/documentos", label: "Documentos", icon: "documents" },
+  { href: "/admin/configuracoes", label: "Configurações", icon: "settings" },
 ];

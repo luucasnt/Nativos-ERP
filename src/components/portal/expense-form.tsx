@@ -19,7 +19,7 @@ export function ExpenseForm({
   const [state, formAction, pending] = useActionState(submitServiceExpense, initialState);
 
   return (
-    <form action={formAction} className="flex max-w-md flex-col gap-3 rounded-sm border border-forest/10 p-4">
+    <form action={formAction} className="flex w-full flex-col gap-3">
       <div className="flex flex-col gap-1">
         <label htmlFor="service_id" className={labelClass}>
           Serviço *

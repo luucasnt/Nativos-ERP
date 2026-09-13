@@ -1,60 +1,97 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { Building2, LayoutDashboard, Truck, Car } from "lucide-react";
-import { Wordmark } from "@/components/brand/logo";
+import Link from "next/link";
+import {
+  Building2,
+  CarFront,
+  LayoutDashboard,
+  ShieldCheck,
+  Truck,
+  type LucideIcon,
+} from "lucide-react";
 import { LoginForm } from "./login-form";
 
-const ACCESS_TYPES = [
-  { label: "Admin", icon: LayoutDashboard, className: "bg-forest/10 text-forest" },
-  { label: "Parceiro", icon: Building2, className: "bg-gold/20 text-forest" },
-  { label: "Fornecedor", icon: Truck, className: "bg-info-light text-info" },
-  { label: "Motorista", icon: Car, className: "bg-warning-light text-warning" },
-] as const;
+export const LOGIN_PORTALS = ["admin", "parceiro", "fornecedor", "motorista"] as const;
+export type LoginPortal = (typeof LOGIN_PORTALS)[number];
 
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
+type PortalConfig = {
+  label: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
 };
 
-const item = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
+export const PORTAL_CONFIG: Record<LoginPortal, PortalConfig> = {
+  admin: {
+    label: "Administrativo",
+    title: "Acesso administrativo",
+    description: "Entre para gerenciar a operação.",
+    icon: LayoutDashboard,
+  },
+  parceiro: {
+    label: "Parceiros",
+    title: "Portal do Parceiro",
+    description: "Acompanhe solicitações e reservas.",
+    icon: Building2,
+  },
+  fornecedor: {
+    label: "Fornecedores",
+    title: "Portal do Fornecedor",
+    description: "Gerencie serviços, equipe e veículos.",
+    icon: Truck,
+  },
+  motorista: {
+    label: "Motoristas",
+    title: "Portal do Motorista",
+    description: "Acesse sua agenda de serviços.",
+    icon: CarFront,
+  },
 };
 
-export function LoginPanel({ next }: { next?: string }) {
+export function isLoginPortal(value: string | undefined): value is LoginPortal {
+  return LOGIN_PORTALS.includes(value as LoginPortal);
+}
+
+export function LoginPanel({ next, portal }: { next?: string; portal: LoginPortal }) {
+  const config = PORTAL_CONFIG[portal];
+  const Icon = config.icon;
+
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="w-full max-w-sm"
-    >
-      <motion.div variants={item} className="mb-8 flex flex-col items-start gap-4">
-        <Wordmark size={30} tone="forest-on-cream" />
-        <div>
-          <h1 className="font-serif text-2xl text-forest">Bem-vindo de volta</h1>
-          <p className="mt-1 text-sm text-forest/60">
-            Trancoso te espera — acesse com o e-mail cadastrado pela Nativos Experiences.
-          </p>
-        </div>
-      </motion.div>
-
-      <motion.div variants={item} className="mb-8 flex flex-wrap gap-2">
-        {ACCESS_TYPES.map(({ label, icon: Icon, className }) => (
-          <span
-            key={label}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${className}`}
-          >
-            <Icon size={13} strokeWidth={2} aria-hidden="true" />
-            {label}
+    <div className="page-enter w-full max-w-[390px]">
+      <div className="surface-panel bg-white p-6 shadow-[0_14px_44px_rgba(23,41,35,0.08)] sm:p-8">
+        <div className="mb-6 text-center">
+          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-gold/35 bg-gold/10 text-forest">
+            <Icon size={21} strokeWidth={1.8} aria-hidden="true" />
           </span>
-        ))}
-      </motion.div>
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold">
+            {config.label}
+          </p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-forest">{config.title}</h1>
+          <p className="mt-1 text-sm text-forest/52">{config.description}</p>
+        </div>
 
-      <motion.div variants={item}>
         <LoginForm next={next} />
-      </motion.div>
-    </motion.div>
+
+        <div className="mt-6 border-t border-forest/10 pt-5">
+          <div className="flex items-center justify-center gap-2 text-[11px] text-forest/46">
+            <ShieldCheck size={14} aria-hidden="true" />
+            Ambiente seguro e protegido
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 text-center">
+        <p className="text-[11px] text-forest/42">Escolha outro tipo de acesso</p>
+        <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
+          {LOGIN_PORTALS.filter((item) => item !== portal).map((item) => (
+            <Link
+              key={item}
+              href={`/login/${item}`}
+              className="focus-ring rounded text-xs font-medium text-forest/58 underline decoration-gold/55 underline-offset-4 hover:text-forest"
+            >
+              {PORTAL_CONFIG[item].label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

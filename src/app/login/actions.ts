@@ -50,7 +50,7 @@ export async function signIn(
     redirect("/change-password");
   }
 
-  if (parsed.data.next) {
+  if (parsed.data.next?.startsWith("/") && !parsed.data.next.startsWith("//")) {
     redirect(parsed.data.next);
   }
 

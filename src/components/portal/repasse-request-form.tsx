@@ -18,7 +18,7 @@ export function RepasseRequestForm({ dedupeKey, entries, action }: RepasseReques
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
-    <form action={formAction} className="flex max-w-md flex-col gap-3 rounded-sm border border-forest/10 p-4">
+    <form action={formAction} className="flex w-full max-w-xl flex-col gap-3">
       <input type="hidden" name="dedupe_key" value={dedupeKey} />
       {entries.length > 0 && (
         <div className="flex flex-col gap-1">

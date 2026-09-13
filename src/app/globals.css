@@ -2,24 +2,23 @@
 
 :root {
   --color-forest: #233b35;
-  --color-forest-light: #33534a;
-  --color-forest-dark: #152520;
-  --color-gold: #c9a978;
-  --color-gold-light: #ddc39d;
-  --color-cream: #f8f5ee;
-  --color-ink: #1c1c1a;
-
-  /* Cores semânticas de produto — usadas com propósito (status, valores
-     financeiros, alertas), nunca como decoração geral da UI. */
-  --color-success: #1f8f56;
-  --color-success-light: #e3f3ea;
-  --color-danger: #c4483a;
-  --color-danger-light: #fbe9e6;
-  --color-warning: #c8862a;
-  --color-warning-light: #faf0dd;
-  --color-info: #2f6690;
-  --color-info-light: #e6eef4;
-
+  --color-forest-light: #35574e;
+  --color-forest-dark: #172923;
+  --color-gold: #b99a66;
+  --color-gold-light: #e8dcc8;
+  --color-cream: #f7f5f0;
+  --color-ink: #1f2926;
+  --color-surface: #fffefa;
+  --color-line: #e4e2dc;
+  --color-muted: #65716d;
+  --color-success: #287a50;
+  --color-success-light: #e9f4ed;
+  --color-danger: #b9463d;
+  --color-danger-light: #fbeceb;
+  --color-warning: #a66d1f;
+  --color-warning-light: #fbf2e2;
+  --color-info: #376c82;
+  --color-info-light: #eaf2f5;
   --background: var(--color-cream);
   --foreground: var(--color-ink);
 }
@@ -42,20 +41,109 @@
   --color-warning-light: var(--color-warning-light);
   --color-info: var(--color-info);
   --color-info-light: var(--color-info-light);
-  --font-serif: var(--font-cormorant);
+  --font-serif: var(--font-jost);
   --font-sans: var(--font-jost);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-jost), sans-serif;
+* {
+  box-sizing: border-box;
 }
 
-h1,
-h2,
-h3,
-h4,
-.font-serif {
-  font-family: var(--font-cormorant), serif;
+html {
+  background: var(--background);
+}
+
+body {
+  min-width: 320px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-jost), system-ui, sans-serif;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--color-gold-light);
+  color: var(--color-forest-dark);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.025em;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9aa29f;
+  }
+}
+
+@layer components {
+  .surface-panel {
+    border: 1px solid var(--color-line);
+    border-radius: 12px;
+    background: var(--color-surface);
+    box-shadow: 0 1px 2px rgba(23, 41, 35, 0.035);
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2;
+  }
+
+  .page-heading {
+    @apply text-2xl font-semibold tracking-tight text-forest md:text-[28px];
+  }
+
+  .page-description {
+    @apply mt-1 text-sm leading-6 text-forest/60;
+  }
+
+  .section-heading {
+    @apply text-base font-semibold tracking-tight text-forest;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-gold;
+  }
+
+  .page-enter {
+    animation: page-enter 180ms ease-out both;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

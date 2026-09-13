@@ -8,5 +8,5 @@ export function formatDate(value: Date | null): string {
 }
 
 export function formatDateTime(value: Date): string {
-  return value.toLocaleString("pt-BR");
+  return value.toLocaleString("pt-BR", { timeZone: "America/Bahia" });
 }

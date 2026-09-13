@@ -43,3 +43,23 @@ export async function assertCanAccessServiceDocument(serviceId: string) {
 
   throw new Error("Você não tem permissão para acessar este documento.");
 }
+
+export async function assertCanAccessBillingCycleDocument(billingCycleId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
+  if (user.account_type === "internal") {
+    return user;
+  }
+
+  const cycle = await prisma.billingCycle.findUniqueOrThrow({
+    where: { id: billingCycleId },
+    select: { company_id: true },
+  });
+  if (user.linked_company_id && cycle.company_id === user.linked_company_id) {
+    return user;
+  }
+
+  throw new Error("Você não tem permissão para acessar esta fatura.");
+}

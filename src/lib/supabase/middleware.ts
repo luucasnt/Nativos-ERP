@@ -81,7 +81,12 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user) {
-    const loginUrl = new URL("/login", request.url);
+    const loginPath = pathname.startsWith(PORTAL_MOTORISTA_PREFIX)
+      ? "/login/motorista"
+      : pathname.startsWith(PORTAL_EMPRESA_PREFIX)
+        ? "/login/parceiro"
+        : "/login/admin";
+    const loginUrl = new URL(loginPath, request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }

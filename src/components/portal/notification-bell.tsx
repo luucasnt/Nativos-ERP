@@ -1,5 +1,6 @@
 "use client";
 
+import { Bell, CheckCheck } from "lucide-react";
 import { useState, useTransition } from "react";
 import { markAllNotificationsReadPortal, markNotificationReadPortal } from "@/app/portal/actions";
 
@@ -17,47 +18,55 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="relative rounded-sm border border-gold/40 px-3 py-1 text-sm text-gold transition hover:bg-gold hover:text-forest"
+        onClick={() => setOpen((current) => !current)}
+        aria-label="Abrir avisos"
+        aria-expanded={open}
+        className="focus-ring relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-forest/12 bg-white text-forest/58 transition hover:border-forest/25 hover:text-forest"
       >
-        Avisos
+        <Bell size={16} aria-hidden="true" />
         {notifications.length > 0 && (
-          <span className="ml-1 rounded-full bg-gold px-1.5 text-xs text-forest">
-            {notifications.length}
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[9px] font-bold text-forest-dark">
+            {notifications.length > 9 ? "9+" : notifications.length}
           </span>
         )}
       </button>
+
       {open && (
-        <div className="absolute right-0 z-10 mt-2 w-80 rounded-sm border border-forest/10 bg-white text-ink shadow-lg">
-          <div className="flex items-center justify-between border-b border-forest/10 px-3 py-2">
-            <span className="text-sm font-medium text-forest">Avisos</span>
+        <div className="surface-panel absolute right-0 z-50 mt-2 w-[min(360px,calc(100vw-2rem))] overflow-hidden bg-white shadow-[0_16px_45px_rgba(23,41,35,0.14)]">
+          <div className="flex items-center justify-between border-b border-forest/10 px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-forest">Avisos</p>
+              <p className="mt-0.5 text-[10px] text-forest/42">{notifications.length} não lidos</p>
+            </div>
             {notifications.length > 0 && (
               <button
                 type="button"
                 disabled={isPending}
                 onClick={() => startTransition(() => markAllNotificationsReadPortal())}
-                className="text-xs text-forest/60 underline hover:text-forest"
+                className="focus-ring inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold text-forest/58 hover:bg-forest/5 hover:text-forest"
               >
-                Marcar todos como lidos
+                <CheckCheck size={13} aria-hidden="true" />
+                Marcar todos
               </button>
             )}
           </div>
+
           <ul className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <li className="px-3 py-4 text-sm text-forest/60">Nenhum aviso novo.</li>
+              <li className="px-4 py-10 text-center text-xs text-forest/45">Nenhum aviso novo.</li>
             ) : (
-              notifications.map((n) => (
-                <li key={n.id} className="border-b border-forest/5 px-3 py-2 text-sm last:border-b-0">
-                  <p className="text-ink">{n.message}</p>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-xs text-forest/50">
-                      {new Date(n.created_at).toLocaleString("pt-BR")}
+              notifications.map((notification) => (
+                <li key={notification.id} className="border-b border-forest/[0.075] px-4 py-3 last:border-b-0">
+                  <p className="text-xs leading-5 text-ink/82">{notification.message}</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-[10px] text-forest/38">
+                      {new Date(notification.created_at).toLocaleString("pt-BR")}
                     </span>
                     <button
                       type="button"
                       disabled={isPending}
-                      onClick={() => startTransition(() => markNotificationReadPortal(n.id))}
-                      className="text-xs text-forest/60 underline hover:text-forest"
+                      onClick={() => startTransition(() => markNotificationReadPortal(notification.id))}
+                      className="focus-ring rounded text-[10px] font-semibold text-forest/55 hover:text-forest"
                     >
                       Marcar como lido
                     </button>

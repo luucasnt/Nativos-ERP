@@ -1,5 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { AUTH_USER_ID_HEADER } from "@/lib/supabase/middleware";
 
@@ -15,7 +17,7 @@ import { AUTH_USER_ID_HEADER } from "@/lib/supabase/middleware";
 // não tivesse sido validado. O header só pode ter sido setado pelo
 // próprio middleware (qualquer valor vindo do cliente é descartado lá
 // antes), então confiar nele aqui não abre uma via de bypass nova.
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async function getCurrentUser() {
   const headerList = await headers();
   const authUserId = headerList.get(AUTH_USER_ID_HEADER);
 
@@ -32,7 +34,7 @@ export async function getCurrentUser() {
   });
 
   return user;
-}
+});
 
 // Segunda checagem de autorização dentro da própria Server Action —
 // defesa em profundidade além do gate que já existe no layout/página, já
@@ -45,4 +47,24 @@ export async function requireInternalUser() {
   }
 
   return user;
+}
+
+export async function requireCompanyPortalUser() {
+  const user = await getCurrentUser();
+
+  if (!user || user.account_type !== "portal" || user.status !== "ativo" || !user.linked_company) {
+    redirect("/login/parceiro");
+  }
+
+  return { ...user, linked_company: user.linked_company };
+}
+
+export async function requireDriverPortalUser() {
+  const user = await getCurrentUser();
+
+  if (!user || user.account_type !== "portal" || user.status !== "ativo" || !user.linked_driver) {
+    redirect("/login/motorista");
+  }
+
+  return { ...user, linked_driver: user.linked_driver };
 }
