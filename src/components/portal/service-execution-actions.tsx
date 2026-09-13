@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { completeService, startService } from "@/lib/services/service-execution";
+import {
+  completeService,
+  startService,
+} from "@/lib/services/service-execution";
 import { buttonClass, secondaryButtonClass } from "@/lib/ui";
 
 export function ServiceExecutionActions({
@@ -19,7 +22,7 @@ export function ServiceExecutionActions({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="grid w-full gap-1 sm:w-auto">
       {executionStatus === "agendado" && (
         <button
           type="button"
@@ -30,7 +33,7 @@ export function ServiceExecutionActions({
               setError(result.error);
             })
           }
-          className={`${buttonClass} px-3 py-1 text-sm`}
+          className={`${buttonClass} min-h-12 w-full px-5 text-sm sm:w-auto`}
         >
           Iniciar
         </button>
@@ -45,12 +48,12 @@ export function ServiceExecutionActions({
               setError(result.error);
             })
           }
-          className={`${secondaryButtonClass} px-3 py-1 text-sm`}
+          className={`${secondaryButtonClass} min-h-12 w-full px-5 text-sm sm:w-auto`}
         >
           Finalizar
         </button>
       )}
-      {error && <span className="text-xs text-red-700">{error}</span>}
+      {error && <span className="text-xs leading-5 text-red-700">{error}</span>}
     </div>
   );
 }

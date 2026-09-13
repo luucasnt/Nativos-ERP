@@ -83,7 +83,85 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     fontSize: 8,
+    lineHeight: 1.45,
     color: BRAND_COLORS.muted,
+  },
+  instructionBox: {
+    marginBottom: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+    borderRadius: 5,
+    backgroundColor: BRAND_COLORS.white,
+  },
+  instructionHeader: {
+    marginBottom: 8,
+    paddingBottom: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND_COLORS.line,
+  },
+  instructionTitle: {
+    fontSize: 9,
+    fontWeight: 600,
+    color: BRAND_COLORS.forest,
+  },
+  instructionSubtitle: {
+    marginTop: 2,
+    fontSize: 7,
+    color: BRAND_COLORS.muted,
+  },
+  instructionRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 5,
+  },
+  instructionNumber: {
+    width: 15,
+    height: 15,
+    marginRight: 7,
+    borderRadius: 8,
+    backgroundColor: BRAND_COLORS.soft,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.goldLight,
+    fontSize: 7,
+    fontWeight: 600,
+    lineHeight: 1.8,
+    textAlign: "center",
+    color: BRAND_COLORS.forest,
+  },
+  instructionText: {
+    flex: 1,
+    paddingTop: 1,
+    fontSize: 7.7,
+    lineHeight: 1.42,
+    color: BRAND_COLORS.ink,
+  },
+  checklist: {
+    marginBottom: 16,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+    borderRadius: 5,
+  },
+  checklistRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 6,
+  },
+  checkbox: {
+    width: 10,
+    height: 10,
+    marginTop: 1,
+    marginRight: 7,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.forest,
+    borderRadius: 1,
+  },
+  checklistText: {
+    flex: 1,
+    fontSize: 7.8,
+    lineHeight: 1.35,
+    color: BRAND_COLORS.ink,
   },
   total: {
     marginTop: 10,
@@ -91,27 +169,30 @@ const styles = StyleSheet.create({
     width: 230,
     padding: 14,
     borderRadius: 5,
-    backgroundColor: BRAND_COLORS.forest,
+    backgroundColor: BRAND_COLORS.white,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
+    borderLeftWidth: 3,
+    borderLeftColor: BRAND_COLORS.gold,
   },
   totalLabel: {
     fontSize: 7.5,
     textTransform: "uppercase",
     letterSpacing: 0.9,
-    color: BRAND_COLORS.cream,
-    opacity: 0.65,
+    color: BRAND_COLORS.muted,
   },
   totalValue: {
     marginTop: 4,
     fontFamily: BRAND_FONTS.serif,
     fontSize: 20,
     fontWeight: 600,
-    color: BRAND_COLORS.cream,
+    lineHeight: 1.15,
+    color: BRAND_COLORS.forest,
   },
   totalNote: {
-    marginTop: 3,
+    marginTop: 5,
     fontSize: 7,
-    color: BRAND_COLORS.cream,
-    opacity: 0.55,
+    color: BRAND_COLORS.muted,
   },
   signatures: {
     marginTop: 20,
@@ -160,12 +241,16 @@ export function DetailGrid({
   items: Array<{ label: string; value: string }>;
   columns?: 2 | 3;
 }) {
-  const width = columns === 3 ? "32.45%" : "49.4%";
+  const width = columns === 3 ? "31.9%" : "48.8%";
 
   return (
     <View style={styles.grid}>
       {items.map((item) => (
-        <View key={item.label} style={[styles.gridItem, { width }]} wrap={false}>
+        <View
+          key={item.label}
+          style={[styles.gridItem, { width }]}
+          wrap={false}
+        >
           <Text style={styles.label}>{item.label}</Text>
           <Text style={styles.value}>{item.value || "—"}</Text>
         </View>
@@ -185,6 +270,56 @@ export function NoticeBox({
     <View style={styles.notice} wrap={false}>
       <Text style={styles.noticeTitle}>{title}</Text>
       <Text style={styles.noticeText}>{children}</Text>
+    </View>
+  );
+}
+
+export function InstructionList({
+  title,
+  subtitle,
+  items,
+}: {
+  title: string;
+  subtitle?: string;
+  items: string[];
+}) {
+  return (
+    <View style={styles.instructionBox} wrap={false}>
+      <View style={styles.instructionHeader}>
+        <Text style={styles.instructionTitle}>{title}</Text>
+        {subtitle && <Text style={styles.instructionSubtitle}>{subtitle}</Text>}
+      </View>
+      {items.map((item, index) => (
+        <View
+          key={item}
+          style={[
+            styles.instructionRow,
+            index === items.length - 1 ? { marginBottom: 0 } : {},
+          ]}
+        >
+          <Text style={styles.instructionNumber}>{index + 1}</Text>
+          <Text style={styles.instructionText}>{item}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function OperationalChecklist({ items }: { items: string[] }) {
+  return (
+    <View style={styles.checklist} wrap={false}>
+      {items.map((item, index) => (
+        <View
+          key={item}
+          style={[
+            styles.checklistRow,
+            index === items.length - 1 ? { marginBottom: 0 } : {},
+          ]}
+        >
+          <View style={styles.checkbox} />
+          <Text style={styles.checklistText}>{item}</Text>
+        </View>
+      ))}
     </View>
   );
 }

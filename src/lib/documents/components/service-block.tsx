@@ -61,9 +61,17 @@ const styles = StyleSheet.create({
   },
   route: {
     marginBottom: 10,
+    flexDirection: "row",
+    gap: 7,
+  },
+  routeItem: {
+    flex: 1,
+    minHeight: 43,
     padding: 9,
     borderRadius: 4,
     backgroundColor: BRAND_COLORS.soft,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.line,
   },
   routeLabel: {
     marginBottom: 3,
@@ -95,50 +103,78 @@ export function ServiceBlock({
   showPrice: boolean;
   sequence?: number;
 }) {
-  const luggageTotal = service.luggage_10kg + service.luggage_23kg + service.luggage_32kg;
-  const seatsTotal = service.bebe_conforto + service.cadeirinha + service.booster;
+  const luggageTotal =
+    service.luggage_10kg + service.luggage_23kg + service.luggage_32kg;
+  const seatsTotal =
+    service.bebe_conforto + service.cadeirinha + service.booster;
 
   const detailItems = [
     {
       label: "Data e horário",
-      value: formatDate(service.scheduled_date) + (service.scheduled_time ? " · " + service.scheduled_time : ""),
+      value:
+        formatDate(service.scheduled_date) +
+        (service.scheduled_time ? " · " + service.scheduled_time : ""),
     },
     {
       label: "Passageiros",
-      value: service.passenger_count === null ? "Não informado" : String(service.passenger_count),
+      value:
+        service.passenger_count === null
+          ? "Não informado"
+          : String(service.passenger_count),
     },
-    ...(service.flight_number ? [{ label: "Voo", value: service.flight_number }] : []),
+    ...(service.flight_number
+      ? [{ label: "Voo", value: service.flight_number }]
+      : []),
   ];
 
   return (
     <View style={styles.block} wrap={false}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.sequence}>Serviço {sequence ? String(sequence).padStart(2, "0") : ""}</Text>
-          <Text style={styles.title}>{SERVICE_TYPE_LABEL[service.type] ?? service.type}</Text>
+          <Text style={styles.sequence}>
+            Serviço {sequence ? String(sequence).padStart(2, "0") : ""}
+          </Text>
+          <Text style={styles.title}>
+            {SERVICE_TYPE_LABEL[service.type] ?? service.type}
+          </Text>
         </View>
-        {showPrice && <Text style={styles.price}>{formatCurrency(service.price)}</Text>}
+        {showPrice && (
+          <Text style={styles.price}>{formatCurrency(service.price)}</Text>
+        )}
       </View>
 
       {(service.pickup_location || service.dropoff_location) && (
         <View style={styles.route}>
-          <Text style={styles.routeLabel}>Rota</Text>
-          <Text style={styles.routeText}>
-            {service.pickup_location ?? "Origem a definir"} → {service.dropoff_location ?? "Destino a definir"}
-          </Text>
+          <View style={styles.routeItem}>
+            <Text style={styles.routeLabel}>Origem</Text>
+            <Text style={styles.routeText}>
+              {service.pickup_location ?? "A definir"}
+            </Text>
+          </View>
+          <View style={styles.routeItem}>
+            <Text style={styles.routeLabel}>Destino</Text>
+            <Text style={styles.routeText}>
+              {service.dropoff_location ?? "A definir"}
+            </Text>
+          </View>
         </View>
       )}
 
-      <DetailGrid items={detailItems} columns={detailItems.length >= 3 ? 3 : 2} />
+      <DetailGrid
+        items={detailItems}
+        columns={detailItems.length >= 3 ? 3 : 2}
+      />
 
       {luggageTotal > 0 && (
         <Text style={styles.extra}>
-          Bagagem · {service.luggage_10kg} até 10 kg · {service.luggage_23kg} até 23 kg · {service.luggage_32kg} até 32 kg
+          Bagagem · {service.luggage_10kg} até 10 kg · {service.luggage_23kg}{" "}
+          até 23 kg · {service.luggage_32kg} até 32 kg
         </Text>
       )}
       {seatsTotal > 0 && (
         <Text style={styles.extra}>
-          Assentos infantis · {service.bebe_conforto} bebê conforto · {service.cadeirinha} cadeirinha · {service.booster} elevação
+          Assentos infantis · {service.bebe_conforto} bebê conforto ·{" "}
+          {service.cadeirinha} cadeirinha · {service.booster} elevação
         </Text>
       )}
     </View>

@@ -107,10 +107,14 @@ export function DocumentShell({
         {children}
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Nativos Experiences · Trancoso, Bahia</Text>
+          <Text style={styles.footerText}>
+            nativosexperiences.com · WhatsApp +55 73 99168-1630
+          </Text>
           <Text
             style={styles.pageNumber}
-            render={({ pageNumber, totalPages }) => "Página " + pageNumber + " de " + totalPages}
+            render={({ pageNumber, totalPages }) =>
+              "Página " + pageNumber + " de " + totalPages
+            }
           />
         </View>
       </Page>

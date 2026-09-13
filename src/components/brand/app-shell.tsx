@@ -40,21 +40,25 @@ export function AppShell({
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-forest/10 bg-white/95 px-4 backdrop-blur md:px-6">
           <div className="flex min-w-0 items-center gap-3 md:hidden">
-            {nav.length > 0 && mobileNav === "drawer" && (
-              <MobileNavigation nav={nav} badges={badges} />
-            )}
+            {nav.length > 0 && <MobileNavigation nav={nav} badges={badges} />}
             <Wordmark size={20} tone="forest-on-cream" priority />
           </div>
 
           <div className="hidden min-w-0 md:block">
-            <p className="truncate text-sm font-semibold text-forest">{title}</p>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-forest/38">Nativos ERP</p>
+            <p className="truncate text-sm font-semibold text-forest">
+              {title}
+            </p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-forest/38">
+              Nativos ERP
+            </p>
           </div>
 
           <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 md:gap-3">
             {nav.length > 0 && (
               <div className="mr-auto hidden w-full justify-center px-5 md:flex">
-                <NavigationSearch items={nav.map(({ href, label }) => ({ href, label }))} />
+                <NavigationSearch
+                  items={nav.map(({ href, label }) => ({ href, label }))}
+                />
               </div>
             )}
             {notifications}
@@ -62,7 +66,9 @@ export function AppShell({
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-forest text-[11px] font-semibold text-cream">
                 {initials(userName)}
               </span>
-              <span className="max-w-32 truncate text-xs font-medium text-forest">{userName}</span>
+              <span className="max-w-32 truncate text-xs font-medium text-forest">
+                {userName}
+              </span>
             </div>
             <form action="/logout" method="post">
               <button
@@ -79,7 +85,7 @@ export function AppShell({
         </header>
 
         <main
-          className={`min-w-0 px-4 py-6 md:px-7 md:py-7 xl:px-9 ${mobileNav === "bottom" ? "pb-24 md:pb-8" : ""}`}
+          className={`min-w-0 px-3 py-4 sm:px-4 sm:py-6 md:px-7 md:py-7 xl:px-9 ${mobileNav === "bottom" ? "pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8" : ""}`}
         >
           <PageTransition>{children}</PageTransition>
         </main>

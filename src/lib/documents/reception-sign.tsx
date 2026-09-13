@@ -7,7 +7,9 @@ import { WordmarkPdf } from "@/lib/documents/components/wordmark-pdf";
 registerBrandFonts();
 
 export async function loadReceptionSignData(serviceId: string) {
-  const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
+  const service = await prisma.service.findUniqueOrThrow({
+    where: { id: serviceId },
+  });
 
   if (!service.reception_sign_enabled) {
     throw new Error("Este serviço não tem a plaquinha de recepção habilitada.");
@@ -21,8 +23,8 @@ export async function loadReceptionSignData(serviceId: string) {
 const styles = StyleSheet.create({
   page: {
     position: "relative",
-    backgroundColor: BRAND_COLORS.forest,
-    color: BRAND_COLORS.cream,
+    backgroundColor: BRAND_COLORS.white,
+    color: BRAND_COLORS.forest,
     padding: 44,
   },
   frame: {
@@ -31,9 +33,17 @@ const styles = StyleSheet.create({
     right: 22,
     bottom: 22,
     left: 22,
-    borderWidth: 1,
+    borderWidth: 2,
+    borderColor: BRAND_COLORS.forest,
+  },
+  innerFrame: {
+    position: "absolute",
+    top: 29,
+    right: 29,
+    bottom: 29,
+    left: 29,
+    borderWidth: 0.7,
     borderColor: BRAND_COLORS.gold,
-    opacity: 0.55,
   },
   header: {
     alignItems: "center",
@@ -56,7 +66,7 @@ const styles = StyleSheet.create({
     fontFamily: BRAND_FONTS.serif,
     fontWeight: 600,
     lineHeight: 1.05,
-    color: BRAND_COLORS.cream,
+    color: BRAND_COLORS.forest,
     textAlign: "center",
   },
   line: {
@@ -71,8 +81,7 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 8,
     letterSpacing: 1.1,
-    color: BRAND_COLORS.cream,
-    opacity: 0.55,
+    color: BRAND_COLORS.muted,
   },
 });
 
@@ -85,15 +94,21 @@ export function ReceptionSignDocument({
   const nameSize = Math.max(34, Math.min(67, 980 / normalizedLength));
 
   return (
-    <Document title={"Recepção · " + data.passengerName} author="Nativos Experiences">
+    <Document
+      title={"Recepção · " + data.passengerName}
+      author="Nativos Experiences"
+    >
       <Page size="A4" orientation="landscape" style={styles.page}>
         <View style={styles.frame} />
+        <View style={styles.innerFrame} />
         <View style={styles.header}>
-          <WordmarkPdf size={31} tone="cream-on-forest" />
+          <WordmarkPdf size={31} tone="forest-on-cream" />
         </View>
         <View style={styles.center}>
           <Text style={styles.welcome}>Bem-vindo</Text>
-          <Text style={[styles.name, { fontSize: nameSize }]}>{data.passengerName}</Text>
+          <Text style={[styles.name, { fontSize: nameSize }]}>
+            {data.passengerName}
+          </Text>
           <View style={styles.line} />
         </View>
         <View style={styles.footer}>

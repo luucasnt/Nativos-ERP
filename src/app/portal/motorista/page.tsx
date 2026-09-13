@@ -1,11 +1,13 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  BriefcaseBusiness,
   CalendarDays,
   Clock3,
   FileText,
   MapPin,
   Navigation,
+  PhoneCall,
   ReceiptText,
   Route,
   Users,
@@ -52,14 +54,23 @@ export default async function PortalMotoristaHomePage() {
 
   const nextService = services[0] ?? null;
   const todayKey = bahiaDateKey(new Date());
-  const todayServices = services.filter((service) => bahiaDateKey(service.scheduled_date) === todayKey);
+  const todayServices = services.filter(
+    (service) => bahiaDateKey(service.scheduled_date) === todayKey,
+  );
+  const remainingTodayServices = todayServices.filter(
+    (service) => service.id !== nextService?.id,
+  );
   const firstName = (user.display_name ?? driver.name).split(" ")[0];
 
   return (
-    <div className="mx-auto max-w-[1180px] space-y-5">
-      <header className="rounded-xl bg-forest px-5 py-5 text-cream md:bg-transparent md:px-0 md:py-0 md:text-ink">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gold">Portal do motorista</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-forest">Olá, {firstName}</h1>
+    <div className="mx-auto max-w-[1180px] space-y-4 sm:space-y-5">
+      <header className="rounded-xl bg-forest px-4 py-4 text-cream sm:px-5 sm:py-5 md:bg-transparent md:px-0 md:py-0 md:text-ink">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gold">
+          Portal do motorista
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-forest">
+          Olá, {firstName}
+        </h1>
         <p className="mt-1 text-xs text-cream/58 md:text-forest/52">
           {new Intl.DateTimeFormat("pt-BR", {
             timeZone: "America/Bahia",
@@ -72,17 +83,27 @@ export default async function PortalMotoristaHomePage() {
 
       {nextService ? (
         <section className="surface-panel overflow-hidden">
-          <div className="flex items-center justify-between border-b border-forest/10 bg-[#faf9f6] px-5 py-3.5">
+          <div className="flex items-center justify-between border-b border-forest/10 bg-[#faf9f6] px-4 py-3.5 sm:px-5">
             <div>
               <p className="eyebrow">Próximo serviço</p>
-              <h2 className="mt-1 text-sm font-semibold text-forest">{SERVICE_TYPE_LABEL[nextService.type] ?? nextService.type}</h2>
+              <h2 className="mt-1 text-sm font-semibold text-forest">
+                {SERVICE_TYPE_LABEL[nextService.type] ?? nextService.type}
+              </h2>
             </div>
-            <Badge tone={nextService.execution_status === "em_andamento" ? "info" : "gold"}>
-              {nextService.execution_status === "em_andamento" ? "Em andamento" : "Próximo"}
+            <Badge
+              tone={
+                nextService.execution_status === "em_andamento"
+                  ? "info"
+                  : "gold"
+              }
+            >
+              {nextService.execution_status === "em_andamento"
+                ? "Em andamento"
+                : "Próximo"}
             </Badge>
           </div>
 
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
               <div>
                 <div className="flex items-baseline gap-3">
@@ -100,51 +121,114 @@ export default async function PortalMotoristaHomePage() {
 
                 <dl className="mt-5 grid gap-3 text-sm">
                   <div className="flex gap-3">
-                    <Users size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />
+                    <Users
+                      size={16}
+                      className="mt-0.5 shrink-0 text-gold"
+                      aria-hidden="true"
+                    />
                     <div>
-                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">Passageiro</dt>
-                      <dd className="mt-0.5 font-medium text-ink">{nextService.reservation.client.name}</dd>
+                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                        Passageiro
+                      </dt>
+                      <dd className="mt-0.5 font-medium text-ink">
+                        {nextService.reservation.client.name}
+                      </dd>
+                      {nextService.reservation.client.phone && (
+                        <dd className="mt-1 text-xs text-forest/52">
+                          {nextService.reservation.client.phone}
+                        </dd>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <MapPin size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">Rota</dt>
-                      <dd className="mt-0.5 leading-5 text-ink/82">
-                        {nextService.pickup_location ?? "Origem não informada"} → {nextService.dropoff_location ?? "Destino não informado"}
+                    <MapPin
+                      size={16}
+                      className="mt-0.5 shrink-0 text-gold"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                        Rota
+                      </dt>
+                      <dd className="mt-1 grid gap-2 rounded-lg bg-forest/[0.04] p-3 text-xs leading-5 text-ink/82 sm:text-sm">
+                        <span>
+                          <strong className="mr-1 font-semibold text-forest">
+                            Origem:
+                          </strong>
+                          {nextService.pickup_location ?? "Não informada"}
+                        </span>
+                        <span>
+                          <strong className="mr-1 font-semibold text-forest">
+                            Destino:
+                          </strong>
+                          {nextService.dropoff_location ?? "Não informado"}
+                        </span>
                       </dd>
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <Route size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />
+                    <Route
+                      size={16}
+                      className="mt-0.5 shrink-0 text-gold"
+                      aria-hidden="true"
+                    />
                     <div>
-                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">Reserva e veículo</dt>
+                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                        Reserva e veículo
+                      </dt>
                       <dd className="mt-0.5 text-ink/82">
-                        {nextService.reservation.code} · {nextService.vehicle ? nextService.vehicle.model + " · " + nextService.vehicle.plate : "Veículo a definir"}
+                        {nextService.reservation.code} ·{" "}
+                        {nextService.vehicle
+                          ? nextService.vehicle.model +
+                            " · " +
+                            nextService.vehicle.plate
+                          : "Veículo a definir"}
                       </dd>
                     </div>
                   </div>
                 </dl>
               </div>
 
-              <div className="flex flex-col gap-2 lg:min-w-44">
-                <ServiceExecutionActions serviceId={nextService.id} executionStatus={nextService.execution_status} />
-                {(nextService.pickup_location || nextService.dropoff_location) && (
+              <div className="grid grid-cols-2 gap-2 lg:min-w-48 lg:grid-cols-1">
+                <ServiceExecutionActions
+                  serviceId={nextService.id}
+                  executionStatus={nextService.execution_status}
+                />
+                {(nextService.pickup_location ||
+                  nextService.dropoff_location) && (
                   <a
-                    href={routeUrl(nextService.pickup_location, nextService.dropoff_location)}
+                    href={routeUrl(
+                      nextService.pickup_location,
+                      nextService.dropoff_location,
+                    )}
                     target="_blank"
                     rel="noreferrer"
-                    className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-4 text-sm font-medium text-forest transition hover:bg-forest/[0.035]"
+                    className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest transition hover:bg-forest/[0.035] sm:text-sm"
                   >
                     <Navigation size={15} aria-hidden="true" />
                     Abrir rota
+                  </a>
+                )}
+                {nextService.reservation.client.phone && (
+                  <a
+                    href={
+                      "tel:" +
+                      nextService.reservation.client.phone.replace(
+                        /[^\d+]/g,
+                        "",
+                      )
+                    }
+                    className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest transition hover:bg-forest/[0.035] sm:text-sm"
+                  >
+                    <PhoneCall size={15} aria-hidden="true" />
+                    Ligar
                   </a>
                 )}
                 <a
                   href={"/api/documentos/os/" + nextService.id}
                   target="_blank"
                   rel="noreferrer"
-                  className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-4 text-sm font-medium text-forest transition hover:bg-forest/[0.035]"
+                  className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest transition hover:bg-forest/[0.035] sm:text-sm"
                 >
                   <FileText size={15} aria-hidden="true" />
                   Ordem de serviço
@@ -152,23 +236,58 @@ export default async function PortalMotoristaHomePage() {
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-2 border-t border-forest/10 pt-4">
+            {nextService.notes && (
+              <div className="mt-5 rounded-lg border border-warning/15 bg-warning-light px-3.5 py-3 text-xs leading-5 text-warning">
+                <strong className="block font-semibold">
+                  Atenção antes do atendimento
+                </strong>
+                <span className="mt-0.5 block">{nextService.notes}</span>
+              </div>
+            )}
+
+            <div className="mt-5 grid grid-cols-2 gap-2 border-t border-forest/10 pt-4 sm:grid-cols-3">
               <div className="rounded-lg bg-forest/[0.045] p-3">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-forest/40">Passageiros</p>
-                <p className="mt-1 text-sm font-semibold text-forest">{nextService.passenger_count ?? "—"}</p>
+                <p className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                  Passageiros
+                </p>
+                <p className="mt-1 text-sm font-semibold text-forest">
+                  {nextService.passenger_count ?? "—"}
+                </p>
+              </div>
+              <div className="col-span-2 rounded-lg bg-forest/[0.045] p-3 sm:col-span-1">
+                <p className="flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                  <BriefcaseBusiness size={12} aria-hidden="true" /> Bagagens
+                </p>
+                <p className="mt-1 text-sm font-semibold text-forest">
+                  {nextService.luggage_10kg +
+                    nextService.luggage_23kg +
+                    nextService.luggage_32kg || "Não informada"}
+                </p>
               </div>
               <div className="rounded-lg bg-forest/[0.045] p-3">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-forest/40">Voo</p>
-                <p className="mt-1 text-sm font-semibold text-forest">{nextService.flight_number ?? "Não informado"}</p>
+                <p className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                  Voo
+                </p>
+                <p className="mt-1 text-sm font-semibold text-forest">
+                  {nextService.flight_number ?? "Não informado"}
+                </p>
               </div>
             </div>
           </div>
         </section>
       ) : (
         <section className="surface-panel px-5 py-14 text-center">
-          <CalendarDays size={32} className="mx-auto text-forest/22" aria-hidden="true" />
-          <h2 className="mt-3 text-sm font-semibold text-forest">Nenhum serviço agendado</h2>
-          <p className="mt-1 text-xs text-forest/46">Sua agenda está livre no momento.</p>
+          <CalendarDays
+            size={32}
+            className="mx-auto text-forest/22"
+            aria-hidden="true"
+          />
+          <h2 className="mt-3 text-sm font-semibold text-forest">
+            Nenhum serviço agendado
+          </h2>
+          <p className="mt-1 text-xs text-forest/46">
+            Sua agenda está livre no momento.
+          </p>
         </section>
       )}
 
@@ -177,31 +296,52 @@ export default async function PortalMotoristaHomePage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Hoje</h2>
-              <p className="mt-1 text-xs text-forest/46">{todayServices.length} serviços na agenda.</p>
+              <p className="mt-1 text-xs text-forest/46">
+                {remainingTodayServices.length} após o próximo atendimento.
+              </p>
             </div>
-            <Link href="/portal/motorista/servicos" className="focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-forest">
+            <Link
+              href="/portal/motorista/servicos"
+              className="focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-forest"
+            >
               Agenda completa
               <ArrowRight size={13} aria-hidden="true" />
             </Link>
           </div>
-          {todayServices.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-forest/46">Nenhum outro serviço hoje.</p>
+          {remainingTodayServices.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-forest/46">
+              Nenhum outro serviço hoje.
+            </p>
           ) : (
             <ul className="divide-y divide-forest/[0.075]">
-              {todayServices.map((service) => (
+              {remainingTodayServices.map((service) => (
                 <li key={service.id}>
-                  <Link href={"/portal/motorista/servicos#" + service.id} className="group flex items-center gap-3 px-5 py-4 hover:bg-forest/[0.025]">
+                  <Link
+                    href={"/portal/motorista/servicos#" + service.id}
+                    className="group flex items-center gap-3 px-5 py-4 hover:bg-forest/[0.025]"
+                  >
                     <span className="flex min-w-14 items-center gap-1 text-sm font-semibold text-forest">
-                      <Clock3 size={13} className="text-gold" aria-hidden="true" />
+                      <Clock3
+                        size={13}
+                        className="text-gold"
+                        aria-hidden="true"
+                      />
                       {service.scheduled_time ?? "—"}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-xs text-ink">{service.reservation.client.name}</strong>
+                      <strong className="block truncate text-xs text-ink">
+                        {service.reservation.client.name}
+                      </strong>
                       <span className="mt-1 block truncate text-[11px] text-forest/45">
-                          {service.pickup_location ?? "Origem a definir"} → {service.dropoff_location ?? "Destino a definir"}
+                        {service.pickup_location ?? "Origem a definir"} →{" "}
+                        {service.dropoff_location ?? "Destino a definir"}
                       </span>
                     </span>
-                    <ArrowRight size={14} className="text-forest/30 group-hover:text-forest" aria-hidden="true" />
+                    <ArrowRight
+                      size={14}
+                      className="text-forest/30 group-hover:text-forest"
+                      aria-hidden="true"
+                    />
                   </Link>
                 </li>
               ))}
@@ -212,11 +352,17 @@ export default async function PortalMotoristaHomePage() {
         <section className="surface-panel p-5">
           <h2 className="section-heading">Ações rápidas</h2>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link href="/portal/motorista/servicos" className="focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-[11px] font-medium text-forest hover:bg-forest/[0.055]">
+            <Link
+              href="/portal/motorista/servicos"
+              className="focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-[11px] font-medium text-forest hover:bg-forest/[0.055]"
+            >
               <CalendarDays size={18} aria-hidden="true" />
               Abrir agenda
             </Link>
-            <Link href="/portal/motorista/despesas" className="focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-[11px] font-medium text-forest hover:bg-forest/[0.055]">
+            <Link
+              href="/portal/motorista/despesas"
+              className="focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-[11px] font-medium text-forest hover:bg-forest/[0.055]"
+            >
               <ReceiptText size={18} aria-hidden="true" />
               Registrar despesa
             </Link>
