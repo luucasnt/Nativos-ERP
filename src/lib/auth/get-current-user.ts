@@ -1,21 +1,30 @@
 import "server-only";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { AUTH_USER_ID_HEADER } from "@/lib/supabase/middleware";
 
 // Fonte da verdade para autorização fina: usada em Server Components e
 // Server Actions (nunca em middleware/Edge, onde o Prisma não roda).
+//
+// Lê o id do usuário do header que o middleware já propagou (ver
+// AUTH_USER_ID_HEADER em src/lib/supabase/middleware.ts) em vez de chamar
+// `supabase.auth.getUser()` de novo aqui — o middleware já faz essa
+// validação de rede contra o Supabase Auth uma vez por requisição pra
+// qualquer rota que chega até uma página/Server Action; repetir a mesma
+// chamada aqui só duplicava a latência de rede sem validar nada que já
+// não tivesse sido validado. O header só pode ter sido setado pelo
+// próprio middleware (qualquer valor vindo do cliente é descartado lá
+// antes), então confiar nele aqui não abre uma via de bypass nova.
 export async function getCurrentUser() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
+  const headerList = await headers();
+  const authUserId = headerList.get(AUTH_USER_ID_HEADER);
 
-  if (!authUser) {
+  if (!authUserId) {
     return null;
   }
 
   const user = await prisma.user.findUnique({
-    where: { auth_user_id: authUser.id },
+    where: { auth_user_id: authUserId },
     include: {
       linked_company: true,
       linked_driver: true,

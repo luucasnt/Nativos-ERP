@@ -7,6 +7,15 @@ const PORTAL_EMPRESA_PREFIX = "/portal/empresa";
 const PORTAL_MOTORISTA_PREFIX = "/portal/motorista";
 const PUBLIC_PATHS = ["/login", "/change-password", "/auth"];
 
+// Nome do header interno que carrega o id do usuário já validado por
+// `getUser()` (rede) aqui no middleware, pra Server Components/Actions
+// não precisarem revalidar a mesma sessão de novo (ver getCurrentUser()
+// em src/lib/auth/get-current-user.ts). Nunca é lido de volta de um
+// response nem exposto ao cliente — só existe dentro da requisição que o
+// Next.js repassa pro servidor depois que o middleware roda, e qualquer
+// valor vindo do próprio cliente é descartado antes de setarmos o nosso.
+export const AUTH_USER_ID_HEADER = "x-nativos-auth-user-id";
+
 function isPublicPath(pathname: string) {
   return (
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
@@ -50,6 +59,20 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Descarta qualquer valor que o próprio cliente tenha tentado mandar
+  // nesse header antes de decidir o valor de verdade — só depois disso
+  // reconstruímos a resposta, preservando os cookies que `setAll` já
+  // possa ter colocado em `supabaseResponse` (refresh de token).
+  request.headers.delete(AUTH_USER_ID_HEADER);
+  if (user) {
+    request.headers.set(AUTH_USER_ID_HEADER, user.id);
+  }
+  const existingCookies = supabaseResponse.cookies.getAll();
+  supabaseResponse = NextResponse.next({ request });
+  for (const cookie of existingCookies) {
+    supabaseResponse.cookies.set(cookie);
+  }
 
   const { pathname } = request.nextUrl;
 
