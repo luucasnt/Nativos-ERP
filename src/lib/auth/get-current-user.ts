@@ -8,13 +8,10 @@ import { AUTH_USER_ID_HEADER } from "@/lib/supabase/middleware";
 // Fonte da verdade para autorização fina: usada em Server Components e
 // Server Actions (nunca em middleware/Edge, onde o Prisma não roda).
 //
-// Lê o id do usuário do header que o middleware já propagou (ver
+// Lê o id do usuário do header que o middleware já propagou após validar
+// criptograficamente os claims da sessão (ver
 // AUTH_USER_ID_HEADER em src/lib/supabase/middleware.ts) em vez de chamar
-// `supabase.auth.getUser()` de novo aqui — o middleware já faz essa
-// validação de rede contra o Supabase Auth uma vez por requisição pra
-// qualquer rota que chega até uma página/Server Action; repetir a mesma
-// chamada aqui só duplicava a latência de rede sem validar nada que já
-// não tivesse sido validado. O header só pode ter sido setado pelo
+// `supabase.auth.getUser()` aqui. O header só pode ter sido setado pelo
 // próprio middleware (qualquer valor vindo do cliente é descartado lá
 // antes), então confiar nele aqui não abre uma via de bypass nova.
 export const getCurrentUser = cache(async function getCurrentUser() {
@@ -46,6 +43,62 @@ export async function requireInternalUser() {
     throw new Error("Acesso restrito à equipe interna da Nativos.");
   }
 
+  return user;
+}
+
+export async function assertActiveUser() {
+  const user = await getCurrentUser();
+  if (!user || user.status !== "ativo") {
+    throw new Error("Sessão expirada ou acesso desativado. Faça login novamente.");
+  }
+  return user;
+}
+
+export async function assertActiveCompanyPortalUser() {
+  const user = await assertActiveUser();
+  if (user.account_type !== "portal" || !user.linked_company) {
+    throw new Error("Acesso restrito ao portal da empresa.");
+  }
+  return {
+    ...user,
+    linked_company_id: user.linked_company_id!,
+    linked_company: user.linked_company,
+  };
+}
+
+export async function assertActiveDriverPortalUser() {
+  const user = await assertActiveUser();
+  if (user.account_type !== "portal" || !user.linked_driver) {
+    throw new Error("Acesso restrito ao portal do motorista.");
+  }
+  return {
+    ...user,
+    linked_driver_id: user.linked_driver_id!,
+    linked_driver: user.linked_driver,
+  };
+}
+
+export async function requireOwnerUser() {
+  const user = await requireInternalUser();
+  if (!user.is_owner || user.role !== "admin") {
+    throw new Error("Acesso restrito ao proprietário da conta.");
+  }
+  return user;
+}
+
+export function canAccessFinance(user: {
+  role: "admin" | "user";
+  internal_role: "financeiro" | "operacional" | null;
+  is_owner: boolean;
+}) {
+  return user.role === "admin" || user.is_owner || user.internal_role === "financeiro";
+}
+
+export async function requireFinancialUser() {
+  const user = await requireInternalUser();
+  if (!canAccessFinance(user)) {
+    throw new Error("Acesso restrito à administração e à equipe financeira da Nativos.");
+  }
   return user;
 }
 

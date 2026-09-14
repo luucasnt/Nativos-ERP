@@ -6,9 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-  next: z.string().optional(),
+  identifier: z.string().min(3).max(254),
+  password: z.string().min(1).max(128),
+  next: z.string().max(512).optional(),
 });
 
 export type SignInState = { error: string | null };
@@ -18,7 +18,7 @@ export async function signIn(
   formData: FormData,
 ): Promise<SignInState> {
   const parsed = schema.safeParse({
-    email: formData.get("email"),
+    identifier: formData.get("identifier"),
     password: formData.get("password"),
     next: formData.get("next") ?? undefined,
   });
@@ -27,9 +27,21 @@ export async function signIn(
     return { error: "Informe e-mail e senha válidos." };
   }
 
+  const identifier = parsed.data.identifier.trim();
+  const normalizedPhone = identifier.replace(/\D/g, "");
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: identifier.toLowerCase() },
+        ...(normalizedPhone.length >= 8 ? [{ linked_driver: { phone: { contains: normalizedPhone.slice(-8) } } }, { linked_company: { contact_phone: { contains: normalizedPhone.slice(-8) } } }] : []),
+      ],
+    },
+  });
+  if (!user?.email) return { error: "E-mail, telefone ou senha inválidos." };
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
+    email: user.email,
     password: parsed.data.password,
   });
 
@@ -37,11 +49,7 @@ export async function signIn(
     return { error: "E-mail ou senha inválidos." };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-  });
-
-  if (!user || user.status !== "ativo") {
+  if (user.status !== "ativo") {
     await supabase.auth.signOut();
     return { error: "Este acesso está inativo. Fale com a Nativos." };
   }

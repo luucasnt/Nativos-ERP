@@ -8,11 +8,13 @@ export default async function AprovacoesPage() {
       where: { approval_status: "pendente" },
       include: { supplier: true },
       orderBy: { created_at: "asc" },
+      take: 100,
     }),
     prisma.vehicle.findMany({
       where: { approval_status: "pendente" },
       include: { supplier: true },
       orderBy: { created_at: "asc" },
+      take: 100,
     }),
   ]);
 
@@ -31,7 +33,18 @@ export default async function AprovacoesPage() {
         {drivers.length === 0 ? (
           <p className="text-sm text-forest/60">Nenhum motorista pendente.</p>
         ) : (
-          <table className={tableClass}>
+          <>
+            <ul className="grid gap-3 md:hidden">
+              {drivers.map((driver) => (
+                <li key={driver.id} className="surface-panel p-4">
+                  <p className="text-sm font-semibold text-ink">{driver.name}</p>
+                  <p className="mt-1 text-xs text-forest/48">{driver.supplier?.name ?? "Sem fornecedor"}</p>
+                  <Link href={`/admin/motoristas/${driver.id}`} className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-forest/15 text-sm font-semibold text-forest">Revisar motorista</Link>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <table className={tableClass}>
             <thead>
               <tr>
                 <th className={thClass}>Nome</th>
@@ -52,7 +65,9 @@ export default async function AprovacoesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
@@ -61,7 +76,19 @@ export default async function AprovacoesPage() {
         {vehicles.length === 0 ? (
           <p className="text-sm text-forest/60">Nenhum veículo pendente.</p>
         ) : (
-          <table className={tableClass}>
+          <>
+            <ul className="grid gap-3 md:hidden">
+              {vehicles.map((vehicle) => (
+                <li key={vehicle.id} className="surface-panel p-4">
+                  <p className="text-sm font-semibold uppercase tracking-[0.08em] text-forest">{vehicle.plate}</p>
+                  <p className="mt-1 text-sm text-ink">{vehicle.model}</p>
+                  <p className="mt-1 text-xs text-forest/48">{vehicle.supplier?.name ?? "Sem fornecedor"}</p>
+                  <Link href={`/admin/veiculos/${vehicle.id}`} className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-forest/15 text-sm font-semibold text-forest">Revisar veículo</Link>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <table className={tableClass}>
             <thead>
               <tr>
                 <th className={thClass}>Placa</th>
@@ -84,7 +111,9 @@ export default async function AprovacoesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </div>

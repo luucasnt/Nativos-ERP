@@ -54,24 +54,32 @@ export async function createFinanceEntry(input: CreateFinanceEntryInput) {
     return existing;
   }
 
-  return prisma.financeEntry.create({
-    data: {
-      type: input.type,
-      category: input.category,
-      status: input.status ?? "programado",
-      payment_eligible: false,
-      amount: input.amount,
-      party_type: input.party_type,
-      party_id: input.party_id,
-      reservation_id: input.reservation_id,
-      service_id: input.service_id,
-      origin_type: input.origin_type,
-      origin_id: input.origin_id,
-      description: input.description,
-      due_date: input.due_date,
-      auto_key: input.auto_key,
-    },
-  });
+  try {
+    return await prisma.financeEntry.create({
+      data: {
+        type: input.type,
+        category: input.category,
+        status: input.status ?? "programado",
+        payment_eligible: false,
+        amount: input.amount,
+        party_type: input.party_type,
+        party_id: input.party_id,
+        reservation_id: input.reservation_id,
+        service_id: input.service_id,
+        origin_type: input.origin_type,
+        origin_id: input.origin_id,
+        description: input.description,
+        due_date: input.due_date,
+        auto_key: input.auto_key,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const concurrent = await prisma.financeEntry.findUnique({ where: { auto_key: input.auto_key } });
+      if (concurrent) return concurrent;
+    }
+    throw error;
+  }
 }
 
 // Regra não-negociável (spec seção 6, item 5): um lançamento só fica
@@ -189,73 +197,158 @@ export async function createPayment(input: CreatePaymentInput) {
     return existing;
   }
 
-  return prisma.$transaction(async (tx) => {
-    const payment = await tx.payment.create({
-      data: {
-        finance_entry_id: input.finance_entry_id,
-        type: input.type,
-        amount: input.amount,
-        payment_method: input.payment_method,
-        bank_account_id: input.bank_account_id,
-        receipt_url: input.receipt_url,
-        dedupe_key: input.dedupe_key,
-      },
-    });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Serializa liquidações do mesmo título. Sem este lock, dois cliques
+      // simultâneos podem ler o mesmo saldo e registrar pagamento acima do valor.
+      await tx.$queryRaw`SELECT id FROM finance_entries WHERE id = ${input.finance_entry_id}::uuid FOR UPDATE`;
 
-    await tx.financeEntry.update({
-      where: { id: input.finance_entry_id },
-      data: { status: "pago" },
-    });
+      const duplicate = await tx.payment.findUnique({ where: { dedupe_key: input.dedupe_key } });
+      if (duplicate) return duplicate;
 
-    return payment;
-  });
+      const entry = await tx.financeEntry.findUniqueOrThrow({
+        where: { id: input.finance_entry_id },
+        include: { compensacao: true },
+      });
+      if (!entry.payment_eligible || entry.reversed_at || entry.status === "cancelado") {
+        throw new Error("Este lançamento não está elegível para pagamento.");
+      }
+
+      const amount = new Prisma.Decimal(input.amount);
+      if (!amount.isPositive()) throw new Error("O valor do pagamento deve ser maior que zero.");
+
+      const paid = await tx.payment.aggregate({
+        where: { finance_entry_id: input.finance_entry_id, reversed_at: null, estorno_of_id: null },
+        _sum: { amount: true },
+      });
+      const paidAmount = paid._sum.amount ?? new Prisma.Decimal(0);
+      const compensatedAmount =
+        entry.compensacao && entry.compensacao.status === "confirmada" && !entry.compensacao.reversed_at
+          ? Prisma.Decimal.min(entry.amount, entry.compensacao.amount)
+          : new Prisma.Decimal(0);
+      const remaining = entry.amount.minus(paidAmount).minus(compensatedAmount);
+      if (remaining.lte(0)) throw new Error("Este lançamento já está totalmente liquidado.");
+      if (amount.gt(remaining)) {
+        throw new Error(`O pagamento não pode ultrapassar o saldo de R$ ${remaining.toFixed(2)}.`);
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          finance_entry_id: input.finance_entry_id,
+          type: input.type,
+          amount,
+          payment_method: input.payment_method,
+          bank_account_id: input.bank_account_id,
+          receipt_url: input.receipt_url,
+          dedupe_key: input.dedupe_key,
+        },
+      });
+
+      const fullyPaid = paidAmount.plus(compensatedAmount).plus(amount).gte(entry.amount);
+      await tx.financeEntry.update({
+        where: { id: input.finance_entry_id },
+        data: { status: fullyPaid ? "pago" : "pendente", payment_eligible: !fullyPaid },
+      });
+
+      return payment;
+    });
+  } catch (error) {
+    // A unique key é a última barreira para retries concorrentes. Se outra
+    // requisição venceu a corrida, devolvemos exatamente o pagamento criado.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const duplicate = await prisma.payment.findUnique({ where: { dedupe_key: input.dedupe_key } });
+      if (duplicate) return duplicate;
+    }
+    throw error;
+  }
 }
 
 export async function reversePayment(
   paymentId: string,
   params: { actorId: string; reason: string; dedupeKey: string },
 ) {
-  const original = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  if (!params.reason.trim()) throw new Error("Informe o motivo do estorno.");
 
-  if (original.reversed_at) {
-    return original;
+  const existingReversal = await prisma.payment.findUnique({ where: { dedupe_key: params.dedupeKey } });
+  if (existingReversal) return existingReversal;
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Serializa o estorno com novos pagamentos do mesmo título.
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId}::uuid FOR UPDATE`;
+      const original = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+
+      if (original.estorno_of_id) throw new Error("Um estorno não pode ser estornado diretamente.");
+      if (original.reversed_at) {
+        const reversal = await tx.payment.findFirst({ where: { estorno_of_id: paymentId } });
+        if (reversal) return reversal;
+        throw new Error("Pagamento já estornado sem contrapartida localizada.");
+      }
+
+      await tx.$queryRaw`SELECT id FROM finance_entries WHERE id = ${original.finance_entry_id}::uuid FOR UPDATE`;
+      const duplicate = await tx.payment.findUnique({ where: { dedupe_key: params.dedupeKey } });
+      if (duplicate) return duplicate;
+
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          reversed_at: new Date(),
+          reversed_by_id: params.actorId,
+          reversal_reason: params.reason.trim(),
+        },
+      });
+
+      const reversal = await tx.payment.create({
+        data: {
+          finance_entry_id: original.finance_entry_id,
+          type: original.type === "recebimento" ? "pagamento" : "recebimento",
+          amount: original.amount,
+          payment_method: original.payment_method,
+          bank_account_id: original.bank_account_id,
+          estorno_of_id: paymentId,
+          dedupe_key: params.dedupeKey,
+        },
+      });
+
+      const [entry, activePayments] = await Promise.all([
+        tx.financeEntry.findUniqueOrThrow({
+          where: { id: original.finance_entry_id },
+          include: { compensacao: true },
+        }),
+        tx.payment.aggregate({
+          where: {
+            finance_entry_id: original.finance_entry_id,
+            reversed_at: null,
+            estorno_of_id: null,
+          },
+          _sum: { amount: true },
+        }),
+      ]);
+      const activeAmount = activePayments._sum.amount ?? new Prisma.Decimal(0);
+      const compensatedAmount =
+        entry.compensacao && entry.compensacao.status === "confirmada" && !entry.compensacao.reversed_at
+          ? Prisma.Decimal.min(entry.amount, entry.compensacao.amount)
+          : new Prisma.Decimal(0);
+      const fullyPaid = activeAmount.plus(compensatedAmount).gte(entry.amount);
+      const unavailable = Boolean(entry.reversed_at) || entry.status === "cancelado";
+
+      await tx.financeEntry.update({
+        where: { id: original.finance_entry_id },
+        data: {
+          status: unavailable ? "cancelado" : fullyPaid ? "pago" : "pendente",
+          payment_eligible: unavailable ? false : !fullyPaid,
+        },
+      });
+
+      return reversal;
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const duplicate = await prisma.payment.findUnique({ where: { dedupe_key: params.dedupeKey } });
+      if (duplicate) return duplicate;
+    }
+    throw error;
   }
-
-  const existingReversal = await prisma.payment.findUnique({
-    where: { dedupe_key: params.dedupeKey },
-  });
-  if (existingReversal) {
-    return existingReversal;
-  }
-
-  const [, reversal] = await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: paymentId },
-      data: {
-        reversed_at: new Date(),
-        reversed_by_id: params.actorId,
-        reversal_reason: params.reason,
-      },
-    }),
-    prisma.payment.create({
-      data: {
-        finance_entry_id: original.finance_entry_id,
-        type: original.type === "recebimento" ? "pagamento" : "recebimento",
-        amount: original.amount,
-        payment_method: original.payment_method,
-        bank_account_id: original.bank_account_id,
-        estorno_of_id: paymentId,
-        dedupe_key: params.dedupeKey,
-      },
-    }),
-  ]);
-
-  await prisma.financeEntry.update({
-    where: { id: original.finance_entry_id },
-    data: { status: "pendente" },
-  });
-
-  return reversal;
 }
 
 type CreateDirectCollectionInput = {
@@ -265,6 +358,7 @@ type CreateDirectCollectionInput = {
   financial_responsible_type: FinancialResponsibleType;
   financial_responsible_id: string;
   amount: Prisma.Decimal.Value;
+  receipt_url?: string | null;
   idempotency_key: string;
   status?: DirectCollectionStatus;
   not_received_reason_id?: string | null;
@@ -275,7 +369,19 @@ export async function createDirectCollection(input: CreateDirectCollectionInput)
     where: { idempotency_key: input.idempotency_key },
   });
   if (existing) {
-    return existing;
+    if (existing.reversed_at) throw new Error("Esta confirmação foi revertida e precisa de uma nova análise financeira.");
+    if (existing.service_id !== input.service_id || existing.receiver_id !== input.receiver_id) {
+      throw new Error("A confirmação existente pertence a outro responsável.");
+    }
+    return prisma.directCollection.update({
+      where: { id: existing.id },
+      data: {
+        status: input.status ?? existing.status,
+        not_received_reason_id: input.not_received_reason_id ?? null,
+        amount: input.amount,
+        receipt_url: input.receipt_url ?? existing.receipt_url,
+      },
+    });
   }
 
   return prisma.directCollection.create({
@@ -286,6 +392,7 @@ export async function createDirectCollection(input: CreateDirectCollectionInput)
       financial_responsible_type: input.financial_responsible_type,
       financial_responsible_id: input.financial_responsible_id,
       amount: input.amount,
+      receipt_url: input.receipt_url ?? null,
       status: input.status ?? "pending",
       not_received_reason_id: input.not_received_reason_id,
       idempotency_key: input.idempotency_key,
@@ -296,8 +403,6 @@ export async function createDirectCollection(input: CreateDirectCollectionInput)
 type CreateCompensationInput = {
   counterparty_type: CompensationCounterpartyType;
   counterparty_id: string;
-  payable_allocation: Prisma.InputJsonValue;
-  receivable_allocation: Prisma.InputJsonValue;
   amount: Prisma.Decimal.Value;
   idempotency_key: string;
   entryIds: string[];
@@ -313,23 +418,110 @@ export async function createCompensation(input: CreateCompensationInput) {
     return existing;
   }
 
-  return prisma.$transaction(async (tx) => {
-    const compensation = await tx.compensation.create({
-      data: {
-        counterparty_type: input.counterparty_type,
-        counterparty_id: input.counterparty_id,
-        payable_allocation: input.payable_allocation,
-        receivable_allocation: input.receivable_allocation,
-        amount: input.amount,
-        idempotency_key: input.idempotency_key,
-      },
-    });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const entryIds = [...new Set(input.entryIds)];
+      const amount = new Prisma.Decimal(input.amount);
+      if (entryIds.length !== 2) {
+        throw new Error("A compensação exige exatamente um lançamento a pagar e um a receber.");
+      }
+      if (!amount.isPositive()) {
+        throw new Error("O valor da compensação deve ser maior que zero.");
+      }
 
-    await tx.financeEntry.updateMany({
-      where: { id: { in: input.entryIds } },
-      data: { compensacao_id: compensation.id, status: "pago", payment_eligible: false },
-    });
+      // Serializa compensações e pagamentos concorrentes dos mesmos títulos.
+      await tx.$queryRaw`
+        SELECT id
+        FROM finance_entries
+        WHERE id = ANY(ARRAY[${Prisma.join(entryIds)}]::uuid[])
+        ORDER BY id
+        FOR UPDATE
+      `;
 
-    return compensation;
-  });
+      const entries = await tx.financeEntry.findMany({
+        where: { id: { in: entryIds }, reversed_at: null },
+      });
+      if (entries.length !== entryIds.length) {
+        throw new Error("Um ou mais lançamentos da compensação não foram encontrados.");
+      }
+      if (
+        entries.some(
+          (entry) =>
+            entry.party_id !== input.counterparty_id ||
+            entry.compensacao_id ||
+            entry.status === "cancelado" ||
+            entry.status === "programado",
+        )
+      ) {
+        throw new Error("Os lançamentos não pertencem à mesma contraparte ou já foram compensados.");
+      }
+
+      const payable = entries.find((entry) => entry.type === "despesa");
+      const receivable = entries.find((entry) => entry.type === "receita");
+      if (!payable || !receivable) {
+        throw new Error("A compensação exige obrigações financeiras de tipos opostos.");
+      }
+
+      const expectedPartyType = input.counterparty_type === "supplier" ? "fornecedor" : "motorista";
+      if (entries.some((entry) => entry.party_type !== expectedPartyType)) {
+        throw new Error("O tipo da contraparte não corresponde aos lançamentos informados.");
+      }
+
+      const paymentGroups = await tx.payment.groupBy({
+        by: ["finance_entry_id"],
+        where: {
+          finance_entry_id: { in: entryIds },
+          reversed_at: null,
+          estorno_of_id: null,
+        },
+        _sum: { amount: true },
+      });
+      const paidByEntry = new Map(
+        paymentGroups.map((group) => [group.finance_entry_id, group._sum.amount ?? new Prisma.Decimal(0)]),
+      );
+      const maxCompensable = Prisma.Decimal.min(
+        payable.amount.minus(paidByEntry.get(payable.id) ?? 0),
+        receivable.amount.minus(paidByEntry.get(receivable.id) ?? 0),
+      );
+      if (maxCompensable.lte(0) || amount.gt(maxCompensable)) {
+        throw new Error(`A compensação não pode ultrapassar o saldo comum de R$ ${maxCompensable.toFixed(2)}.`);
+      }
+
+      const compensation = await tx.compensation.create({
+        data: {
+          counterparty_type: input.counterparty_type,
+          counterparty_id: input.counterparty_id,
+          payable_allocation: { finance_entry_id: payable.id, amount: amount.toString() },
+          receivable_allocation: { finance_entry_id: receivable.id, amount: amount.toString() },
+          amount,
+          idempotency_key: input.idempotency_key,
+        },
+      });
+
+      for (const entry of entries) {
+        const paidAmount = paidByEntry.get(entry.id) ?? new Prisma.Decimal(0);
+        const compensatedAmount = Prisma.Decimal.min(entry.amount, amount);
+        const fullySettled = paidAmount.plus(compensatedAmount).gte(entry.amount);
+
+        await tx.financeEntry.update({
+          where: { id: entry.id },
+          data: {
+            compensacao_id: compensation.id,
+            status: fullySettled ? "pago" : "pendente",
+            payment_eligible: !fullySettled,
+          },
+        });
+      }
+
+      return compensation;
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const concurrent = await prisma.compensation.findUnique({
+        where: { idempotency_key: input.idempotency_key },
+      });
+      if (concurrent) return concurrent;
+    }
+    throw error;
+  }
 }

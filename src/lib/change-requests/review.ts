@@ -47,23 +47,23 @@ export async function reviewChangeRequest(params: {
   };
 
   if (changeRequest.requester_type === "company") {
-    await notifyCompanyPortalUsers({
+    await Promise.allSettled([notifyCompanyPortalUsers({
       companyId: changeRequest.requester_id,
       type: notificationType,
       message,
       entityRefType: "change_request",
       entityRefId: changeRequest.id,
       emailVariables,
-    });
+    })]);
   } else {
-    await notifyDriverPortalUser({
+    await Promise.allSettled([notifyDriverPortalUser({
       driverId: changeRequest.requester_id,
       type: notificationType,
       message,
       entityRefType: "change_request",
       entityRefId: changeRequest.id,
       emailVariables,
-    });
+    })]);
   }
 
   return changeRequest;

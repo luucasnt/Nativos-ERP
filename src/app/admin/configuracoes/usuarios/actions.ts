@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireInternalUser } from "@/lib/auth/get-current-user";
-import { createInternalUser, resetTemporaryPassword } from "@/lib/auth/provision-user";
+import { requireOwnerUser } from "@/lib/auth/get-current-user";
+import {
+  createInternalUser,
+  resetTemporaryPassword,
+  syncAppMetadata,
+} from "@/lib/auth/provision-user";
 import { logAudit } from "@/lib/audit";
 
 const PATH = "/admin/configuracoes/usuarios";
@@ -28,7 +32,7 @@ export async function createInternalUserAction(
   _prevState: InternalUserFormState,
   formData: FormData,
 ): Promise<InternalUserFormState> {
-  const actor = await requireInternalUser();
+  const actor = await requireOwnerUser();
 
   const parsed = schema.safeParse({
     email: formData.get("email"),
@@ -41,11 +45,7 @@ export async function createInternalUserAction(
     return { ...emptyState, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  // Só um proprietário pode conceder o papel de proprietário a outro usuário.
   const wantsOwner = parsed.data.is_owner === "on";
-  if (wantsOwner && !actor.is_owner) {
-    return { ...emptyState, error: "Apenas um proprietário pode conceder esse papel." };
-  }
 
   try {
     const result = await createInternalUser({
@@ -74,15 +74,33 @@ export async function createInternalUserAction(
 }
 
 export async function setInternalUserStatus(id: string, status: "ativo" | "inativo") {
-  const actor = await requireInternalUser();
+  const actor = await requireOwnerUser();
+  const targetId = z.string().uuid().parse(id);
+  const target = await prisma.user.findUniqueOrThrow({ where: { id: targetId } });
 
-  await prisma.user.update({ where: { id }, data: { status } });
+  if (target.account_type !== "internal") {
+    throw new Error("O acesso informado não é um usuário interno.");
+  }
+  if (target.id === actor.id && status === "inativo") {
+    throw new Error("Você não pode desativar o próprio acesso.");
+  }
+  if (target.is_owner && status === "inativo") {
+    const activeOwners = await prisma.user.count({
+      where: { account_type: "internal", is_owner: true, status: "ativo" },
+    });
+    if (activeOwners <= 1) {
+      throw new Error("O último proprietário ativo não pode ser desativado.");
+    }
+  }
+
+  await prisma.user.update({ where: { id: targetId }, data: { status } });
+  await syncAppMetadata(targetId);
 
   await logAudit({
     actorId: actor.id,
     action: status === "ativo" ? "usuario_interno_ativado" : "usuario_interno_desativado",
     entityType: "user",
-    entityId: id,
+    entityId: targetId,
   });
 
   revalidatePath(PATH);
@@ -92,16 +110,21 @@ export async function resetInternalUserPasswordAction(
   userId: string,
   _prevState: InternalUserFormState,
 ): Promise<InternalUserFormState> {
-  const actor = await requireInternalUser();
+  const actor = await requireOwnerUser();
 
   try {
-    const { temporaryPassword } = await resetTemporaryPassword(userId);
+    const targetId = z.string().uuid().parse(userId);
+    const target = await prisma.user.findUniqueOrThrow({ where: { id: targetId } });
+    if (target.account_type !== "internal") {
+      return { ...emptyState, error: "O acesso informado não é um usuário interno." };
+    }
+    const { temporaryPassword } = await resetTemporaryPassword(targetId);
 
     await logAudit({
       actorId: actor.id,
       action: "senha_temporaria_gerada",
       entityType: "user",
-      entityId: userId,
+      entityId: targetId,
     });
 
     revalidatePath(PATH);

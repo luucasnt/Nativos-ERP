@@ -21,7 +21,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
         onClick={() => setOpen((current) => !current)}
         aria-label="Abrir avisos"
         aria-expanded={open}
-        className="focus-ring relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-forest/12 bg-white text-forest/58 transition hover:border-forest/25 hover:text-forest"
+        className="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-lg border border-forest/12 bg-white text-forest/58 transition hover:border-forest/25 hover:text-forest md:h-9 md:w-9"
       >
         <Bell size={16} aria-hidden="true" />
         {notifications.length > 0 && (

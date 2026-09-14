@@ -57,6 +57,23 @@ describe("execução própria", () => {
     });
   });
 
+  it("comissão do motorista incide sobre o líquido após despesas da reserva", () => {
+    const entries = computeServiceSettlementEntries(
+      baseInput({
+        price: 380,
+        service_expense_total: 120,
+        driver_id: DRIVER_ID,
+        driver_owner_type: "proprio",
+        driver_payment_type: "comissao",
+        driver_commission_percent: 30,
+      }),
+    );
+    expect(amountsByCategory(entries)).toEqual({
+      "receita:venda_servico": "380",
+      "despesa:repasse_motorista": "78",
+    });
+  });
+
   it("motorista com payment_type diaria => nenhum repasse POR SERVIÇO (o repasse por dia é gerado à parte, ver tests/finance/lifecycle.test.ts)", () => {
     const entries = computeServiceSettlementEntries(
       baseInput({

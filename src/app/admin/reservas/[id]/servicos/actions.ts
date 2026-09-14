@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
@@ -14,18 +15,19 @@ import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/li
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
 import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
 import { checkPartnerBillingLimit, detectDriverVehicleConflict } from "@/lib/alerts/detectors";
+import { checkCompanyCredit } from "@/lib/finance/credit-control";
 
 const decimalField = z
   .string()
   .optional()
   .transform((v) => (v ? v.trim() : ""))
-  .refine((v) => v === "" || !Number.isNaN(Number(v)), "Valor numérico inválido.");
+  .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0), "Informe um valor maior ou igual a zero.");
 
 const intField = z
   .string()
   .optional()
   .transform((v) => (v ? v.trim() : ""))
-  .refine((v) => v === "" || Number.isInteger(Number(v)), "Valor inteiro inválido.");
+  .refine((v) => v === "" || (Number.isInteger(Number(v)) && Number(v) >= 0), "Informe um número inteiro maior ou igual a zero.");
 
 const baseServiceFields = {
   type: z.enum([
@@ -80,6 +82,19 @@ const updateServiceSchema = z.object(baseServiceFields);
 
 export type ServiceFormState = { error: string | null };
 
+async function requireServiceInReservation(reservationId: string, serviceId: string) {
+  const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
+  if (service.reservation_id !== reservationId) {
+    throw new Error("O serviço informado não pertence a esta reserva.");
+  }
+  return service;
+}
+
+function decimalChanged(next: string | null, current: Prisma.Decimal | null) {
+  if (next === null || current === null) return next !== null || current !== null;
+  return !new Prisma.Decimal(next).equals(current);
+}
+
 function toIntOrNull(value: string) {
   return value === "" ? null : Number(value);
 }
@@ -126,6 +141,12 @@ function readBaseFields(formData: FormData) {
 function mapCommonData(d: z.infer<typeof updateServiceSchema>) {
   if (d.execution_type === "fornecedor" && !d.supplier_id) {
     return { ok: false as const, error: "Selecione o fornecedor que executa este serviço." };
+  }
+  if (d.execution_type === "fornecedor" && d.supplier_cost === "") {
+    return { ok: false as const, error: "Informe o custo do fornecedor para calcular a margem corretamente." };
+  }
+  if (d.reception_sign_enabled === "on" && !d.reception_passenger_name?.trim()) {
+    return { ok: false as const, error: "Informe o nome que será exibido na plaquinha de recepção." };
   }
 
   return {
@@ -217,6 +238,15 @@ export async function createService(
     common.data.discount_value,
   );
 
+  if (reservation.origin_partner_id && reservation.collection_mode === "faturado") {
+    const credit = await checkCompanyCredit({ companyId: reservation.origin_partner_id, additionalAmount: price });
+    if (credit.blocked) return { error: credit.reason ?? "O parceiro está bloqueado para novas reservas." };
+  }
+  if (common.data.execution_type === "fornecedor" && common.data.supplier_id) {
+    const credit = await checkCompanyCredit({ companyId: common.data.supplier_id });
+    if (credit.blocked) return { error: credit.reason ?? "O fornecedor está bloqueado por pendência financeira." };
+  }
+
   const service = await prisma.service.create({
     data: {
       ...common.data,
@@ -224,7 +254,10 @@ export async function createService(
       original_price: parsed.data.original_price,
       price,
       collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
-      acceptance_status: common.data.execution_type === "propria" ? "aceito" : "aguardando_aceite",
+      acceptance_status:
+        common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
+          ? "aceito"
+          : "aguardando_aceite",
     },
   });
 
@@ -281,8 +314,26 @@ export async function updateService(
 
   const [reservation, existing] = await Promise.all([
     prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } }),
-    prisma.service.findUniqueOrThrow({ where: { id: serviceId } }),
+    prisma.service.findUniqueOrThrow({
+      where: { id: serviceId },
+      include: {
+        finance_entries: {
+          where: {
+            reversed_at: null,
+            OR: [
+              { status: { in: ["pendente", "vencido", "pago"] } },
+              { payments: { some: { reversed_at: null, estorno_of_id: null } } },
+            ],
+          },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    }),
   ]);
+  if (existing.reservation_id !== reservationId) {
+    return { error: "O serviço informado não pertence a esta reserva." };
+  }
 
   // original_price nunca é editado manualmente depois de definido (spec
   // seção 5) — só o desconto muda o `price` final.
@@ -292,9 +343,29 @@ export async function updateService(
     common.data.discount_value,
   );
 
+  if (reservation.origin_partner_id && reservation.collection_mode === "faturado") {
+    const credit = await checkCompanyCredit({ companyId: reservation.origin_partner_id, additionalAmount: price });
+    if (credit.blocked) return { error: credit.reason ?? "O parceiro está bloqueado para novas reservas." };
+  }
+
   const executionOrSupplierChanged =
     common.data.execution_type !== existing.execution_type ||
     common.data.supplier_id !== existing.supplier_id;
+  const ownResourcesChanged =
+    common.data.execution_type === "propria" &&
+    (common.data.driver_id !== existing.driver_id || common.data.vehicle_id !== existing.vehicle_id);
+
+  const financialDataChanged =
+    executionOrSupplierChanged ||
+    common.data.driver_id !== existing.driver_id ||
+    decimalChanged(common.data.supplier_cost, existing.supplier_cost) ||
+    common.data.discount_type !== existing.discount_type ||
+    decimalChanged(common.data.discount_value, existing.discount_value);
+  if (financialDataChanged && existing.finance_entries.length > 0) {
+    return {
+      error: "Este serviço já possui título financeiro elegível ou liquidado. Reverta/ajuste o lançamento antes de alterar preço, custo, executor ou cobrança.",
+    };
+  }
 
   await prisma.service.update({
     where: { id: serviceId },
@@ -304,9 +375,12 @@ export async function updateService(
       collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
       // Troca de fornecedor/modalidade reabre o fluxo de aceite; serviço
       // próprio não precisa de aceite de terceiro.
-      ...(executionOrSupplierChanged
+      ...(executionOrSupplierChanged || ownResourcesChanged
         ? {
-            acceptance_status: common.data.execution_type === "propria" ? "aceito" : "aguardando_aceite",
+            acceptance_status:
+              common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
+                ? "aceito"
+                : "aguardando_aceite",
             acceptance_reason: null,
           }
         : {}),
@@ -349,10 +423,29 @@ export async function updateService(
 export async function cancelService(reservationId: string, serviceId: string) {
   const user = await requireInternalUser();
 
-  await prisma.service.update({
-    where: { id: serviceId },
-    data: { execution_status: "cancelado" },
+  await requireServiceInReservation(reservationId, serviceId);
+  const paid = await prisma.financeEntry.findFirst({
+    where: {
+      service_id: serviceId,
+      reversed_at: null,
+      OR: [
+        { status: "pago" },
+        { payments: { some: { reversed_at: null, estorno_of_id: null } } },
+      ],
+    },
+    select: { id: true },
   });
+  if (paid) {
+    throw new Error("Este serviço possui pagamento registrado. Faça o estorno antes de cancelar.");
+  }
+
+  await prisma.$transaction([
+    prisma.financeEntry.updateMany({
+      where: { service_id: serviceId, reversed_at: null, status: { in: ["programado", "pendente", "vencido"] } },
+      data: { status: "cancelado", payment_eligible: false },
+    }),
+    prisma.service.update({ where: { id: serviceId }, data: { execution_status: "cancelado" } }),
+  ]);
 
   await afterServiceMutation(reservationId, serviceId);
 
@@ -368,6 +461,8 @@ export async function cancelService(reservationId: string, serviceId: string) {
 
 export async function acceptServiceInternal(reservationId: string, serviceId: string) {
   const user = await requireInternalUser();
+
+  await requireServiceInReservation(reservationId, serviceId);
 
   await acceptService(serviceId);
 
@@ -387,6 +482,8 @@ export async function rejectServiceInternal(
   reason: string,
 ) {
   const user = await requireInternalUser();
+
+  await requireServiceInReservation(reservationId, serviceId);
 
   await rejectService(serviceId, reason);
 

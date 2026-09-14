@@ -25,6 +25,7 @@
 import type { DirectCollectionReceiverType, FinancialResponsibleType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createDirectCollection } from "@/lib/finance/ledger";
+import { submitChangeRequest } from "@/lib/change-requests/submit";
 
 async function resolveDirectCollectionParty(serviceId: string) {
   const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
@@ -55,7 +56,7 @@ async function resolveDirectCollectionParty(serviceId: string) {
   return { receiverType, responsibleType, partyId, amount: entry?.amount ?? service.price };
 }
 
-export async function confirmDirectCollectionReceived(serviceId: string) {
+export async function confirmDirectCollectionReceived(serviceId: string, receiptUrl?: string) {
   const { receiverType, responsibleType, partyId, amount } = await resolveDirectCollectionParty(serviceId);
 
   return createDirectCollection({
@@ -66,11 +67,18 @@ export async function confirmDirectCollectionReceived(serviceId: string) {
     financial_responsible_id: partyId,
     amount,
     status: "received",
+    receipt_url: receiptUrl ?? null,
     idempotency_key: `direct_collection:${serviceId}`,
   });
 }
 
 export async function confirmDirectCollectionNotReceived(serviceId: string, reasonId: string) {
+  const reason = await prisma.catalogItem.findFirst({
+    where: { id: reasonId, type: "motivo_perda", active: true },
+    select: { id: true },
+  });
+  if (!reason) throw new Error("Motivo inválido ou inativo.");
+
   const { receiverType, responsibleType, partyId, amount } = await resolveDirectCollectionParty(serviceId);
 
   return createDirectCollection({
@@ -81,7 +89,38 @@ export async function confirmDirectCollectionNotReceived(serviceId: string, reas
     financial_responsible_id: partyId,
     amount,
     status: "not_received",
-    not_received_reason_id: reasonId,
+    not_received_reason_id: reason.id,
     idempotency_key: `direct_collection:${serviceId}`,
+  });
+}
+
+/**
+ * Cobrança direta confirmada pelo fornecedor gera automaticamente o pedido
+ * de repasse do resultado da Nativos. O pedido é idempotente; o pagamento
+ * bancário continua sendo registrado pelo financeiro com comprovante.
+ */
+export async function ensureDirectSupplierRepasseRequest(serviceId: string, companyId: string) {
+  const entry = await prisma.financeEntry.findUnique({
+    where: { auto_key: `svc:${serviceId}:repasse_fornecedor` },
+    select: { id: true, amount: true, type: true, party_type: true, party_id: true, status: true },
+  });
+  if (!entry || entry.type !== "receita" || entry.party_type !== "fornecedor" || entry.party_id !== companyId) {
+    throw new Error("O lançamento de repasse da cobrança direta não foi encontrado.");
+  }
+  if (entry.status === "cancelado" || entry.status === "pago") return null;
+
+  return submitChangeRequest({
+    type: "repasse_nativos",
+    requesterType: "company",
+    requesterId: companyId,
+    companyId,
+    reservationId: (await prisma.service.findUniqueOrThrow({ where: { id: serviceId }, select: { reservation_id: true } })).reservation_id,
+    allocationDetails: {
+      entry_ids: [entry.id],
+      amount: entry.amount.toString(),
+      origem: "cobranca_direta_fornecedor",
+      observacao: "Repasse automático do resultado Nativos após confirmação do recebimento direto.",
+    },
+    dedupeKey: `direct-repasse:${serviceId}`,
   });
 }

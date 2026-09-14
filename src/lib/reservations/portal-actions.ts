@@ -2,22 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { assertActiveCompanyPortalUser } from "@/lib/auth/get-current-user";
 import { acceptService, rejectService } from "@/lib/reservations/acceptance";
 import { logAudit } from "@/lib/audit";
 
 export type PortalAcceptanceState = { error: string | null };
 
 async function assertCanRespond(serviceId: string) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    throw new Error("Sessão expirada. Faça login novamente.");
-  }
+  const user = await assertActiveCompanyPortalUser();
 
   const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
 
-  if (!user.linked_company_id || service.supplier_id !== user.linked_company_id) {
+  if (!user.linked_company.roles.includes("fornecedor") || service.supplier_id !== user.linked_company_id) {
     throw new Error("Você não tem permissão para responder a este serviço.");
   }
 

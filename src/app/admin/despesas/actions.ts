@@ -13,8 +13,8 @@ export async function approveExpense(expenseId: string) {
   await logAudit({
     actorId: user.id,
     action: "despesa_aprovada",
-    entityType: "service",
-    entityId: expense.service_id,
+    entityType: expense.service_id ? "service" : "vehicle",
+    entityId: expense.service_id ?? expense.vehicle_id ?? expense.id,
   });
 
   revalidatePath("/admin/despesas");
@@ -24,19 +24,21 @@ export async function rejectExpense(expenseId: string, reason: string) {
   const user = await requireInternalUser();
   const expense = await rejectServiceExpense(expenseId, user.id, reason);
 
-  await notifyDriverPortalUser({
-    driverId: expense.driver_id,
-    type: "despesa_rejeitada",
-    message: `Sua despesa foi rejeitada: ${reason}`,
-    entityRefType: "service",
-    entityRefId: expense.service_id,
-  });
+  if (expense.service_id) {
+    await notifyDriverPortalUser({
+      driverId: expense.driver_id,
+      type: "despesa_rejeitada",
+      message: `Sua despesa foi rejeitada: ${reason}`,
+      entityRefType: "service",
+      entityRefId: expense.service_id,
+    });
+  }
 
   await logAudit({
     actorId: user.id,
     action: "despesa_rejeitada",
-    entityType: "service",
-    entityId: expense.service_id,
+    entityType: expense.service_id ? "service" : "vehicle",
+    entityId: expense.service_id ?? expense.vehicle_id ?? expense.id,
     metadata: { reason },
   });
 

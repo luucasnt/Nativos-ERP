@@ -13,6 +13,12 @@ type ExtractEntry = {
   amount: { toString(): string };
   created_at: Date;
   reservation: { id: string; code: string } | null;
+  compensacao: {
+    amount: { toString(): string };
+    status: string;
+    reversed_at: Date | null;
+  } | null;
+  payments: Array<{ amount: { toString(): string } }>;
 };
 
 function statusTone(
@@ -28,6 +34,16 @@ const money = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
+function amounts(entry: ExtractEntry) {
+  const original = Number(entry.amount);
+  const paid = entry.payments.reduce((total, payment) => total + Number(payment.amount), 0);
+  const compensated =
+    entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at
+      ? Math.min(original, Number(entry.compensacao.amount))
+      : 0;
+  return { original, paid, compensated, balance: Math.max(0, original - paid - compensated) };
+}
+
 export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
   if (entries.length === 0) {
     return (
@@ -40,8 +56,11 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
   return (
     <>
       <ul className="divide-y divide-forest/[0.075] md:hidden">
-        {entries.map((entry) => (
-          <li key={entry.id} className="py-4 first:pt-0 last:pb-0">
+        {entries.map((entry) => {
+          const { original, paid, compensated, balance } = amounts(entry);
+          const hasSettlement = paid > 0 || compensated > 0;
+          return (
+            <li key={entry.id} className="py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-ink">
@@ -61,7 +80,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
             </div>
             <div className="mt-3 flex items-end justify-between rounded-lg bg-[#faf9f6] px-3 py-2.5">
               <span className="text-[10px] uppercase tracking-[0.08em] text-forest/42">
-                {FINANCE_ENTRY_TYPE_LABEL[entry.type] ?? entry.type}
+                {hasSettlement ? "Saldo" : FINANCE_ENTRY_TYPE_LABEL[entry.type] ?? entry.type}
               </span>
               <strong
                 className={
@@ -69,11 +88,19 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                   (entry.type === "receita" ? "text-danger" : "text-success")
                 }
               >
-                {money.format(Number(entry.amount))}
+                {money.format(hasSettlement ? balance : original)}
               </strong>
             </div>
-          </li>
-        ))}
+            {hasSettlement && (
+              <p className="mt-2 text-[10px] text-forest/45">
+                Original {money.format(original)}
+                {paid > 0 ? ` · pago ${money.format(paid)}` : ""}
+                {compensated > 0 ? ` · compensado ${money.format(compensated)}` : ""}
+              </p>
+            )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="hidden overflow-x-auto md:block">
@@ -98,7 +125,10 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
+            {entries.map((entry) => {
+              const { original, paid, compensated, balance } = amounts(entry);
+              const hasSettlement = paid > 0 || compensated > 0;
+              return (
               <tr
                 key={entry.id}
                 className="border-t border-forest/[0.075] hover:bg-forest/[0.022]"
@@ -126,7 +156,14 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                     (entry.type === "receita" ? "text-danger" : "text-success")
                   }
                 >
-                  {money.format(Number(entry.amount))}
+                  {money.format(hasSettlement ? balance : original)}
+                  {hasSettlement && (
+                    <span className="mt-1 block text-[10px] font-normal text-forest/42">
+                      Original {money.format(original)}
+                      {paid > 0 ? ` · pago ${money.format(paid)}` : ""}
+                      {compensated > 0 ? ` · compensado ${money.format(compensated)}` : ""}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3.5">
                   <Badge tone={statusTone(entry.status)}>
@@ -134,7 +171,8 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                   </Badge>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

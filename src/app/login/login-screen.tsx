@@ -95,10 +95,10 @@ export function LoginScreen({
       </section>
 
       <section className="flex min-h-screen flex-col">
-        <div className="flex items-center justify-center border-b border-forest/8 bg-white px-5 py-5 lg:hidden">
-          <Wordmark size={28} tone="forest-on-cream" priority />
+        <div className="flex items-center justify-center border-b border-forest/8 bg-white px-5 py-4 lg:hidden">
+          <Wordmark size={25} tone="forest-on-cream" priority />
         </div>
-        <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 lg:py-14">
+        <div className="flex flex-1 items-start justify-center px-5 pb-8 pt-8 sm:px-8 lg:items-center lg:py-14">
           <LoginPanel next={next} portal={portal} />
         </div>
         <footer className="px-5 py-5 text-center text-[10px] text-forest/35">
@@ -108,4 +108,3 @@ export function LoginScreen({
     </main>
   );
 }
-

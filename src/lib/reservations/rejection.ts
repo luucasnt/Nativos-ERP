@@ -3,7 +3,6 @@
 // pura de negócio, sem checagem de autorização — quem chama (a Server
 // Action do admin) decide quem pode chamar isto.
 import { prisma } from "@/lib/prisma";
-import { cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 
 // "Rejeitar reserva inteira" (spec seção 5/6, adiado da Fase 3 para a
 // Fase 6): status manual fora do algoritmo automático
@@ -17,16 +16,31 @@ export async function rejectReservationEntirely(reservationId: string, reason: s
     throw new Error("Informe o motivo da rejeição.");
   }
 
-  const services = await prisma.service.findMany({
-    where: { reservation_id: reservationId },
+  const activePayment = await prisma.financeEntry.findFirst({
+    where: {
+      reservation_id: reservationId,
+      reversed_at: null,
+      OR: [{ status: "pago" }, { payments: { some: { reversed_at: null, estorno_of_id: null } } }],
+    },
     select: { id: true },
   });
-  for (const service of services) {
-    await cancelServiceFinanceEntries(service.id);
+  if (activePayment) {
+    throw new Error("A reserva possui pagamento registrado e não pode ser rejeitada sem estorno.");
   }
 
-  return prisma.reservation.update({
-    where: { id: reservationId },
-    data: { status: "rejeitado" },
-  });
+  const [, , reservation] = await prisma.$transaction([
+    prisma.financeEntry.updateMany({
+      where: { reservation_id: reservationId, reversed_at: null, status: { in: ["programado", "pendente", "vencido"] } },
+      data: { status: "cancelado", payment_eligible: false },
+    }),
+    prisma.service.updateMany({
+      where: { reservation_id: reservationId, execution_status: { not: "cancelado" } },
+      data: { execution_status: "cancelado" },
+    }),
+    prisma.reservation.update({
+      where: { id: reservationId },
+      data: { status: "rejeitado", has_partial_cancellation: false },
+    }),
+  ]);
+  return reservation;
 }

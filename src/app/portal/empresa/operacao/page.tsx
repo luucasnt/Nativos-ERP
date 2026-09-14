@@ -39,12 +39,17 @@ export default async function PortalEmpresaOperacaoPage() {
         acceptance_status: "aguardando_aceite",
         execution_status: "agendado",
       },
-      include: {
-        reservation: { include: { client: true } },
-        driver: true,
-        vehicle: true,
+      select: {
+        id: true,
+        type: true,
+        scheduled_date: true,
+        scheduled_time: true,
+        pickup_location: true,
+        dropoff_location: true,
+        reservation: { select: { code: true, client: { select: { name: true } } } },
       },
       orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }],
+      take: 50,
     }),
     prisma.service.findMany({
       where: {
@@ -52,12 +57,20 @@ export default async function PortalEmpresaOperacaoPage() {
         acceptance_status: "aceito",
         execution_status: { in: ["agendado", "em_andamento"] },
       },
-      include: {
-        reservation: { include: { client: true } },
-        driver: true,
-        vehicle: true,
+      select: {
+        id: true,
+        type: true,
+        execution_status: true,
+        scheduled_date: true,
+        scheduled_time: true,
+        reception_sign_enabled: true,
+        reception_passenger_name: true,
+        reservation: { select: { code: true, client: { select: { name: true } } } },
+        driver: { select: { name: true } },
+        vehicle: { select: { model: true, plate: true } },
       },
       orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }],
+      take: 100,
     }),
     prisma.service.findMany({
       where: {
@@ -66,8 +79,13 @@ export default async function PortalEmpresaOperacaoPage() {
         execution_status: "concluido",
         direct_collections: { none: {} },
       },
-      include: { reservation: { include: { client: true } } },
+      select: {
+        id: true,
+        type: true,
+        reservation: { select: { code: true, client: { select: { name: true } } } },
+      },
       orderBy: { scheduled_date: "desc" },
+      take: 50,
     }),
     prisma.catalogItem.findMany({
       where: { type: "motivo_perda", active: true },
@@ -142,8 +160,57 @@ export default async function PortalEmpresaOperacaoPage() {
             <p className="mt-3 text-sm text-forest/46">Nenhum serviço ativo.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[930px] text-sm">
+          <>
+            <ul className="grid gap-3 p-4 md:hidden">
+              {activeServices.map((service) => (
+                <li key={service.id}>
+                  <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-forest">
+                          {service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC" }) ?? "A definir"}
+                          <span className="font-normal text-forest/48"> · {service.scheduled_time ?? "—"}</span>
+                        </p>
+                        <p className="mt-1 text-[11px] text-forest/43">{service.reservation.code}</p>
+                      </div>
+                      <Badge tone={executionTone(service.execution_status)}>
+                        {EXECUTION_LABEL[service.execution_status] ?? service.execution_status}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-ink">{service.reservation.client.name}</p>
+                    <p className="mt-1 text-xs text-forest/58">{SERVICE_TYPE_LABEL[service.type] ?? service.type}</p>
+                    <div className="mt-3 rounded-lg bg-white p-3 text-xs leading-5 text-forest/58">
+                      <p><strong className="font-medium text-forest">Motorista:</strong> {service.driver?.name ?? "A definir"}</p>
+                      <p><strong className="font-medium text-forest">Veículo:</strong> {service.vehicle ? `${service.vehicle.model} · ${service.vehicle.plate}` : "A definir"}</p>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} />
+                      <a
+                        href={`/api/documentos/os/${service.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="focus-ring inline-flex min-h-12 items-center justify-center rounded-lg border border-forest/15 bg-white text-sm font-semibold text-forest active:bg-forest/5"
+                      >
+                        Abrir OS
+                      </a>
+                      {service.reception_sign_enabled && service.reception_passenger_name && (
+                        <a
+                          href={`/api/documentos/plaquinha/${service.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="focus-ring col-span-2 inline-flex min-h-12 items-center justify-center rounded-lg border border-forest/15 bg-white text-sm font-semibold text-forest active:bg-forest/5"
+                        >
+                          Abrir plaquinha
+                        </a>
+                      )}
+                    </div>
+                  </article>
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[930px] text-sm">
               <thead>
                 <tr>
                   <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Data e hora</th>
@@ -190,13 +257,24 @@ export default async function PortalEmpresaOperacaoPage() {
                         >
                           OS
                         </a>
+                        {service.reception_sign_enabled && service.reception_passenger_name && (
+                          <a
+                            href={`/api/documentos/plaquinha/${service.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="focus-ring rounded text-xs font-semibold text-forest hover:text-forest-light"
+                          >
+                            Plaquinha
+                          </a>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
@@ -229,4 +307,3 @@ export default async function PortalEmpresaOperacaoPage() {
     </div>
   );
 }
-

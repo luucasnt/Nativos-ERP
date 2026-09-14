@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import {
   AlertTriangle,
   ArrowRight,
@@ -48,48 +49,63 @@ function executionTone(status: string): "success" | "info" | "neutral" | "danger
   return "neutral";
 }
 
+type DashboardCounters = {
+  today_count: number;
+  in_progress: number;
+  pending_acceptances: number;
+  open_alerts: number;
+  open_requests: number;
+  pending_expenses: number;
+  unassigned_services: number;
+  active_drivers: number;
+  active_vehicles: number;
+};
+
 export default async function AdminHomePage() {
   const user = await getCurrentUser();
   const { now, start, end, weekEnd } = bahiaDayRange();
 
-  const [
-    todayCount,
-    todayServices,
-    inProgress,
-    pendingAcceptances,
-    openAlerts,
-    openRequests,
-    pendingExpenses,
-    unassignedServices,
-    upcomingServices,
-    activeDrivers,
-    activeVehicles,
-  ] = await Promise.all([
-    prisma.service.count({
-      where: { scheduled_date: { gte: start, lt: end }, execution_status: { not: "cancelado" } },
-    }),
+  const [counterRows, todayServices, upcomingServices] = await Promise.all([
+    prisma.$queryRaw<DashboardCounters[]>(Prisma.sql`
+      SELECT
+        (SELECT COUNT(*)::integer FROM "public"."services"
+          WHERE "scheduled_date" >= ${start} AND "scheduled_date" < ${end}
+            AND "execution_status" <> 'cancelado') AS "today_count",
+        (SELECT COUNT(*)::integer FROM "public"."services"
+          WHERE "execution_status" = 'em_andamento') AS "in_progress",
+        (SELECT COUNT(*)::integer FROM "public"."services"
+          WHERE "execution_type" = 'fornecedor'
+            AND "acceptance_status" = 'aguardando_aceite'
+            AND "execution_status" = 'agendado') AS "pending_acceptances",
+        (SELECT COUNT(*)::integer FROM "public"."alerts"
+          WHERE "archived" = false) AS "open_alerts",
+        (SELECT COUNT(*)::integer FROM "public"."change_requests"
+          WHERE "status" IN ('solicitada', 'em_analise')) AS "open_requests",
+        (SELECT COUNT(*)::integer FROM "public"."service_expenses"
+          WHERE "status" = 'pendente') AS "pending_expenses",
+        (SELECT COUNT(*)::integer FROM "public"."services"
+          WHERE "execution_status" = 'agendado'
+            AND "scheduled_date" >= ${start} AND "scheduled_date" < ${weekEnd}
+            AND ("driver_id" IS NULL OR "vehicle_id" IS NULL)) AS "unassigned_services",
+        (SELECT COUNT(*)::integer FROM "public"."drivers"
+          WHERE "status" = 'ativo' AND "approval_status" = 'aprovado') AS "active_drivers",
+        (SELECT COUNT(*)::integer FROM "public"."vehicles"
+          WHERE "status" = 'ativo' AND "approval_status" = 'aprovado') AS "active_vehicles"
+    `),
     prisma.service.findMany({
       where: { scheduled_date: { gte: start, lt: end }, execution_status: { not: "cancelado" } },
       orderBy: [{ scheduled_time: "asc" }, { created_at: "asc" }],
       take: 12,
-      include: {
-        reservation: { include: { client: true } },
-        driver: true,
-        vehicle: true,
-      },
-    }),
-    prisma.service.count({ where: { execution_status: "em_andamento" } }),
-    prisma.service.count({
-      where: { execution_type: "fornecedor", acceptance_status: "aguardando_aceite", execution_status: "agendado" },
-    }),
-    prisma.alert.count({ where: { archived: false } }),
-    prisma.changeRequest.count({ where: { status: { in: ["solicitada", "em_analise"] } } }),
-    prisma.serviceExpense.count({ where: { status: "pendente" } }),
-    prisma.service.count({
-      where: {
-        execution_status: "agendado",
-        scheduled_date: { gte: start, lt: weekEnd },
-        OR: [{ driver_id: null }, { vehicle_id: null }],
+      select: {
+        id: true,
+        reservation_id: true,
+        scheduled_time: true,
+        execution_status: true,
+        pickup_location: true,
+        dropoff_location: true,
+        reservation: { select: { code: true, client: { select: { name: true } } } },
+        driver: { select: { name: true } },
+        vehicle: { select: { model: true, plate: true } },
       },
     }),
     prisma.service.findMany({
@@ -99,11 +115,39 @@ export default async function AdminHomePage() {
       },
       orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }],
       take: 7,
-      include: { reservation: { include: { client: true } }, driver: true },
+      select: {
+        id: true,
+        scheduled_date: true,
+        scheduled_time: true,
+        type: true,
+        reservation: { select: { code: true, client: { select: { name: true } } } },
+        driver: { select: { name: true } },
+      },
     }),
-    prisma.driver.count({ where: { status: "ativo", approval_status: "aprovado" } }),
-    prisma.vehicle.count({ where: { status: "ativo", approval_status: "aprovado" } }),
   ]);
+
+  const counters = counterRows[0] ?? {
+    today_count: 0,
+    in_progress: 0,
+    pending_acceptances: 0,
+    open_alerts: 0,
+    open_requests: 0,
+    pending_expenses: 0,
+    unassigned_services: 0,
+    active_drivers: 0,
+    active_vehicles: 0,
+  };
+  const {
+    today_count: todayCount,
+    in_progress: inProgress,
+    pending_acceptances: pendingAcceptances,
+    open_alerts: openAlerts,
+    open_requests: openRequests,
+    pending_expenses: pendingExpenses,
+    unassigned_services: unassignedServices,
+    active_drivers: activeDrivers,
+    active_vehicles: activeVehicles,
+  } = counters;
 
   const attentionItems = [
     {
@@ -225,7 +269,65 @@ export default async function AdminHomePage() {
               <p className="mt-1 text-xs text-forest/46">Nenhum serviço está programado.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <ul className="divide-y divide-forest/[0.075] md:hidden">
+                {todayServices.map((service) => (
+                  <li key={service.id}>
+                    <Link
+                      href={`/admin/reservas/${service.reservation_id}/servicos/${service.id}`}
+                      className="focus-ring block px-4 py-4 transition active:bg-forest/[0.04]"
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-2">
+                            <strong className="text-base font-semibold text-forest">
+                              {service.scheduled_time ?? "—"}
+                            </strong>
+                            <span className="text-[11px] font-medium text-forest/48">
+                              {service.reservation.code}
+                            </span>
+                          </span>
+                          <span className="mt-1 block truncate text-sm font-medium text-ink">
+                            {service.reservation.client.name}
+                          </span>
+                        </span>
+                        <Badge tone={executionTone(service.execution_status)}>
+                          {EXECUTION_LABEL[service.execution_status] ?? service.execution_status}
+                        </Badge>
+                      </span>
+
+                      <span className="mt-3 grid gap-2 rounded-lg bg-forest/[0.035] p-3 text-xs text-forest/58">
+                        <span className="flex min-w-0 items-start gap-2">
+                          <MapPin className="mt-0.5 shrink-0" size={13} aria-hidden="true" />
+                          <span className="min-w-0">
+                            <span className="block truncate">
+                              {service.pickup_location ?? "Origem não informada"}
+                            </span>
+                            <span className="mt-0.5 block truncate text-forest/42">
+                              até {service.dropoff_location ?? "destino não informado"}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <CarFront className="shrink-0" size={13} aria-hidden="true" />
+                          <span className="truncate">
+                            {service.driver?.name ?? "Motorista a definir"}
+                            {service.vehicle
+                              ? ` · ${service.vehicle.model} · ${service.vehicle.plate}`
+                              : " · Veículo a definir"}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="mt-3 flex items-center justify-end gap-1 text-xs font-semibold text-forest">
+                        Abrir serviço
+                        <ArrowRight size={14} aria-hidden="true" />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr>
@@ -273,7 +375,8 @@ export default async function AdminHomePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </section>
 

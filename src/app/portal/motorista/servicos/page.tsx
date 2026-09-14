@@ -31,9 +31,21 @@ export default async function PortalMotoristaServicosPage() {
         driver_id: driver.id,
         execution_status: { in: ["agendado", "em_andamento"] },
       },
-      include: {
-        reservation: { include: { client: true } },
-        vehicle: true,
+      select: {
+        id: true,
+        type: true,
+        execution_status: true,
+        scheduled_date: true,
+        scheduled_time: true,
+        pickup_location: true,
+        dropoff_location: true,
+        passenger_count: true,
+        flight_number: true,
+        notes: true,
+        reception_sign_enabled: true,
+        reception_passenger_name: true,
+        reservation: { select: { code: true, client: { select: { name: true, phone: true } } } },
+        vehicle: { select: { model: true, plate: true } },
       },
       orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }],
       take: 60,
@@ -45,7 +57,11 @@ export default async function PortalMotoristaServicosPage() {
         execution_status: "concluido",
         direct_collections: { none: {} },
       },
-      include: { reservation: { include: { client: true } } },
+      select: {
+        id: true,
+        type: true,
+        reservation: { select: { code: true, client: { select: { name: true } } } },
+      },
       orderBy: { scheduled_date: "desc" },
       take: 30,
     }),
@@ -214,6 +230,17 @@ export default async function PortalMotoristaServicosPage() {
                     <FileText size={14} aria-hidden="true" />
                     OS
                   </a>
+                  {service.reception_sign_enabled && service.reception_passenger_name && (
+                    <a
+                      href={`/api/documentos/plaquinha/${service.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="focus-ring col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest hover:bg-forest/[0.035] sm:col-span-1"
+                    >
+                      <FileText size={14} aria-hidden="true" />
+                      Plaquinha
+                    </a>
+                  )}
                 </div>
               </div>
             </article>

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { assertActiveUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
@@ -15,18 +15,18 @@ import { markReservationCommissionsEligible } from "@/lib/finance/commissions";
 // linha inteira, que abriria preço/custo/etc. à escrita de portal) e
 // reaproveitada tanto pelo portal do motorista quanto pelo da empresa.
 async function assertCanOperateService(serviceId: string) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    throw new Error("Sessão expirada. Faça login novamente.");
-  }
+  const user = await assertActiveUser();
 
   const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
 
   const isInternal = user.account_type === "internal";
-  const isAssignedDriver = user.linked_driver_id === service.driver_id;
+  const isAssignedDriver =
+    user.account_type === "portal" && user.linked_driver_id === service.driver_id;
   const isSupplierCompany =
-    Boolean(service.supplier_id) && user.linked_company_id === service.supplier_id;
+    user.account_type === "portal" &&
+    Boolean(service.supplier_id) &&
+    user.linked_company_id === service.supplier_id &&
+    Boolean(user.linked_company?.roles.includes("fornecedor"));
 
   if (!isInternal && !isAssignedDriver && !isSupplierCompany) {
     throw new Error("Você não tem permissão para operar este serviço.");

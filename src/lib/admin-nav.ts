@@ -31,6 +31,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/veiculos", label: "Veículos", icon: "vehicle" },
   { href: "/admin/empresas", label: "Empresas", icon: "building" },
   { href: "/admin/financeiro", label: "Financeiro", icon: "finance" },
+  { href: "/admin/relatorios", label: "Relatórios", icon: "documents" },
   { href: "/admin/despesas", label: "Despesas", icon: "receipt", badgeKey: "despesas" },
   { href: "/admin/solicitacoes", label: "Solicitações", icon: "requests", badgeKey: "solicitacoes" },
   { href: "/admin/aprovacoes", label: "Aprovações", icon: "approvals" },

@@ -9,11 +9,16 @@ import { processOutboxOnce } from "@/lib/communication/outbox";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-    }
+  if (!secret) {
+    return NextResponse.json(
+      { error: "Processamento automático não configurado." },
+      { status: 503 },
+    );
+  }
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
   const result = await processOutboxOnce();

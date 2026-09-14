@@ -6,7 +6,12 @@ import { buttonClass, inputClass, labelClass } from "@/lib/ui";
 
 const initialState: ChangeRequestFormState = { error: null };
 
-export function NovaReservaRequestForm({ dedupeKey }: { dedupeKey: string }) {
+type ClientOption = { id: string; name: string; email: string | null };
+
+export function NovaReservaRequestForm({
+  dedupeKey,
+  clients = [],
+}: { dedupeKey: string; clients?: ClientOption[] }) {
   const [state, formAction, pending] = useActionState(submitNovaReservaRequest, initialState);
 
   return (
@@ -18,6 +23,17 @@ export function NovaReservaRequestForm({ dedupeKey }: { dedupeKey: string }) {
         </label>
         <input id="cliente_nome" name="cliente_nome" required className={inputClass} />
       </div>
+      {clients.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="client_id" className={labelClass}>Cadastro existente</label>
+          <select id="client_id" name="client_id" className={inputClass}>
+            <option value="">Usar o nome informado acima</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>{client.name}{client.email ? ` · ${client.email}` : ""}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <label htmlFor="descricao" className={labelClass}>
           O que você precisa? *

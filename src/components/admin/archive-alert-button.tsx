@@ -12,7 +12,7 @@ export function ArchiveAlertButton({ alertId }: { alertId: string }) {
       type="button"
       disabled={isPending}
       onClick={() => startTransition(() => archiveAlertAction(alertId))}
-      className={`${secondaryButtonClass} px-3 py-1 text-xs`}
+      className={`${secondaryButtonClass} min-h-11 w-full px-3 text-xs sm:w-auto`}
     >
       Arquivar
     </button>

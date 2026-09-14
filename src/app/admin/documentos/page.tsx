@@ -21,7 +21,7 @@ function DocumentLink({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="focus-ring inline-flex min-h-8 items-center rounded-lg border border-forest/12 bg-white px-2.5 text-[11px] font-semibold text-forest transition hover:border-forest/25 hover:bg-forest/[0.03]"
+      className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-forest/12 bg-white px-3 text-[11px] font-semibold text-forest transition hover:border-forest/25 hover:bg-forest/[0.03] md:min-h-8 md:px-2.5"
     >
       {label}
     </a>
@@ -87,8 +87,34 @@ export default async function DocumentosPage() {
         {reservations.length === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhuma reserva disponível.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[780px] text-sm">
+          <>
+            <ul className="grid gap-3 p-4 md:hidden">
+              {reservations.map((reservation) => (
+                <li key={reservation.id}>
+                  <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link href={`/admin/reservas/${reservation.id}`} className="focus-ring rounded text-xs font-semibold text-forest">
+                          {reservation.code}
+                        </Link>
+                        <p className="mt-1 truncate text-sm font-medium text-ink">{reservation.client.name}</p>
+                      </div>
+                      <span className="text-xs text-forest/48">{reservation._count.services} serviço(s)</span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <DocumentLink href={`/api/documentos/voucher/${reservation.id}`} label="Voucher" />
+                      <DocumentLink href={`/api/documentos/orcamento/${reservation.id}`} label="Orçamento" />
+                      <span className="col-span-2 grid">
+                        <DocumentLink href={`/api/documentos/contrato/${reservation.id}`} label="Contrato" />
+                      </span>
+                    </div>
+                  </article>
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[780px] text-sm">
               <thead>
                 <tr>
                   <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reserva</th>
@@ -117,8 +143,9 @@ export default async function DocumentosPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
@@ -206,4 +233,3 @@ export default async function DocumentosPage() {
     </div>
   );
 }
-

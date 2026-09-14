@@ -11,6 +11,13 @@ export async function getPartyFinanceExtract(partyType: FinancePartyType, partyI
     where: { party_type: partyType, party_id: partyId },
     orderBy: { created_at: "desc" },
     take: 50,
-    include: { reservation: true },
+    include: {
+      reservation: { select: { id: true, code: true } },
+      compensacao: { select: { amount: true, status: true, reversed_at: true } },
+      payments: {
+        where: { reversed_at: null, estorno_of_id: null },
+        select: { amount: true },
+      },
+    },
   });
 }

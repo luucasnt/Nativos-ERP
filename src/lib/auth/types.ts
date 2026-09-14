@@ -1,4 +1,4 @@
-import type { AccountType, InternalRole, Role } from "@prisma/client";
+import type { AccountType, InternalRole, Role, UserStatus } from "@prisma/client";
 
 // Espelha um subconjunto do model User em app_metadata do Supabase Auth
 // (gravado apenas por código de servidor via service role — imutável pelo
@@ -15,4 +15,5 @@ export type AppMetadata = {
   linked_company_id: string | null;
   linked_driver_id: string | null;
   must_change_password: boolean;
+  status: UserStatus;
 };

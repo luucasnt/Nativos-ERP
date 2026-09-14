@@ -8,7 +8,7 @@ type ReasonOption = { id: string; label: string };
 type DirectCollectionActionsProps = {
   serviceId: string;
   reasons: ReasonOption[];
-  onConfirmReceived: (serviceId: string) => Promise<{ error: string | null }>;
+  onConfirmReceived: (serviceId: string, receiptUrl: string) => Promise<{ error: string | null }>;
   onConfirmNotReceived: (serviceId: string, reasonId: string) => Promise<{ error: string | null }>;
 };
 
@@ -22,17 +22,22 @@ export function DirectCollectionActions({
   const [error, setError] = useState<string | null>(null);
   const [showNotReceived, setShowNotReceived] = useState(false);
   const [reasonId, setReasonId] = useState("");
+  const [success, setSuccess] = useState<string | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState("");
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex gap-2">
+    <div className="flex w-full flex-col items-stretch gap-2 sm:items-end">
+      <div className="grid gap-2 sm:flex">
+        <input value={receiptUrl} onChange={(event) => setReceiptUrl(event.target.value)} className={`${inputClass} text-sm`} placeholder="Link do comprovante obrigatório" type="url" aria-label="Comprovante do recebimento" required />
         <button
           type="button"
           disabled={isPending}
           onClick={() =>
             startTransition(async () => {
-              const result = await onConfirmReceived(serviceId);
+              setSuccess(null);
+              const result = await onConfirmReceived(serviceId, receiptUrl);
               setError(result.error);
+              if (!result.error) setSuccess("Recebimento confirmado.");
             })
           }
           className={`${buttonClass} px-3 py-1 text-sm`}
@@ -49,7 +54,7 @@ export function DirectCollectionActions({
         </button>
       </div>
       {showNotReceived && (
-        <div className="flex gap-2">
+        <div className="grid gap-2 sm:flex">
           <select
             value={reasonId}
             onChange={(e) => setReasonId(e.target.value)}
@@ -67,8 +72,10 @@ export function DirectCollectionActions({
             disabled={isPending}
             onClick={() =>
               startTransition(async () => {
+                setSuccess(null);
                 const result = await onConfirmNotReceived(serviceId, reasonId);
                 setError(result.error);
+                if (!result.error) setSuccess("Ocorrência registrada.");
               })
             }
             className={`${secondaryButtonClass} px-3 py-1 text-sm`}
@@ -77,7 +84,8 @@ export function DirectCollectionActions({
           </button>
         </div>
       )}
-      {error && <span className="text-xs text-red-700">{error}</span>}
+      {error && <span role="alert" className="text-sm text-red-700">{error}</span>}
+      {success && <span role="status" className="text-sm text-success">{success}</span>}
     </div>
   );
 }

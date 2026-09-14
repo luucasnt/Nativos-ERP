@@ -22,6 +22,7 @@ type VehicleFormProps = {
     owner_type: string;
     supplier_id: string | null;
     status: string;
+    initial_odometer_km: number | null;
   };
 };
 
@@ -57,6 +58,13 @@ export function VehicleForm({ action, categories, suppliers, defaultValues }: Ve
           />
         </div>
       </div>
+      {ownerType === "proprio" && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="initial_odometer_km" className={labelClass}>KM atual no cadastro *</label>
+          <input id="initial_odometer_km" name="initial_odometer_km" type="number" min="0" step="1" required inputMode="numeric" defaultValue={defaultValues?.initial_odometer_km ?? ""} className={inputClass} placeholder="Ex.: 48.100" />
+          <p className="text-[11px] text-forest/45">Será a base para o cálculo de consumo nos próximos abastecimentos.</p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="category_id" className={labelClass}>

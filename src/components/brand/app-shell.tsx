@@ -38,7 +38,7 @@ export function AppShell({
       {nav.length > 0 && <Sidebar nav={nav} badges={badges} />}
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-forest/10 bg-white/95 px-4 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-40 flex h-[calc(4rem+env(safe-area-inset-top))] items-center gap-3 border-b border-forest/10 bg-white/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur md:h-16 md:px-6 md:pt-0">
           <div className="flex min-w-0 items-center gap-3 md:hidden">
             {nav.length > 0 && <MobileNavigation nav={nav} badges={badges} />}
             <Wordmark size={20} tone="forest-on-cream" priority />
@@ -75,7 +75,7 @@ export function AppShell({
                 type="submit"
                 title="Sair do sistema"
                 aria-label="Sair do sistema"
-                className="focus-ring inline-flex h-9 items-center gap-2 rounded-lg border border-forest/12 bg-white px-2.5 text-xs font-medium text-forest/62 transition hover:border-forest/25 hover:text-forest"
+                className="focus-ring inline-flex h-11 w-11 items-center justify-center gap-2 rounded-lg border border-forest/12 bg-white px-2.5 text-xs font-medium text-forest/62 transition hover:border-forest/25 hover:text-forest md:h-9 md:w-auto"
               >
                 <LogOut size={15} aria-hidden="true" />
                 <span className="hidden xl:inline">Sair</span>

@@ -5,18 +5,18 @@
 // documentos tipicamente enviados por e-mail pelo admin, não baixados
 // pelo próprio portal (ver README).
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { assertActiveUser } from "@/lib/auth/get-current-user";
 
 export async function assertCanAccessReservationDocument(reservationId: string) {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Sessão expirada. Faça login novamente.");
-  }
+  const user = await assertActiveUser();
   if (user.account_type === "internal") {
     return user;
   }
 
-  const reservation = await prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } });
+  const reservation = await prisma.reservation.findUniqueOrThrow({
+    where: { id: reservationId },
+    select: { origin_partner_id: true },
+  });
   if (user.linked_company_id && reservation.origin_partner_id === user.linked_company_id) {
     return user;
   }
@@ -25,15 +25,15 @@ export async function assertCanAccessReservationDocument(reservationId: string) 
 }
 
 export async function assertCanAccessServiceDocument(serviceId: string) {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Sessão expirada. Faça login novamente.");
-  }
+  const user = await assertActiveUser();
   if (user.account_type === "internal") {
     return user;
   }
 
-  const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
+  const service = await prisma.service.findUniqueOrThrow({
+    where: { id: serviceId },
+    select: { driver_id: true, supplier_id: true },
+  });
   if (user.linked_driver_id && service.driver_id === user.linked_driver_id) {
     return user;
   }
@@ -45,10 +45,7 @@ export async function assertCanAccessServiceDocument(serviceId: string) {
 }
 
 export async function assertCanAccessBillingCycleDocument(billingCycleId: string) {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Sessão expirada. Faça login novamente.");
-  }
+  const user = await assertActiveUser();
   if (user.account_type === "internal") {
     return user;
   }

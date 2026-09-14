@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { FinanceEntryStatus, FinanceEntryType, Prisma } from "@prisma/client";
+import { Prisma, type FinanceEntryStatus, type FinanceEntryType } from "@prisma/client";
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -24,6 +24,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { inputClass, secondaryButtonClass } from "@/lib/ui";
 import { registerPayment } from "./actions";
+import { requireFinancialUser } from "@/lib/auth/get-current-user";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -89,27 +90,44 @@ function invoiceStatusLabel(status: string) {
   return labels[status] ?? status;
 }
 
+function activeCompensationAmount(entry: {
+  amount: Prisma.Decimal;
+  compensacao: { amount: Prisma.Decimal; status: string; reversed_at: Date | null } | null;
+}) {
+  if (entry.compensacao?.status !== "confirmada" || entry.compensacao.reversed_at) return 0;
+  return Math.min(Number(entry.amount), Number(entry.compensacao.amount));
+}
+
+function activePaymentAmount(entry: { payments: Array<{ amount: Prisma.Decimal }> }) {
+  return entry.payments.reduce((total, payment) => total + Number(payment.amount), 0);
+}
+
+type CashflowAggregate = {
+  bucket: Date;
+  type: FinanceEntryType;
+  amount: Prisma.Decimal;
+};
+
+type FinancialSummaryAggregate = {
+  type: FinanceEntryType;
+  status: FinanceEntryStatus;
+  amount: Prisma.Decimal;
+};
+
+type OverdueAggregate = {
+  type: FinanceEntryType;
+  amount: Prisma.Decimal;
+};
+
 function groupCashflow(
-  entries: Array<{
-    created_at: Date;
-    type: FinanceEntryType;
-    amount: { toString(): string };
-    status: FinanceEntryStatus;
-  }>,
+  entries: CashflowAggregate[],
   days: number,
 ): CashflowPoint[] {
-  const groupSize = days > 100 ? 30 : days > 45 ? 7 : 1;
   const groups = new Map<string, { date: Date; receitas: number; despesas: number }>();
 
   for (const entry of entries) {
-    if (entry.status === "cancelado") continue;
-    const date = new Date(entry.created_at);
-    date.setUTCHours(0, 0, 0, 0);
-    if (groupSize > 1) {
-      const day = date.getUTCDate();
-      date.setUTCDate(day - ((day - 1) % groupSize));
-    }
-    const key = date.toISOString().slice(0, 10);
+    const date = new Date(entry.bucket);
+    const key = date.toISOString();
     const current = groups.get(key) ?? { date, receitas: 0, despesas: 0 };
     if (entry.type === "receita") current.receitas += Number(entry.amount);
     else current.despesas += Number(entry.amount);
@@ -121,13 +139,22 @@ function groupCashflow(
     .map((item) => ({
       label: item.date.toLocaleDateString("pt-BR", {
         timeZone: "UTC",
-        day: "2-digit",
-        month: "short",
+        ...(days > 100 ? { month: "short", year: "2-digit" } : { day: "2-digit", month: "short" }),
       }),
       receitas: item.receitas,
       despesas: item.despesas,
       resultado: item.receitas - item.despesas,
     }));
+}
+
+/*
+ * O gráfico recebe dados já agregados no Postgres. Assim o navegador e a
+ * função serverless não precisam carregar cada lançamento do período.
+ */
+function cashflowBucket(days: number) {
+  if (days > 100) return "month";
+  if (days > 45) return "week";
+  return "day";
 }
 
 export default async function FinanceiroPage({
@@ -142,6 +169,7 @@ export default async function FinanceiroPage({
   }>;
 }) {
   const params = await searchParams;
+  await requireFinancialUser();
   const view = parseView(params.view);
   const period = parsePeriod(params.period);
   const days = PERIOD_DAYS[period];
@@ -149,80 +177,152 @@ export default async function FinanceiroPage({
   from.setUTCDate(from.getUTCDate() - days);
   from.setUTCHours(0, 0, 0, 0);
 
-  const selectedType = VALID_TYPE.has(params.type as FinanceEntryType)
-    ? (params.type as FinanceEntryType)
-    : view === "receber"
-      ? "receita"
-      : view === "pagar"
-        ? "despesa"
+  const selectedType = view === "receber"
+    ? "receita"
+    : view === "pagar"
+      ? "despesa"
+      : VALID_TYPE.has(params.type as FinanceEntryType)
+        ? (params.type as FinanceEntryType)
         : undefined;
   const selectedStatus = VALID_STATUS.has(params.status as FinanceEntryStatus)
     ? (params.status as FinanceEntryStatus)
     : undefined;
   const query = params.q?.trim() ?? "";
 
+  const now = new Date();
   const entryWhere: Prisma.FinanceEntryWhereInput = {
     created_at: { gte: from },
     ...(selectedType ? { type: selectedType } : {}),
-    ...(selectedStatus ? { status: selectedStatus } : {}),
   };
 
-  if (query) {
+  if (selectedStatus === "vencido") {
     entryWhere.OR = [
+      { status: "vencido" },
+      { status: { in: ["programado", "pendente"] }, due_date: { lt: now } },
+    ];
+  } else if (selectedStatus) {
+    entryWhere.status = selectedStatus;
+  }
+
+  if (query) {
+    const searchConditions: Prisma.FinanceEntryWhereInput[] = [
       { description: { contains: query, mode: "insensitive" } },
       { reservation: { is: { code: { contains: query, mode: "insensitive" } } } },
     ];
+    entryWhere.AND = [{ OR: searchConditions }];
   }
 
-  const now = new Date();
   const nextDueLimit = new Date(now);
   nextDueLimit.setUTCDate(nextDueLimit.getUTCDate() + 45);
 
-  const [summaryEntries, entries, upcomingDue, billingCycles] = await Promise.all([
-    prisma.financeEntry.findMany({
-      where: { created_at: { gte: from } },
-      select: { type: true, amount: true, status: true, created_at: true },
-    }),
+  const [summaryGroups, overdueSummary, chartEntries, entries, upcomingDue, billingCycles, bankAccounts] = await Promise.all([
+    prisma.$queryRaw<FinancialSummaryAggregate[]>(Prisma.sql`
+      SELECT
+        entry."type",
+        entry."status",
+        SUM(
+          CASE
+            WHEN entry."status" IN ('programado', 'pendente', 'vencido') THEN
+              GREATEST(
+                entry."amount" - CASE
+                  WHEN compensation."status" = 'confirmada' AND compensation."reversed_at" IS NULL
+                    THEN LEAST(entry."amount", compensation."amount")
+                  ELSE 0
+                END - COALESCE(active_payment."amount", 0),
+                0
+              )
+            ELSE entry."amount"
+          END
+        ) AS "amount"
+      FROM "public"."finance_entries" AS entry
+      LEFT JOIN "public"."compensations" AS compensation ON compensation."id" = entry."compensacao_id"
+      LEFT JOIN LATERAL (
+        SELECT SUM(payment."amount") AS "amount"
+        FROM "public"."payments" AS payment
+        WHERE payment."finance_entry_id" = entry."id"
+          AND payment."reversed_at" IS NULL
+          AND payment."estorno_of_id" IS NULL
+      ) AS active_payment ON true
+      WHERE entry."reversed_at" IS NULL AND entry."status" <> 'cancelado'
+      GROUP BY entry."type", entry."status"
+    `),
+    prisma.$queryRaw<OverdueAggregate[]>(Prisma.sql`
+      SELECT
+        entry."type",
+        SUM(
+          GREATEST(
+            entry."amount" - CASE
+              WHEN compensation."status" = 'confirmada' AND compensation."reversed_at" IS NULL
+                THEN LEAST(entry."amount", compensation."amount")
+              ELSE 0
+            END - COALESCE(active_payment."amount", 0),
+            0
+          )
+        ) AS "amount"
+      FROM "public"."finance_entries" AS entry
+      LEFT JOIN "public"."compensations" AS compensation ON compensation."id" = entry."compensacao_id"
+      LEFT JOIN LATERAL (
+        SELECT SUM(payment."amount") AS "amount"
+        FROM "public"."payments" AS payment
+        WHERE payment."finance_entry_id" = entry."id"
+          AND payment."reversed_at" IS NULL
+          AND payment."estorno_of_id" IS NULL
+      ) AS active_payment ON true
+      WHERE entry."reversed_at" IS NULL
+        AND entry."status" IN ('programado', 'pendente', 'vencido')
+        AND entry."due_date" < ${now}
+      GROUP BY entry."type"
+    `),
+    prisma.$queryRaw<CashflowAggregate[]>(Prisma.sql`
+      SELECT
+        date_trunc(${cashflowBucket(days)}, "created_at") AS "bucket",
+        "type",
+        SUM("amount") AS "amount"
+      FROM "public"."finance_entries"
+      WHERE "created_at" >= ${from}
+        AND "status" <> 'cancelado'
+      GROUP BY 1, 2
+      ORDER BY 1 ASC
+    `),
     prisma.financeEntry.findMany({
       where: entryWhere,
       orderBy: { created_at: "desc" },
-      take: 250,
+      take: 50,
       include: {
         reservation: { include: { client: true } },
         service: true,
         payments: {
-          where: { reversed_at: null },
+          where: { reversed_at: null, estorno_of_id: null },
           orderBy: { created_at: "desc" },
-          take: 1,
         },
+        compensacao: { select: { amount: true, status: true, reversed_at: true } },
       },
     }),
     prisma.financeEntry.findMany({
       where: {
-        due_date: { gte: now, lte: nextDueLimit },
-        status: { in: ["programado", "pendente"] },
+        due_date: { lte: nextDueLimit },
+        status: { in: ["programado", "pendente", "vencido"] },
       },
       orderBy: { due_date: "asc" },
       take: 6,
-      include: { reservation: { include: { client: true } } },
+      include: {
+        reservation: { include: { client: true } },
+        compensacao: { select: { amount: true, status: true, reversed_at: true } },
+        payments: {
+          where: { reversed_at: null, estorno_of_id: null },
+          select: { amount: true },
+        },
+      },
     }),
-    prisma.billingCycle.findMany({
+    view === "faturas" ? prisma.billingCycle.findMany({
       orderBy: [{ period: "desc" }, { created_at: "desc" }],
       take: 40,
       include: {
         company: true,
-        reservations: {
-          include: {
-            reservation: {
-              include: {
-                client: true,
-                services: { where: { execution_status: { not: "cancelado" } } },
-              },
-            },
-          },
-        },
+        _count: { select: { reservations: true } },
       },
-    }),
+    }) : Promise.resolve([]),
+    prisma.bankAccount.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const companyIds = new Set<string>();
@@ -268,10 +368,9 @@ export default async function FinanceiroPage({
     }
   }
 
-  const totals = summaryEntries.reduce(
+  const totals = summaryGroups.reduce(
     (result, entry) => {
-      if (entry.status === "cancelado") return result;
-      const amount = Number(entry.amount);
+      const amount = Number(entry.amount ?? 0);
       if (entry.type === "receita") {
         result.revenue += amount;
         if (["pendente", "programado", "vencido"].includes(entry.status)) {
@@ -283,13 +382,14 @@ export default async function FinanceiroPage({
           result.payable += amount;
         }
       }
-      if (entry.status === "vencido") result.overdue += amount;
       return result;
     },
     { revenue: 0, expense: 0, receivable: 0, payable: 0, overdue: 0 },
   );
+  totals.overdue = overdueSummary.reduce((sum, entry) => sum + Number(entry.amount ?? 0), 0);
 
-  const chartData = groupCashflow(summaryEntries, days);
+  const chartData = groupCashflow(chartEntries, days);
+  const periodResult = chartData.reduce((sum, entry) => sum + entry.resultado, 0);
 
   return (
     <div className="mx-auto max-w-[1480px] space-y-6">
@@ -301,7 +401,9 @@ export default async function FinanceiroPage({
             Acompanhe entradas, saídas, vencimentos e faturamento sem misturar com a operação.
           </p>
         </div>
-        <form className="flex items-center gap-2" action="/admin/financeiro" method="get">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <Link href="/admin/financeiro/compensacoes" className={secondaryButtonClass}>Compensar fornecedor</Link>
+        <form className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:w-auto" action="/admin/financeiro" method="get">
           <input type="hidden" name="view" value={view} />
           <label htmlFor="period" className="sr-only">Período</label>
           <select
@@ -316,6 +418,7 @@ export default async function FinanceiroPage({
           </select>
           <button type="submit" className={secondaryButtonClass}>Aplicar</button>
         </form>
+        </div>
       </header>
 
       <nav aria-label="Áreas do financeiro" className="flex gap-1 overflow-x-auto border-b border-forest/10">
@@ -360,9 +463,9 @@ export default async function FinanceiroPage({
         <MetricCard
           icon={TrendingUp}
           label="Resultado projetado"
-          value={money.format(totals.revenue - totals.expense)}
-          accent={totals.revenue - totals.expense >= 0 ? "gold" : "warning"}
-          trend={{ direction: totals.revenue - totals.expense >= 0 ? "up" : "down", label: "período de " + days + " dias", tone: totals.revenue - totals.expense >= 0 ? "positive" : "negative" }}
+          value={money.format(periodResult)}
+          accent={periodResult >= 0 ? "gold" : "warning"}
+          trend={{ direction: periodResult >= 0 ? "up" : "down", label: "lançamentos dos últimos " + days + " dias", tone: periodResult >= 0 ? "positive" : "negative" }}
         />
       </section>
 
@@ -382,8 +485,39 @@ export default async function FinanceiroPage({
               <p className="mt-1 text-xs text-forest/46">Os ciclos aparecerão aqui quando forem fechados.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+            <>
+              <ul className="grid gap-3 p-4 md:hidden">
+                {billingCycles.map((cycle) => (
+                  <li key={cycle.id}>
+                    <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-ink">{cycle.company.name}</p>
+                          <p className="mt-1 text-xs text-forest/48">Período {cycle.period}</p>
+                        </div>
+                        <Badge tone={invoiceTone(cycle.status)}>{invoiceStatusLabel(cycle.status)}</Badge>
+                      </div>
+                      <dl className="mt-4 grid grid-cols-3 gap-3 text-xs">
+                        <div><dt className="text-forest/43">Total</dt><dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.total_amount))}</dd></div>
+                        <div><dt className="text-forest/43">Pago</dt><dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.paid_amount))}</dd></div>
+                        <div><dt className="text-forest/43">Reservas</dt><dd className="mt-1 font-semibold text-forest">{cycle._count.reservations}</dd></div>
+                      </dl>
+                      <a
+                        href={`/api/documentos/fatura/${cycle.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-forest/15 bg-white text-sm font-semibold text-forest active:bg-forest/5"
+                      >
+                        Gerar PDF
+                        <ArrowRight size={14} aria-hidden="true" />
+                      </a>
+                    </article>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr>
                     <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Parceiro</th>
@@ -400,7 +534,7 @@ export default async function FinanceiroPage({
                     <tr key={cycle.id} className="border-t border-forest/[0.075] hover:bg-forest/[0.022]">
                       <td className="px-5 py-3.5 font-medium text-ink">{cycle.company.name}</td>
                       <td className="px-4 py-3.5 text-forest/64">{cycle.period}</td>
-                      <td className="px-4 py-3.5 text-forest/64">{cycle.reservations.length}</td>
+                      <td className="px-4 py-3.5 text-forest/64">{cycle._count.reservations}</td>
                       <td className="px-4 py-3.5 font-semibold text-forest">{money.format(Number(cycle.total_amount))}</td>
                       <td className="px-4 py-3.5 text-forest/64">{money.format(Number(cycle.paid_amount))}</td>
                       <td className="px-4 py-3.5">
@@ -420,8 +554,9 @@ export default async function FinanceiroPage({
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+            </>
           )}
         </section>
       ) : (
@@ -469,7 +604,7 @@ export default async function FinanceiroPage({
                         </span>
                       </span>
                       <strong className={"text-xs " + (entry.type === "receita" ? "text-success" : "text-danger")}>
-                        {money.format(Number(entry.amount))}
+                        {money.format(Math.max(0, Number(entry.amount) - activeCompensationAmount(entry) - activePaymentAmount(entry)))}
                       </strong>
                     </li>
                   ))}
@@ -481,7 +616,7 @@ export default async function FinanceiroPage({
           <section className="surface-panel overflow-hidden">
             <div className="border-b border-forest/10 px-5 py-4">
               <h2 className="section-heading">Lançamentos</h2>
-              <p className="mt-1 text-xs text-forest/46">Últimos 250 registros conforme os filtros.</p>
+              <p className="mt-1 text-xs text-forest/46">Últimos 50 registros conforme os filtros.</p>
             </div>
 
             <form action="/admin/financeiro" method="get" className="grid gap-2 border-b border-forest/10 bg-[#faf9f6] p-3 md:grid-cols-[minmax(220px,1fr)_160px_170px_auto]">
@@ -514,7 +649,24 @@ export default async function FinanceiroPage({
             {entries.length === 0 ? (
               <p className="px-5 py-14 text-center text-sm text-forest/46">Nenhum lançamento encontrado.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              <div className="divide-y divide-forest/10 md:hidden">
+                {entries.map((entry) => {
+                  const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + activeCompensationAmount(entry);
+                  const remaining = Math.max(0, Number(entry.amount) - paid);
+                  const isOverdue = entry.status !== "pago" && entry.due_date && entry.due_date < now;
+                  return <article key={entry.id} className="space-y-4 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}</p><p className="mt-1 text-xs text-forest/52">{entry.reservation?.code ?? "Sem reserva"} · {partyName(entry)}</p></div>
+                      <Badge tone={isOverdue ? "danger" : statusTone(entry.status)}>{isOverdue ? "Vencido" : FINANCE_ENTRY_STATUS_LABEL[entry.status]}</Badge>
+                    </div>
+                    <div className="flex items-end justify-between gap-3"><div><span className="block text-xs text-forest/48">{entry.type === "receita" ? "A receber" : "A pagar"}</span><strong className={`mt-1 block text-lg ${entry.type === "receita" ? "text-success" : "text-danger"}`}>{money.format(Number(entry.amount))}</strong>{paid > 0 && remaining > 0 && <span className="mt-1 block text-xs text-forest/55">Pago {money.format(paid)} · saldo {money.format(remaining)}</span>}</div><span className="text-xs text-forest/48">{entry.due_date ? `Vence ${entry.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}</span></div>
+                    {entry.payment_eligible && entry.status !== "pago" && <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
+                    {entry.status === "pago" && entry.payments[0] && <a href={`/api/documentos/recibo/${entry.payments[0].id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir recibo</a>}
+                  </article>;
+                })}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[1050px] text-sm">
                   <thead>
                     <tr>
@@ -554,6 +706,11 @@ export default async function FinanceiroPage({
                         </td>
                         <td className={"px-4 py-3.5 text-xs font-semibold " + (entry.type === "receita" ? "text-success" : "text-danger")}>
                           {entry.type === "receita" ? "+" : "−"} {money.format(Number(entry.amount))}
+                          {activeCompensationAmount(entry) > 0 && (
+                            <span className="mt-1 block text-[10px] font-normal text-forest/42">
+                              Saldo {money.format(Math.max(0, Number(entry.amount) - entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) - activeCompensationAmount(entry)))}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
                           <Badge tone={statusTone(entry.status)}>
@@ -561,9 +718,11 @@ export default async function FinanceiroPage({
                           </Badge>
                         </td>
                         <td className="px-5 py-3.5">
-                          {entry.payment_eligible && entry.status === "pendente" && (
-                            <RegisterPaymentForm entryId={entry.id} onRegister={registerPayment} />
-                          )}
+                          {entry.payment_eligible && entry.status !== "pago" && (() => {
+                            const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + activeCompensationAmount(entry);
+                            const remaining = Math.max(0, Number(entry.amount) - paid);
+                            return <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />;
+                          })()}
                           {entry.status === "pago" && entry.payments[0] && (
                             <a
                               href={"/api/documentos/recibo/" + entry.payments[0].id}
@@ -581,6 +740,7 @@ export default async function FinanceiroPage({
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </section>
         </>

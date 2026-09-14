@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { AccountType, InternalRole } from "@prisma/client";
+import type { AccountType, InternalRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AppMetadata } from "@/lib/auth/types";
 // `import type` é apagado na compilação — não executa o `import "server-only"`
@@ -27,6 +27,7 @@ function toAppMetadata(user: {
   linked_company_id: string | null;
   linked_driver_id: string | null;
   must_change_password: boolean;
+  status: UserStatus;
 }): AppMetadata {
   return {
     user_id: user.id,
@@ -37,6 +38,7 @@ function toAppMetadata(user: {
     linked_company_id: user.linked_company_id,
     linked_driver_id: user.linked_driver_id,
     must_change_password: user.must_change_password,
+    status: user.status,
   };
 }
 

@@ -1,0 +1,4 @@
+import { requireInternalUser } from "@/lib/auth/get-current-user";
+import { prisma } from "@/lib/prisma";
+import { OperationSettingsForm } from "./form";
+export default async function OperationSettingsPage() { await requireInternalUser(); const setting = await prisma.setting.findUnique({ where: { key: "operacao_padrao" } }); const value = (setting?.value as Record<string, number> | undefined) ?? { airport_wait_minutes: 20, no_show_minutes: 40, service_buffer_minutes: 30, extra_hour_amount: 300, default_billing_due_day: 15 }; return <div><h1 className="mb-2 font-serif text-3xl text-forest">Parâmetros da operação</h1><p className="mb-6 max-w-2xl text-sm text-forest/60">Regras globais usadas como padrão em reservas, serviços, cobrança e documentos.</p><OperationSettingsForm defaults={value} /></div>; }

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   Building2,
   CarFront,
@@ -17,6 +16,7 @@ type PortalConfig = {
   title: string;
   description: string;
   icon: LucideIcon;
+  welcome: string;
 };
 
 export const PORTAL_CONFIG: Record<LoginPortal, PortalConfig> = {
@@ -25,24 +25,28 @@ export const PORTAL_CONFIG: Record<LoginPortal, PortalConfig> = {
     title: "Acesso administrativo",
     description: "Entre para gerenciar a operação.",
     icon: LayoutDashboard,
+    welcome: "Bem-vindo à gestão Nativos.",
   },
   parceiro: {
     label: "Parceiros",
     title: "Portal do Parceiro",
     description: "Acompanhe solicitações e reservas.",
     icon: Building2,
+    welcome: "Bem-vindo ao seu portal Nativos.",
   },
   fornecedor: {
-    label: "Fornecedores",
-    title: "Portal do Fornecedor",
-    description: "Gerencie serviços, equipe e veículos.",
+    label: "Operação",
+    title: "Acesso operacional",
+    description: "Gerencie sua agenda, equipe e recursos.",
     icon: Truck,
+    welcome: "Bem-vindo à sua operação Nativos.",
   },
   motorista: {
     label: "Motoristas",
     title: "Portal do Motorista",
     description: "Acesse sua agenda de serviços.",
     icon: CarFront,
+    welcome: "Bem-vindo à sua jornada Nativos.",
   },
 };
 
@@ -65,10 +69,11 @@ export function LoginPanel({ next, portal }: { next?: string; portal: LoginPorta
             {config.label}
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-forest">{config.title}</h1>
+          <p className="mt-3 text-xs font-medium text-forest/70">{config.welcome}</p>
           <p className="mt-1 text-sm text-forest/52">{config.description}</p>
         </div>
 
-        <LoginForm next={next} />
+        <LoginForm next={next} portal={portal} />
 
         <div className="mt-6 border-t border-forest/10 pt-5">
           <div className="flex items-center justify-center gap-2 text-[11px] text-forest/46">
@@ -78,20 +83,6 @@ export function LoginPanel({ next, portal }: { next?: string; portal: LoginPorta
         </div>
       </div>
 
-      <div className="mt-5 text-center">
-        <p className="text-[11px] text-forest/42">Escolha outro tipo de acesso</p>
-        <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
-          {LOGIN_PORTALS.filter((item) => item !== portal).map((item) => (
-            <Link
-              key={item}
-              href={`/login/${item}`}
-              className="focus-ring rounded text-xs font-medium text-forest/58 underline decoration-gold/55 underline-offset-4 hover:text-forest"
-            >
-              {PORTAL_CONFIG[item].label}
-            </Link>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

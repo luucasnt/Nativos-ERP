@@ -18,6 +18,7 @@ export default async function AlertasPage() {
   const alerts = await prisma.alert.findMany({
     where: { archived: false },
     orderBy: [{ severity: "desc" }, { created_at: "desc" }],
+    take: 100,
   });
 
   return (
@@ -32,7 +33,25 @@ export default async function AlertasPage() {
       {alerts.length === 0 ? (
         <p className="text-forest/60">Nenhum alerta ativo.</p>
       ) : (
-        <table className={tableClass}>
+        <>
+          <ul className="grid gap-3 md:hidden">
+            {alerts.map((alert) => (
+              <li key={alert.id} className="surface-panel p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${SEVERITY_CLASS[alert.severity]}`}>
+                    {SEVERITY_LABEL[alert.severity]}
+                  </span>
+                  <time className="text-[10px] text-forest/42">{alert.created_at.toLocaleString("pt-BR")}</time>
+                </div>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-forest/50">{alert.type}</p>
+                <p className="mt-2 text-sm leading-6 text-ink">{alert.message}</p>
+                <div className="mt-4"><ArchiveAlertButton alertId={alert.id} /></div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className={tableClass}>
           <thead>
             <tr>
               <th className={thClass}>Severidade</th>
@@ -59,7 +78,9 @@ export default async function AlertasPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

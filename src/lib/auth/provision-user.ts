@@ -63,6 +63,12 @@ export async function provisionCompanyOrDriverLogin(input: {
     const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
     if (company.owner_driver_id) {
       driverId = company.owner_driver_id;
+    } else {
+      const ownerDriver = await prisma.driver.findFirst({
+        where: { supplier_id: companyId, is_company_owner_driver: true, status: "ativo" },
+        select: { id: true },
+      });
+      driverId = ownerDriver?.id ?? null;
     }
   }
 

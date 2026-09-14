@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
@@ -11,6 +12,7 @@ import { recalculateReservationTax } from "@/lib/reservations/tax";
 import { generateServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
 import { rejectReservationEntirely as rejectReservationEntirelyLib } from "@/lib/reservations/rejection";
+import { cancelReservation as cancelReservationLib } from "@/lib/reservations/cancellation";
 
 // Campos da reserva (collection_mode, is_cortesia, origin_partner) entram
 // na fórmula de liquidação de cada serviço — mudar algum deles exige
@@ -38,7 +40,7 @@ const reservationSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? v.trim() : ""))
-    .refine((v) => v === "" || !Number.isNaN(Number(v)), "Percentual inválido."),
+    .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 100), "Informe um percentual entre 0 e 100."),
   is_cortesia: z.enum(["on"]).optional(),
   is_net_fare: z.enum(["on"]).optional(),
   requires_nf: z.enum(["on"]).optional(),
@@ -47,7 +49,7 @@ const reservationSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? v.trim() : ""))
-    .refine((v) => v === "" || !Number.isNaN(Number(v)), "Alíquota inválida."),
+    .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 100), "Informe uma alíquota entre 0 e 100."),
 });
 
 export type ReservationFormState = { error: string | null };
@@ -80,6 +82,9 @@ function parse(formData: FormData) {
 
   if (d.referrer_type && d.referrer_type !== "pessoa_fisica" && !d.referrer_id) {
     return { ok: false as const, error: "Selecione o indicador." };
+  }
+  if (d.collection_mode === "faturado" && !d.origin_partner_id) {
+    return { ok: false as const, error: "Selecione o parceiro responsável pelo faturamento." };
   }
 
   return {
@@ -116,11 +121,16 @@ export async function createReservation(
     return { error: result.error };
   }
 
-  const code = await generateNextReservationCode();
-
-  const reservation = await prisma.reservation.create({
-    data: { ...result.data, code },
-  });
+  let reservation: Awaited<ReturnType<typeof prisma.reservation.create>> | null = null;
+  for (let attempt = 0; attempt < 4 && !reservation; attempt += 1) {
+    const code = await generateNextReservationCode();
+    try {
+      reservation = await prisma.reservation.create({ data: { ...result.data, code } });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+    }
+  }
+  if (!reservation) throw new Error("Não foi possível gerar um código único para a reserva. Tente novamente.");
 
   await recalculateReservationTax(reservation.id);
   await recalculateReservationCommissions(reservation.id);
@@ -146,6 +156,35 @@ export async function updateReservation(
 
   if (!result.ok) {
     return { error: result.error };
+  }
+
+  const [current, lockedEntry] = await Promise.all([
+    prisma.reservation.findUniqueOrThrow({ where: { id } }),
+    prisma.financeEntry.findFirst({
+      where: {
+        reservation_id: id,
+        reversed_at: null,
+        OR: [
+          { status: { in: ["pendente", "vencido", "pago"] } },
+          { payments: { some: { reversed_at: null, estorno_of_id: null } } },
+        ],
+      },
+      select: { id: true },
+    }),
+  ]);
+  const changedFinancialRule =
+    current.client_id !== result.data.client_id ||
+    current.origin_partner_id !== result.data.origin_partner_id ||
+    current.collection_mode !== result.data.collection_mode ||
+    current.is_cortesia !== result.data.is_cortesia ||
+    current.is_net_fare !== result.data.is_net_fare ||
+    current.requires_nf !== result.data.requires_nf ||
+    (current.commission_percent?.toString() ?? null) !== result.data.commission_percent ||
+    (current.tax_percent_snapshot?.toString() ?? null) !== result.data.tax_percent_snapshot;
+  if (lockedEntry && changedFinancialRule) {
+    return {
+      error: "A reserva possui títulos financeiros elegíveis ou pagos. Faça um ajuste/estorno antes de alterar cliente, cobrança, comissão, imposto ou cortesia.",
+    };
   }
 
   await prisma.reservation.update({ where: { id }, data: result.data });
@@ -182,6 +221,21 @@ export async function rejectReservationEntirely(reservationId: string, reason: s
     metadata: { reason },
   });
 
+  revalidatePath("/admin/reservas");
+  revalidatePath(`/admin/reservas/${reservationId}`);
+}
+
+export async function cancelReservationEntirely(reservationId: string, reason: string) {
+  const user = await requireInternalUser();
+  if (!reason.trim()) throw new Error("Informe o motivo do cancelamento.");
+  await cancelReservationLib(reservationId);
+  await logAudit({
+    actorId: user.id,
+    action: "reserva_cancelada",
+    entityType: "reservation",
+    entityId: reservationId,
+    metadata: { reason: reason.trim() },
+  });
   revalidatePath("/admin/reservas");
   revalidatePath(`/admin/reservas/${reservationId}`);
 }

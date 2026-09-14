@@ -1,6 +1,22 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 const sections = [
+  {
+    href: "/admin/configuracoes/empresa",
+    title: "Dados da Nativos",
+    description: "Nome, documento, contatos, endereço, site e rodapé usados nos documentos e comunicações.",
+  },
+  {
+    href: "/admin/configuracoes/operacao",
+    title: "Parâmetros da operação",
+    description: "Espera, no-show, intervalo entre serviços, hora excedente e vencimento padrão.",
+  },
+  {
+    href: "/admin/configuracoes/bancos",
+    title: "Contas bancárias e caixa",
+    description: "Contas usadas em pagamentos, recebimentos, comprovantes e fechamentos de caixa.",
+  },
   {
     href: "/admin/configuracoes/catalogo",
     title: "Catálogo",
@@ -43,12 +59,17 @@ const sections = [
   },
 ];
 
-export default function ConfiguracoesPage() {
+export default async function ConfiguracoesPage() {
+  const user = await getCurrentUser();
+  const visibleSections = user?.is_owner
+    ? sections
+    : sections.filter((section) => section.href !== "/admin/configuracoes/usuarios");
+
   return (
     <div>
       <h1 className="mb-6 font-serif text-3xl text-forest">Configurações</h1>
       <div className="grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
-        {sections.map((s) => (
+        {visibleSections.map((s) => (
           <Link
             key={s.href}
             href={s.href}

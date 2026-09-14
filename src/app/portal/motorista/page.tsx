@@ -44,9 +44,29 @@ export default async function PortalMotoristaHomePage() {
       driver_id: driver.id,
       execution_status: { in: ["agendado", "em_andamento"] },
     },
-    include: {
-      reservation: { include: { client: true } },
-      vehicle: true,
+    select: {
+      id: true,
+      type: true,
+      execution_status: true,
+      scheduled_date: true,
+      scheduled_time: true,
+      pickup_location: true,
+      dropoff_location: true,
+      passenger_count: true,
+      luggage_10kg: true,
+      luggage_23kg: true,
+      luggage_32kg: true,
+      flight_number: true,
+      notes: true,
+      reception_sign_enabled: true,
+      reception_passenger_name: true,
+      reservation: {
+        select: {
+          code: true,
+          client: { select: { name: true, phone: true } },
+        },
+      },
+      vehicle: { select: { model: true, plate: true } },
     },
     orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }],
     take: 30,
@@ -233,6 +253,17 @@ export default async function PortalMotoristaHomePage() {
                   <FileText size={15} aria-hidden="true" />
                   Ordem de serviço
                 </a>
+                {nextService.reception_sign_enabled && nextService.reception_passenger_name && (
+                  <a
+                    href={`/api/documentos/plaquinha/${nextService.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest transition hover:bg-forest/[0.035] sm:text-sm"
+                  >
+                    <Users size={15} aria-hidden="true" />
+                    Plaquinha
+                  </a>
+                )}
               </div>
             </div>
 

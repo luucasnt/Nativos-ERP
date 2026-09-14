@@ -10,6 +10,7 @@
 // livre da solicitação (motivo, descrição, ids de lançamento referenciados
 // etc.), não só para repasse.
 import type { ChangeRequestRequesterType, Prisma } from "@prisma/client";
+import { Prisma as PrismaRuntime } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateNextProtocol } from "@/lib/change-requests/protocol";
 import { changeRequestCategoryForType } from "@/lib/change-requests/sla";
@@ -28,19 +29,27 @@ export async function submitChangeRequest(params: {
     return existing;
   }
 
-  const protocol = await generateNextProtocol();
-
-  return prisma.changeRequest.create({
-    data: {
-      protocol,
-      category: changeRequestCategoryForType(params.type),
-      type: params.type,
-      requester_type: params.requesterType,
-      requester_id: params.requesterId,
-      company_id: params.companyId,
-      reservation_id: params.reservationId,
-      allocation_details: params.allocationDetails,
-      dedupe_key: params.dedupeKey,
-    },
-  });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const protocol = await generateNextProtocol();
+    try {
+      return await prisma.changeRequest.create({
+        data: {
+          protocol,
+          category: changeRequestCategoryForType(params.type),
+          type: params.type,
+          requester_type: params.requesterType,
+          requester_id: params.requesterId,
+          company_id: params.companyId,
+          reservation_id: params.reservationId,
+          allocation_details: params.allocationDetails,
+          dedupe_key: params.dedupeKey,
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof PrismaRuntime.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+      const duplicate = await prisma.changeRequest.findUnique({ where: { dedupe_key: params.dedupeKey } });
+      if (duplicate) return duplicate;
+    }
+  }
+  throw new Error("Não foi possível gerar um protocolo único. Tente novamente.");
 }

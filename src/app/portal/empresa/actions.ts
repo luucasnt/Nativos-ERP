@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { assertActiveCompanyPortalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
 import {
   confirmDirectCollectionNotReceived,
   confirmDirectCollectionReceived,
+  ensureDirectSupplierRepasseRequest,
 } from "@/lib/finance/direct-collection";
 import { submitChangeRequest } from "@/lib/change-requests/submit";
 import { alertChangeRequestNeedsReview } from "@/lib/alerts/detectors";
@@ -15,24 +16,32 @@ import { alertChangeRequestNeedsReview } from "@/lib/alerts/detectors";
 export type DirectCollectionState = { error: string | null };
 
 async function assertOwnSupplierService(serviceId: string) {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id) {
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("fornecedor")) {
     throw new Error("Sessão expirada. Faça login novamente.");
   }
 
-  const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
+  const service = await prisma.service.findUniqueOrThrow({
+    where: { id: serviceId },
+    select: { supplier_id: true, execution_status: true, collection_actor: true },
+  });
   if (service.supplier_id !== user.linked_company_id) {
     throw new Error("Você não tem permissão para confirmar o recebimento deste serviço.");
+  }
+  if (service.execution_status !== "concluido" || service.collection_actor !== "fornecedor") {
+    throw new Error("O recebimento só pode ser confirmado após concluir um serviço de cobrança direta.");
   }
 
   return { user, service };
 }
 
-export async function confirmReceivedPortalEmpresa(serviceId: string): Promise<DirectCollectionState> {
+export async function confirmReceivedPortalEmpresa(serviceId: string, receiptUrl: string): Promise<DirectCollectionState> {
   try {
     const { user } = await assertOwnSupplierService(serviceId);
+    const proof = z.string().url("Anexe um comprovante válido.").parse(receiptUrl);
 
-    await confirmDirectCollectionReceived(serviceId);
+    await confirmDirectCollectionReceived(serviceId, proof);
+    await ensureDirectSupplierRepasseRequest(serviceId, user.linked_company_id);
 
     await logAudit({
       actorId: user.id,
@@ -98,9 +107,9 @@ export async function registerDriverPortal(
   _prevState: DriverRegistrationState,
   formData: FormData,
 ): Promise<DriverRegistrationState> {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id) {
-    return { error: "Sessão expirada. Faça login novamente." };
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("fornecedor")) {
+    return { error: "Apenas fornecedores podem cadastrar motoristas." };
   }
 
   const parsed = driverRegistrationSchema.safeParse({
@@ -158,9 +167,9 @@ export async function registerVehiclePortal(
   _prevState: VehicleRegistrationState,
   formData: FormData,
 ): Promise<VehicleRegistrationState> {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id) {
-    return { error: "Sessão expirada. Faça login novamente." };
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("fornecedor")) {
+    return { error: "Apenas fornecedores podem cadastrar veículos." };
   }
 
   const parsed = vehicleRegistrationSchema.safeParse({
@@ -176,11 +185,19 @@ export async function registerVehiclePortal(
 
   const d = parsed.data;
 
+  const category = d.category_id
+    ? await prisma.catalogItem.findFirst({
+        where: { id: d.category_id, type: "tipo_veiculo", active: true },
+        select: { id: true },
+      })
+    : null;
+  if (d.category_id && !category) return { error: "Categoria de veículo inválida ou inativa." };
+
   const vehicle = await prisma.vehicle.create({
     data: {
       plate: d.plate.toUpperCase(),
       model: d.model,
-      category_id: d.category_id || null,
+      category_id: category?.id ?? null,
       capacity: Number(d.capacity),
       owner_type: "terceirizado",
       supplier_id: user.linked_company_id,
@@ -204,6 +221,7 @@ export type ChangeRequestFormState = { error: string | null };
 const novaReservaSchema = z.object({
   dedupe_key: z.string().min(1),
   cliente_nome: z.string().min(1, "Informe o nome do cliente."),
+  client_id: z.string().uuid().optional().or(z.literal("")),
   descricao: z.string().min(1, "Descreva a reserva desejada."),
 });
 
@@ -215,18 +233,27 @@ export async function submitNovaReservaRequest(
   _prevState: ChangeRequestFormState,
   formData: FormData,
 ): Promise<ChangeRequestFormState> {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id || !user.linked_company?.roles.includes("parceiro")) {
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("parceiro")) {
     return { error: "Sessão expirada. Faça login novamente." };
   }
 
   const parsed = novaReservaSchema.safeParse({
     dedupe_key: formData.get("dedupe_key"),
     cliente_nome: formData.get("cliente_nome"),
+    client_id: formData.get("client_id") || undefined,
     descricao: formData.get("descricao"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  if (parsed.data.client_id) {
+    const client = await prisma.client.findFirst({
+      where: { id: parsed.data.client_id, origin_partner_id: user.linked_company_id },
+      select: { id: true, name: true },
+    });
+    if (!client) return { error: "Cliente não encontrado no seu cadastro." };
   }
 
   const changeRequest = await submitChangeRequest({
@@ -234,7 +261,11 @@ export async function submitNovaReservaRequest(
     requesterType: "company",
     requesterId: user.linked_company_id,
     companyId: user.linked_company_id,
-    allocationDetails: { cliente_nome: parsed.data.cliente_nome, descricao: parsed.data.descricao },
+    allocationDetails: {
+      cliente_nome: parsed.data.cliente_nome,
+      client_id: parsed.data.client_id || null,
+      descricao: parsed.data.descricao,
+    },
     dedupeKey: parsed.data.dedupe_key,
   });
 
@@ -249,6 +280,137 @@ export async function submitNovaReservaRequest(
   return { error: null };
 }
 
+const clientSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome do cliente."),
+  document: z.string().trim().optional(),
+  email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
+  phone: z.string().trim().optional(),
+});
+
+export async function registerClientPortal(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("parceiro")) {
+    return { error: "Apenas parceiros podem cadastrar clientes." };
+  }
+  const parsed = clientSchema.safeParse({
+    name: formData.get("name"),
+    document: formData.get("document") || undefined,
+    email: formData.get("email") || undefined,
+    phone: formData.get("phone") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const duplicate = await prisma.client.findFirst({
+    where: {
+      origin_partner_id: user.linked_company_id,
+      OR: [
+        parsed.data.document ? { document: parsed.data.document } : undefined,
+        parsed.data.email ? { email: parsed.data.email } : undefined,
+      ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    },
+  });
+  if (duplicate) return { error: "Já existe um cliente com este documento ou e-mail." };
+
+  await prisma.client.create({
+    data: {
+      name: parsed.data.name,
+      document: parsed.data.document || null,
+      email: parsed.data.email || null,
+      phone: parsed.data.phone || null,
+      origin: "parceiro",
+      origin_partner_id: user.linked_company_id,
+    },
+  });
+  revalidatePath("/portal/empresa");
+  return { error: null };
+}
+
+const advanceInvoiceSchema = z.object({
+  dedupe_key: z.string().min(1),
+  billing_cycle_id: z.string().uuid(),
+  amount: z.string().min(1).refine((value) => Number(value) > 0, "Informe um valor válido."),
+  nota: z.string().trim().min(5, "Explique o pedido de antecipação."),
+});
+
+const invoicePaymentSchema = z.object({
+  dedupe_key: z.string().min(1),
+  billing_cycle_id: z.string().uuid(),
+  amount: z.string().min(1).refine((value) => Number(value) > 0, "Informe um valor válido."),
+  receipt_url: z.string().url("Anexe um comprovante válido."),
+  nota: z.string().trim().max(300).optional(),
+});
+
+export async function submitInvoicePaymentRequest(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("parceiro")) return { error: "Apenas parceiros podem informar pagamento de fatura." };
+  const parsed = invoicePaymentSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"), billing_cycle_id: formData.get("billing_cycle_id"),
+    amount: formData.get("amount"), receipt_url: formData.get("receipt_url"), nota: formData.get("nota") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  const cycle = await prisma.billingCycle.findFirst({ where: { id: parsed.data.billing_cycle_id, company_id: user.linked_company_id, status: { in: ["fechado", "faturado", "parcialmente_pago", "vencido"] } }, include: { reservations: { select: { reservation_id: true } } } });
+  if (!cycle) return { error: "Fatura não encontrada ou não disponível para pagamento." };
+  const remaining = Number(cycle.total_amount) - Number(cycle.paid_amount);
+  if (Number(parsed.data.amount) > remaining) return { error: "O valor excede o saldo da fatura." };
+  await submitChangeRequest({
+    type: "pagamento_fatura", requesterType: "company", requesterId: user.linked_company_id,
+    companyId: user.linked_company_id, allocationDetails: {
+      billing_cycle_id: cycle.id, reservation_ids: cycle.reservations.map((item) => item.reservation_id),
+      amount: Number(parsed.data.amount), receipt_url: parsed.data.receipt_url, nota: parsed.data.nota ?? null,
+    }, dedupeKey: parsed.data.dedupe_key,
+  });
+  revalidatePath("/portal/empresa/financeiro"); revalidatePath("/portal/empresa/solicitacoes");
+  return { error: null };
+}
+
+export async function submitInvoiceAdvanceRequest(
+  _prevState: ChangeRequestFormState,
+  formData: FormData,
+): Promise<ChangeRequestFormState> {
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("parceiro")) {
+    return { error: "Apenas parceiros podem solicitar antecipação." };
+  }
+  const parsed = advanceInvoiceSchema.safeParse({
+    dedupe_key: formData.get("dedupe_key"),
+    billing_cycle_id: formData.get("billing_cycle_id"),
+    amount: formData.get("amount"),
+    nota: formData.get("nota"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  const cycle = await prisma.billingCycle.findFirst({
+    where: {
+      id: parsed.data.billing_cycle_id,
+      company_id: user.linked_company_id,
+      status: { in: ["aberto", "fechado", "parcialmente_pago", "vencido"] },
+    },
+  });
+  if (!cycle) return { error: "Fatura não encontrada ou não elegível para antecipação." };
+  const remaining = Number(cycle.total_amount) - Number(cycle.paid_amount);
+  if (Number(parsed.data.amount) > remaining) return { error: "O valor excede o saldo da fatura." };
+  await submitChangeRequest({
+    type: "antecipacao_fatura",
+    requesterType: "company",
+    requesterId: user.linked_company_id,
+    companyId: user.linked_company_id,
+    allocationDetails: {
+      billing_cycle_id: cycle.id,
+      amount: Number(parsed.data.amount),
+      nota: parsed.data.nota,
+    },
+    dedupeKey: parsed.data.dedupe_key,
+  });
+  revalidatePath("/portal/empresa/financeiro");
+  revalidatePath("/portal/empresa/solicitacoes");
+  return { error: null };
+}
+
 const alteracaoSchema = z.object({
   dedupe_key: z.string().min(1),
   reservation_id: z.string().uuid("Selecione a reserva."),
@@ -259,9 +421,9 @@ export async function submitAlteracaoRequest(
   _prevState: ChangeRequestFormState,
   formData: FormData,
 ): Promise<ChangeRequestFormState> {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id) {
-    return { error: "Sessão expirada. Faça login novamente." };
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("parceiro")) {
+    return { error: "Apenas parceiros podem solicitar alterações de reserva." };
   }
 
   const parsed = alteracaoSchema.safeParse({
@@ -315,9 +477,9 @@ export async function submitCancelamentoRequest(
   _prevState: ChangeRequestFormState,
   formData: FormData,
 ): Promise<ChangeRequestFormState> {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id) {
-    return { error: "Sessão expirada. Faça login novamente." };
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("parceiro")) {
+    return { error: "Apenas parceiros podem solicitar cancelamentos." };
   }
 
   const parsed = cancelamentoSchema.safeParse({
@@ -363,7 +525,7 @@ export async function submitCancelamentoRequest(
 
 const repasseSchema = z.object({
   dedupe_key: z.string().min(1),
-  entry_ids: z.array(z.string().uuid()).optional(),
+  entry_ids: z.array(z.string().uuid()).min(1, "Selecione ao menos um lançamento."),
   nota: z.string().optional(),
 });
 
@@ -371,9 +533,9 @@ export async function submitRepasseRequestEmpresa(
   _prevState: ChangeRequestFormState,
   formData: FormData,
 ): Promise<ChangeRequestFormState> {
-  const user = await getCurrentUser();
-  if (!user || !user.linked_company_id) {
-    return { error: "Sessão expirada. Faça login novamente." };
+  const user = await assertActiveCompanyPortalUser();
+  if (!user.linked_company.roles.includes("fornecedor")) {
+    return { error: "Apenas fornecedores podem solicitar repasse." };
   }
 
   const parsed = repasseSchema.safeParse({
@@ -385,12 +547,28 @@ export async function submitRepasseRequestEmpresa(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const entryIds = [...new Set(parsed.data.entry_ids)];
+  const eligibleCount = await prisma.financeEntry.count({
+    where: {
+      id: { in: entryIds },
+      party_type: "fornecedor",
+      party_id: user.linked_company_id,
+      type: "despesa",
+      status: "pendente",
+      payment_eligible: true,
+      reversed_at: null,
+    },
+  });
+  if (eligibleCount !== entryIds.length) {
+    return { error: "Um ou mais lançamentos não pertencem à sua conta ou não estão elegíveis." };
+  }
+
   const changeRequest = await submitChangeRequest({
     type: "repasse_nativos",
     requesterType: "company",
     requesterId: user.linked_company_id,
     companyId: user.linked_company_id,
-    allocationDetails: { entry_ids: parsed.data.entry_ids ?? [], nota: parsed.data.nota ?? null },
+    allocationDetails: { entry_ids: entryIds, nota: parsed.data.nota ?? null },
     dedupeKey: parsed.data.dedupe_key,
   });
 
@@ -401,6 +579,7 @@ export async function submitRepasseRequestEmpresa(
     entityId: changeRequest.id,
   });
 
-  revalidatePath("/portal/empresa");
+  revalidatePath("/portal/empresa/financeiro");
+  revalidatePath("/portal/empresa/solicitacoes");
   return { error: null };
 }

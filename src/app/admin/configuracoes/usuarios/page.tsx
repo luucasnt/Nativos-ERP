@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { tableClass, thClass } from "@/lib/ui";
@@ -5,19 +6,22 @@ import { NewInternalUserForm } from "./new-user-form";
 import { UserRow } from "./user-row";
 
 export default async function UsuariosInternosPage() {
-  const [actor, users] = await Promise.all([
-    getCurrentUser(),
-    prisma.user.findMany({
-      where: { account_type: "internal" },
-      orderBy: { created_at: "asc" },
-    }),
-  ]);
+  const actor = await getCurrentUser();
+  if (!actor?.is_owner || actor.role !== "admin") {
+    redirect("/admin/configuracoes");
+  }
+
+  const users = await prisma.user.findMany({
+    where: { account_type: "internal" },
+    orderBy: { created_at: "asc" },
+    take: 100,
+  });
 
   return (
     <div>
       <h1 className="mb-6 font-serif text-3xl text-forest">Usuários internos</h1>
 
-      <NewInternalUserForm actorIsOwner={actor?.is_owner ?? false} />
+      <NewInternalUserForm actorIsOwner />
 
       <table className={tableClass}>
         <thead>

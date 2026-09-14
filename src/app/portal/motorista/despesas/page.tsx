@@ -21,14 +21,14 @@ export default async function PortalMotoristaDespesasPage() {
   const user = await requireDriverPortalUser();
   const driver = user.linked_driver;
 
-  const [categories, expenses, eligibleServices] = await Promise.all([
+  const [categories, expenses, eligibleServices, vehicles] = await Promise.all([
     prisma.catalogItem.findMany({
       where: { type: "categoria_despesa", active: true },
       orderBy: { order: "asc" },
     }),
     prisma.serviceExpense.findMany({
       where: { driver_id: driver.id },
-      include: { category: true, service: { include: { reservation: true } } },
+      include: { category: true, vehicle: true, service: { include: { reservation: true } } },
       orderBy: { created_at: "desc" },
       take: 100,
     }),
@@ -41,6 +41,11 @@ export default async function PortalMotoristaDespesasPage() {
       orderBy: { scheduled_date: "desc" },
       take: 40,
     }),
+    prisma.vehicle.findMany({
+      where: { owner_type: "proprio", status: { not: "inativo" } },
+      select: { id: true, plate: true, model: true },
+      orderBy: { plate: "asc" },
+    }),
   ]);
 
   return (
@@ -49,7 +54,7 @@ export default async function PortalMotoristaDespesasPage() {
         <p className="eyebrow">Prestação de contas</p>
         <h1 className="page-heading mt-1">Minhas despesas</h1>
         <p className="page-description">
-          Registre custos do serviço e acompanhe a análise da equipe Nativos.
+          Registre custos de uma reserva ou despesas avulsas do veículo e acompanhe a análise da equipe Nativos.
         </p>
       </header>
 
@@ -77,11 +82,10 @@ export default async function PortalMotoristaDespesasPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-forest">
-                          {expense.service.reservation.code}
+                          {expense.service?.reservation.code ?? "Despesa avulsa"}
                         </p>
                         <p className="mt-1 truncate text-xs text-forest/50">
-                          {SERVICE_TYPE_LABEL[expense.service.type] ??
-                            expense.service.type}
+                          {expense.service ? (SERVICE_TYPE_LABEL[expense.service.type] ?? expense.service.type) : expense.vehicle ? `${expense.vehicle.plate} · ${expense.vehicle.model}` : "Despesa de veículo"}
                         </p>
                       </div>
                       <Badge tone={statusTone(expense.status)}>
@@ -105,6 +109,8 @@ export default async function PortalMotoristaDespesasPage() {
                           {money.format(Number(expense.amount))}
                         </dd>
                       </div>
+                      {expense.odometer_km != null && <div><dt className="text-[10px] uppercase tracking-[0.08em] text-forest/42">Odômetro</dt><dd className="mt-1 text-forest/75">{expense.odometer_km.toLocaleString("pt-BR")} km</dd></div>}
+                      {expense.calculated_km_per_liter != null && <div className="text-right"><dt className="text-[10px] uppercase tracking-[0.08em] text-forest/42">Consumo</dt><dd className="mt-1 font-semibold text-forest">{Number(expense.calculated_km_per_liter).toFixed(2)} km/l</dd></div>}
                     </dl>
                     <p className="mt-2 text-[11px] text-forest/42">
                       Enviada em{" "}
@@ -150,11 +156,10 @@ export default async function PortalMotoristaDespesasPage() {
                         </td>
                         <td className="px-4 py-3.5">
                           <p className="text-xs font-medium text-ink">
-                            {expense.service.reservation.code}
+                            {expense.service?.reservation.code ?? "Despesa avulsa"}
                           </p>
                           <p className="mt-1 text-[10px] text-forest/42">
-                            {SERVICE_TYPE_LABEL[expense.service.type] ??
-                              expense.service.type}
+                            {expense.service ? (SERVICE_TYPE_LABEL[expense.service.type] ?? expense.service.type) : expense.vehicle ? `${expense.vehicle.plate} · ${expense.vehicle.model}` : "Despesa de veículo"}
                           </p>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-forest/65">
@@ -183,9 +188,10 @@ export default async function PortalMotoristaDespesasPage() {
             <h2 className="section-heading">Registrar despesa</h2>
           </div>
           <p className="mb-4 mt-1 text-xs leading-5 text-forest/46">
-            Vincule o gasto ao serviço correspondente.
+            A reserva é opcional. Para despesas avulsas, selecione apenas o veículo.
           </p>
           <ExpenseForm
+            dedupeKey={crypto.randomUUID()}
             services={eligibleServices.map((service) => ({
               id: service.id,
               label:
@@ -194,6 +200,7 @@ export default async function PortalMotoristaDespesasPage() {
                 (SERVICE_TYPE_LABEL[service.type] ?? service.type),
             }))}
             categories={categories}
+            vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, label: `${vehicle.plate} — ${vehicle.model}` }))}
           />
         </aside>
       </div>

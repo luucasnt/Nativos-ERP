@@ -37,7 +37,13 @@ export default async function PortalEmpresaHomePage() {
       isPartner
         ? prisma.reservation.findMany({
             where: { origin_partner_id: company.id },
-            include: { client: true, _count: { select: { services: true } } },
+            select: {
+              id: true,
+              code: true,
+              status: true,
+              client: { select: { name: true } },
+              _count: { select: { services: true } },
+            },
             orderBy: { created_at: "desc" },
             take: 6,
           })
@@ -48,7 +54,15 @@ export default async function PortalEmpresaHomePage() {
               supplier_id: company.id,
               execution_status: { in: ["agendado", "em_andamento"] },
             },
-            include: { reservation: { include: { client: true } }, driver: true },
+            select: {
+              id: true,
+              type: true,
+              scheduled_date: true,
+              scheduled_time: true,
+              acceptance_status: true,
+              reservation: { select: { code: true, client: { select: { name: true } } } },
+              driver: { select: { name: true } },
+            },
             orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }],
             take: 6,
           })
@@ -198,8 +212,38 @@ export default async function PortalEmpresaHomePage() {
               {reservations.length === 0 ? (
                 <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhuma reserva vinculada ainda.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[650px] text-sm">
+                <>
+                  <ul className="divide-y divide-forest/[0.075] md:hidden">
+                    {reservations.map((reservation) => (
+                      <li key={reservation.id} className="p-4">
+                        <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-forest">{reservation.code}</p>
+                              <p className="mt-1 truncate text-sm font-medium text-ink">{reservation.client.name}</p>
+                            </div>
+                            <Badge tone={reservationTone(reservation.status)}>
+                              {RESERVATION_STATUS_LABEL[reservation.status]}
+                            </Badge>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-forest/52">
+                            <span>{reservation._count.services} serviço(s)</span>
+                            <a
+                              href={`/api/documentos/voucher/${reservation.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-forest/15 bg-white px-4 font-semibold text-forest"
+                            >
+                              Voucher
+                            </a>
+                          </div>
+                        </article>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr>
                         <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reserva</th>
@@ -233,8 +277,9 @@ export default async function PortalEmpresaHomePage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
           )}

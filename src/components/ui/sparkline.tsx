@@ -1,40 +1,43 @@
-"use client";
-
-import { useId } from "react";
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
-
 type SparklineProps = {
   data: number[];
   color?: string;
 };
 
-// Mini gráfico de tendência ao lado de um número grande de card de
-// métrica (padrão Stripe) — não tem eixo, legenda nem tooltip, é só uma
-// pista visual de "subindo/descendo/estável" nos últimos períodos.
 export function Sparkline({ data, color = "var(--color-forest)" }: SparklineProps) {
-  const gradientId = `sparkline-fill-${useId().replace(/:/g, "")}`;
-  const points = data.map((value, index) => ({ value, index }));
+  if (data.length === 0) return null;
+
+  const width = 80;
+  const height = 40;
+  const padding = 3;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = Math.max(max - min, 1);
+  const linePoints = data
+    .map((value, index) => {
+      const x = data.length === 1 ? width / 2 : (index / (data.length - 1)) * width;
+      const y = padding + ((max - value) / range) * (height - padding * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const areaPoints = `0,${height} ${linePoints} ${width},${height}`;
 
   return (
-    <div className="h-10 w-20 shrink-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={1.75}
-            fill={`url(#${gradientId})`}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
+    <svg
+      aria-hidden="true"
+      className="h-10 w-20 shrink-0"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+    >
+      <polygon points={areaPoints} fill={color} fillOpacity="0.1" />
+      <polyline
+        points={linePoints}
+        fill="none"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.75"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
   );
 }

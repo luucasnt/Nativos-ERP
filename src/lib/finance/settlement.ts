@@ -35,6 +35,7 @@ export type ServiceSettlementInput = {
   driver_owner_type: OwnerType | null;
   driver_payment_type: DriverPaymentType | null;
   driver_commission_percent: Prisma.Decimal.Value | null;
+  service_expense_total?: Prisma.Decimal.Value;
 };
 
 export type EntrySpec = {
@@ -105,8 +106,9 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
       // motorista próprio (só Company tem direct_collection_settlement_mode),
       // aplicamos por analogia o mesmo padrão de "retém a própria
       // remuneração e repassa a margem" usado para fornecedor.
+      const netPrice = Prisma.Decimal.max(new Prisma.Decimal(0), price.minus(input.service_expense_total ?? 0));
       const driverPay =
-        computeOwnDriverCommissionPay(price, input.driver_payment_type, input.driver_commission_percent) ??
+        computeOwnDriverCommissionPay(netPrice, input.driver_payment_type, input.driver_commission_percent) ??
         new Prisma.Decimal(0);
       const amount = price.minus(driverPay);
       if (amount.gt(0)) {
@@ -140,7 +142,8 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
 
   if (input.execution_type === "propria" && input.driver_id && input.driver_owner_type === "proprio") {
     if (collectionActor === "nativos") {
-      const driverPay = computeOwnDriverCommissionPay(price, input.driver_payment_type, input.driver_commission_percent);
+      const netPrice = Prisma.Decimal.max(new Prisma.Decimal(0), price.minus(input.service_expense_total ?? 0));
+      const driverPay = computeOwnDriverCommissionPay(netPrice, input.driver_payment_type, input.driver_commission_percent);
       if (driverPay && driverPay.gt(0)) {
         entries.push({
           key: "repasse_motorista",
@@ -194,6 +197,11 @@ async function loadSettlementInput(serviceId: string): Promise<{
     },
   });
 
+  const expenseTotal = await prisma.serviceExpense.aggregate({
+    where: { service_id: serviceId, status: { not: "rejeitado" } },
+    _sum: { amount: true },
+  });
+
   return {
     reservationId: service.reservation_id,
     input: {
@@ -210,13 +218,17 @@ async function loadSettlementInput(serviceId: string): Promise<{
       driver_owner_type: service.driver?.owner_type ?? null,
       driver_payment_type: service.driver?.payment_type ?? null,
       driver_commission_percent: service.driver?.commission ?? null,
+      service_expense_total: expenseTotal._sum.amount ?? new Prisma.Decimal(0),
     },
   };
 }
 
 async function upsertProgrammedEntry(serviceId: string, reservationId: string, spec: EntrySpec) {
   const autoKey = `svc:${serviceId}:${spec.key}`;
-  const existing = await prisma.financeEntry.findUnique({ where: { auto_key: autoKey } });
+  const existing = await prisma.financeEntry.findUnique({
+    where: { auto_key: autoKey },
+    include: { payments: { where: { reversed_at: null, estorno_of_id: null }, select: { id: true } } },
+  });
 
   if (!existing) {
     return createFinanceEntry({
@@ -243,7 +255,7 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
   // Só um lançamento ainda em rascunho (programado, nunca revertido) pode
   // ser ajustado in-place — uma vez elegível/pago, mudar de valor exige
   // uma reversão formal, não uma edição silenciosa.
-  if (existing.status === "programado" && !existing.reversed_at) {
+  if ((existing.status === "programado" || (existing.status === "pendente" && existing.payments.length === 0)) && !existing.reversed_at) {
     return prisma.financeEntry.update({
       where: { id: existing.id },
       data: { amount: spec.amount, party_type: spec.party_type, party_id: spec.party_id },
@@ -294,11 +306,22 @@ export async function markServiceFinanceEntriesEligible(serviceId: string) {
 }
 
 function dailyDriverKey(driverId: string, referenceDate: Date) {
-  return `driver_daily:${driverId}:${referenceDate.toISOString().slice(0, 10)}`;
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bahia",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(referenceDate);
+  return `driver_daily:${driverId}:${day}`;
 }
 
 function monthlyDriverKey(driverId: string, referenceDate: Date) {
-  return `driver_monthly:${driverId}:${referenceDate.toISOString().slice(0, 7)}`;
+  const month = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bahia",
+    year: "numeric",
+    month: "2-digit",
+  }).format(referenceDate);
+  return `driver_monthly:${driverId}:${month}`;
 }
 
 // Cria (se ainda não existir) um lançamento já elegível para o auto_key
@@ -406,8 +429,6 @@ async function compensateGrossRepassPairIfPresent(serviceId: string) {
   await createCompensation({
     counterparty_type: "supplier",
     counterparty_id: receivable.party_id,
-    payable_allocation: { finance_entry_id: payable.id, amount: payable.amount.toString() },
-    receivable_allocation: { finance_entry_id: receivable.id, amount: receivable.amount.toString() },
     amount,
     idempotency_key: `svc:${serviceId}:compensacao_gross_repass`,
     entryIds: [receivable.id, payable.id],

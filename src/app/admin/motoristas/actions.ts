@@ -60,6 +60,15 @@ function parseDriverForm(formData: FormData) {
     return { ok: false as const, error: "Selecione o fornecedor deste motorista terceirizado." };
   }
 
+  const commission = d.commission === "" ? null : Number(d.commission);
+  const dailyRate = d.daily_rate === "" ? null : Number(d.daily_rate);
+  if ((d.payment_type === "comissao" || d.payment_type === "mesclado") && (commission === null || commission <= 0 || commission > 100)) {
+    return { ok: false as const, error: "Informe uma comissão entre 0,01% e 100%." };
+  }
+  if ((d.payment_type === "diaria" || d.payment_type === "mesclado") && (dailyRate === null || dailyRate <= 0)) {
+    return { ok: false as const, error: "Informe o valor da diária." };
+  }
+
   return {
     ok: true as const,
     data: {

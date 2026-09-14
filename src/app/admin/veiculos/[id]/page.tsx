@@ -60,6 +60,7 @@ export default async function EditarVeiculoPage({
           owner_type: vehicle.owner_type,
           supplier_id: vehicle.supplier_id,
           status: vehicle.status,
+          initial_odometer_km: vehicle.initial_odometer_km,
         }}
       />
     </div>

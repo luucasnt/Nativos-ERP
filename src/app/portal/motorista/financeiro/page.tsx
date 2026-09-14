@@ -22,16 +22,33 @@ export default async function PortalMotoristaFinanceiroPage() {
       where: {
         party_type: "motorista",
         party_id: driver.id,
+        type: "despesa",
         status: "pendente",
         payment_eligible: true,
       },
       orderBy: { created_at: "desc" },
+      take: 100,
+      include: {
+        compensacao: { select: { amount: true, status: true, reversed_at: true } },
+        payments: {
+          where: { reversed_at: null, estorno_of_id: null },
+          select: { amount: true },
+        },
+      },
     }),
   ]);
 
   const openAmount = extract
     .filter((entry) => ["programado", "pendente", "vencido"].includes(entry.status))
-    .reduce((total, entry) => total + Number(entry.amount), 0);
+    .reduce((total, entry) => {
+      const amount = Number(entry.amount);
+      const compensated =
+        entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at
+          ? Math.min(amount, Number(entry.compensacao.amount))
+          : 0;
+      const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+      return total + Math.max(0, amount - compensated - paid);
+    }, 0);
   const paidAmount = extract
     .filter((entry) => entry.status === "pago")
     .reduce((total, entry) => total + Number(entry.amount), 0);
@@ -69,7 +86,19 @@ export default async function PortalMotoristaFinanceiroPage() {
           dedupeKey={crypto.randomUUID()}
           entries={eligibleEntries.map((entry) => ({
             id: entry.id,
-            label: (entry.description ?? entry.category) + " — " + money.format(Number(entry.amount)),
+            label:
+              (entry.description ?? entry.category) +
+              " — saldo " +
+              money.format(
+                Math.max(
+                  0,
+                  Number(entry.amount) -
+                    (entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at
+                      ? Math.min(Number(entry.amount), Number(entry.compensacao.amount))
+                      : 0) -
+                    entry.payments.reduce((total, payment) => total + Number(payment.amount), 0),
+                ),
+              ),
           }))}
           action={submitRepasseRequestMotorista}
         />
@@ -77,4 +106,3 @@ export default async function PortalMotoristaFinanceiroPage() {
     </div>
   );
 }
-

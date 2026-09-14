@@ -18,6 +18,7 @@ const vehicleSchema = z.object({
   owner_type: z.enum(["proprio", "terceirizado"]),
   supplier_id: z.string().uuid().optional().or(z.literal("")),
   status: z.enum(["ativo", "manutencao", "inativo"]),
+  initial_odometer_km: z.string().optional(),
 });
 
 export type VehicleFormState = { error: string | null };
@@ -31,6 +32,7 @@ function parseVehicleForm(formData: FormData) {
     owner_type: formData.get("owner_type"),
     supplier_id: formData.get("supplier_id") || undefined,
     status: formData.get("status"),
+    initial_odometer_km: formData.get("initial_odometer_km") || undefined,
   });
 
   if (!parsed.success) {
@@ -41,6 +43,10 @@ function parseVehicleForm(formData: FormData) {
 
   if (d.owner_type === "terceirizado" && !d.supplier_id) {
     return { ok: false as const, error: "Selecione o fornecedor deste veículo terceirizado." };
+  }
+  const initialKm = d.initial_odometer_km ? Number(d.initial_odometer_km) : null;
+  if (d.owner_type === "proprio" && (initialKm === null || !Number.isInteger(initialKm) || initialKm < 0)) {
+    return { ok: false as const, error: "Informe o KM atual do veículo próprio." };
   }
 
   return {
@@ -53,6 +59,8 @@ function parseVehicleForm(formData: FormData) {
       owner_type: d.owner_type,
       supplier_id: d.owner_type === "terceirizado" ? d.supplier_id || null : null,
       status: d.status,
+      initial_odometer_km: initialKm,
+      odometer_updated_at: initialKm === null ? null : new Date(),
     },
   };
 }
