@@ -44,7 +44,7 @@ export function NovaReservaRequestForm({
       <button type="submit" disabled={pending} className={buttonClass}>
         {pending ? "Enviando…" : "Solicitar nova reserva"}
       </button>
-      <p className="text-xs text-forest/50">
+      <p className="text-xs text-forest/62">
         A equipe Nativos analisa e monta a reserva a partir do seu pedido.
       </p>
     </form>

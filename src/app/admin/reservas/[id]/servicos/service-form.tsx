@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { ServiceFormState } from "./actions";
-import { buttonClass, inputClass, labelClass, secondaryButtonClass } from "@/lib/ui";
+import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
 
 const initialState: ServiceFormState = { error: null };
 
@@ -77,7 +77,7 @@ export function ServiceForm({
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="type" className={labelClass}>
             Tipo *
@@ -136,7 +136,7 @@ export function ServiceForm({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="driver_id" className={labelClass}>
             Motorista
@@ -175,9 +175,9 @@ export function ServiceForm({
         </div>
       </div>
 
-      <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+      <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">Agenda</legend>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="scheduled_date" className={labelClass}>
               Data
@@ -203,7 +203,7 @@ export function ServiceForm({
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="pickup_location" className={labelClass}>
               Local de origem
@@ -227,7 +227,7 @@ export function ServiceForm({
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="passenger_count" className={labelClass}>
               Passageiros
@@ -268,7 +268,7 @@ export function ServiceForm({
       </fieldset>
 
       {type === "disposicao" && (
-        <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+        <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
           <legend className="font-serif text-lg text-forest">Disposição</legend>
           <div className="flex flex-col gap-1">
             <label htmlFor="pacote_disposicao_id" className={labelClass}>
@@ -288,7 +288,7 @@ export function ServiceForm({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label htmlFor="km_incluido" className={labelClass}>
                 Km incluído
@@ -329,7 +329,7 @@ export function ServiceForm({
         </fieldset>
       )}
 
-      <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+      <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">Preço</legend>
         {isEditing ? (
           <p className="text-sm text-forest/60">
@@ -351,7 +351,7 @@ export function ServiceForm({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="discount_type" className={labelClass}>
               Desconto
@@ -396,7 +396,7 @@ export function ServiceForm({
             />
           </div>
         )}
-        <p className="text-xs text-forest/50">
+        <p className="text-xs text-forest/62">
           O desconto nunca altera o custo pago ao fornecedor — a margem da
           Nativos absorve o desconto integralmente.
         </p>
@@ -433,9 +433,9 @@ export function ServiceForm({
         </div>
       </fieldset>
 
-      <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+      <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">Bagagem e cadeirinha</legend>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="luggage_10kg" className={labelClass}>
               Mala até 10kg
@@ -476,7 +476,7 @@ export function ServiceForm({
             />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="bebe_conforto" className={labelClass}>
               Bebê conforto
@@ -519,7 +519,7 @@ export function ServiceForm({
         </div>
       </fieldset>
 
-      <fieldset className="flex flex-col gap-3 rounded-sm border border-forest/10 p-4">
+      <fieldset className="flex flex-col gap-3 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">Outras opções</legend>
         <label className="flex items-center gap-2 text-sm text-forest/80">
           <input
@@ -533,11 +533,11 @@ export function ServiceForm({
       </fieldset>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href={cancelHref} className={secondaryButtonClass}>
+        <Link href={cancelHref} className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

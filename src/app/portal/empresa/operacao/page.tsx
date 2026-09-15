@@ -105,7 +105,7 @@ export default async function PortalEmpresaOperacaoPage() {
         <div className="flex items-center justify-between gap-3 border-b border-forest/10 px-5 py-4">
           <div>
             <h2 className="section-heading">Aguardando sua confirmação</h2>
-            <p className="mt-1 text-xs text-forest/46">Responda rapidamente para garantir a alocação.</p>
+            <p className="mt-1 text-xs text-forest/58">Responda rapidamente para garantir a alocação.</p>
           </div>
           <span className="rounded-full bg-warning-light px-2.5 py-1 text-xs font-semibold text-warning">
             {pendingAcceptance.length}
@@ -116,7 +116,7 @@ export default async function PortalEmpresaOperacaoPage() {
           <div className="px-5 py-12 text-center">
             <BadgeCheck size={30} className="mx-auto text-success/45" aria-hidden="true" />
             <p className="mt-3 text-sm font-medium text-forest">Nenhuma confirmação pendente</p>
-            <p className="mt-1 text-xs text-forest/46">Sua fila de aceite está em dia.</p>
+            <p className="mt-1 text-xs text-forest/58">Sua fila de aceite está em dia.</p>
           </div>
         ) : (
           <ul className="divide-y divide-forest/[0.075]">
@@ -126,14 +126,14 @@ export default async function PortalEmpresaOperacaoPage() {
                   <strong className="block text-sm text-forest">
                     {service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "short" }) ?? "A definir"}
                   </strong>
-                  <span className="mt-1 block text-xs text-forest/46">{service.scheduled_time ?? "Horário a definir"}</span>
+                  <span className="mt-1 block text-xs text-forest/58">{service.scheduled_time ?? "Horário a definir"}</span>
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{service.reservation.client.name}</p>
-                  <p className="mt-1 text-xs text-forest/52">
+                  <p className="mt-1 text-xs text-forest/62">
                     {service.reservation.code} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                   </p>
-                  <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-forest/42">
+                  <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-forest/55">
                     <MapPin size={11} aria-hidden="true" />
                     {service.pickup_location ?? "Origem não informada"} → {service.dropoff_location ?? "Destino não informado"}
                   </p>
@@ -149,7 +149,7 @@ export default async function PortalEmpresaOperacaoPage() {
         <div className="flex items-center justify-between gap-3 border-b border-forest/10 px-5 py-4">
           <div>
             <h2 className="section-heading">Serviços confirmados</h2>
-            <p className="mt-1 text-xs text-forest/46">Agenda ativa dos motoristas da empresa.</p>
+            <p className="mt-1 text-xs text-forest/58">Agenda ativa dos motoristas da empresa.</p>
           </div>
           <Route size={18} className="text-gold" aria-hidden="true" />
         </div>
@@ -157,11 +157,11 @@ export default async function PortalEmpresaOperacaoPage() {
         {activeServices.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <CalendarDays size={30} className="mx-auto text-forest/22" aria-hidden="true" />
-            <p className="mt-3 text-sm text-forest/46">Nenhum serviço ativo.</p>
+            <p className="mt-3 text-sm text-forest/58">Nenhum serviço ativo.</p>
           </div>
         ) : (
           <>
-            <ul className="grid gap-3 p-4 md:hidden">
+            <ul className="grid gap-3 p-4 xl:hidden">
               {activeServices.map((service) => (
                 <li key={service.id}>
                   <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
@@ -169,9 +169,9 @@ export default async function PortalEmpresaOperacaoPage() {
                       <div>
                         <p className="text-xs font-semibold text-forest">
                           {service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC" }) ?? "A definir"}
-                          <span className="font-normal text-forest/48"> · {service.scheduled_time ?? "—"}</span>
+                          <span className="font-normal text-forest/60"> · {service.scheduled_time ?? "—"}</span>
                         </p>
-                        <p className="mt-1 text-[11px] text-forest/43">{service.reservation.code}</p>
+                        <p className="mt-1 text-[11px] text-forest/55">{service.reservation.code}</p>
                       </div>
                       <Badge tone={executionTone(service.execution_status)}>
                         {EXECUTION_LABEL[service.execution_status] ?? service.execution_status}
@@ -209,16 +209,16 @@ export default async function PortalEmpresaOperacaoPage() {
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[930px] text-sm">
               <thead>
                 <tr>
-                  <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Data e hora</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reserva</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Serviço</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Motorista / veículo</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
-                  <th className="bg-[#faf9f6] px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Ações</th>
+                  <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Data e hora</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Reserva</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Serviço</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Motorista / veículo</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
+                  <th className="bg-[#faf9f6] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,16 +228,16 @@ export default async function PortalEmpresaOperacaoPage() {
                       <p className="text-xs font-semibold text-forest">
                         {service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC" }) ?? "A definir"}
                       </p>
-                      <p className="mt-1 text-[11px] text-forest/45">{service.scheduled_time ?? "—"}</p>
+                      <p className="mt-1 text-[11px] text-forest/58">{service.scheduled_time ?? "—"}</p>
                     </td>
                     <td className="px-4 py-3.5">
                       <p className="text-xs font-medium text-ink">{service.reservation.client.name}</p>
-                      <p className="mt-1 text-[10px] text-forest/42">{service.reservation.code}</p>
+                      <p className="mt-1 text-[11px] text-forest/55">{service.reservation.code}</p>
                     </td>
                     <td className="px-4 py-3.5 text-xs text-forest/65">{SERVICE_TYPE_LABEL[service.type] ?? service.type}</td>
                     <td className="px-4 py-3.5">
                       <p className="text-xs text-ink/75">{service.driver?.name ?? "A definir"}</p>
-                      <p className="mt-1 text-[10px] text-forest/42">
+                      <p className="mt-1 text-[11px] text-forest/55">
                         {service.vehicle ? service.vehicle.model + " · " + service.vehicle.plate : "Veículo a definir"}
                       </p>
                     </td>
@@ -282,14 +282,14 @@ export default async function PortalEmpresaOperacaoPage() {
         <section className="surface-panel overflow-hidden">
           <div className="border-b border-forest/10 px-5 py-4">
             <h2 className="section-heading">Confirmação de recebimento direto</h2>
-            <p className="mt-1 text-xs text-forest/46">Confirme valores recebidos diretamente do passageiro.</p>
+            <p className="mt-1 text-xs text-forest/58">Confirme valores recebidos diretamente do passageiro.</p>
           </div>
           <ul className="divide-y divide-forest/[0.075]">
             {awaitingCollection.map((service) => (
               <li key={service.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center">
                 <span className="min-w-0 flex-1">
                   <strong className="block text-xs text-ink">{service.reservation.client.name}</strong>
-                  <span className="mt-1 block text-[11px] text-forest/46">
+                  <span className="mt-1 block text-[11px] text-forest/58">
                     {service.reservation.code} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                   </span>
                 </span>

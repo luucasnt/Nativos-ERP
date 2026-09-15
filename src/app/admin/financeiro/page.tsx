@@ -15,6 +15,7 @@ import { FinanceCashflowChart, type CashflowPoint } from "@/components/admin/fin
 import { RegisterPaymentForm } from "@/components/admin/register-payment-form";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/ui/metric-card";
+import { SectionNavigation } from "@/components/ui/section-navigation";
 import {
   FINANCE_ENTRY_CATEGORY_LABEL,
   FINANCE_ENTRY_STATUS_LABEL,
@@ -421,22 +422,16 @@ export default async function FinanceiroPage({
         </div>
       </header>
 
-      <nav aria-label="Áreas do financeiro" className="flex gap-1 overflow-x-auto border-b border-forest/10">
-        {VIEWS.map((item) => (
-          <Link
-            key={item.key}
-            href={"/admin/financeiro?view=" + item.key + "&period=" + period}
-            aria-current={view === item.key ? "page" : undefined}
-            className={
-              "focus-ring relative shrink-0 px-3 pb-3 pt-1 text-xs font-medium transition " +
-              (view === item.key ? "text-forest" : "text-forest/48 hover:text-forest")
-            }
-          >
-            {item.label}
-            {view === item.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gold" />}
-          </Link>
-        ))}
-      </nav>
+      <SectionNavigation
+        activeKey={view}
+        ariaLabel="Áreas do financeiro"
+        mobileLabel="Área financeira"
+        items={VIEWS.map((item) => ({
+          key: item.key,
+          label: item.label,
+          href: "/admin/financeiro?view=" + item.key + "&period=" + period,
+        }))}
+      />
 
       <section aria-label="Resumo financeiro" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -469,12 +464,20 @@ export default async function FinanceiroPage({
         />
       </section>
 
+      {totals.overdue > 0 && (
+        <Link href={`/admin/financeiro?view=${view}&period=${period}&status=vencido`} className="operational-strip interactive-panel flex min-h-14 items-center gap-3 px-4 py-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger-light text-danger"><AlertCircle size={18} aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1"><strong className="block text-sm text-forest">Há valores vencidos que exigem conferência</strong><span className="mt-0.5 block text-xs text-forest/65">Abra a lista filtrada e regularize os lançamentos sem procurar manualmente.</span></span>
+          <ArrowRight size={17} className="shrink-0 text-forest/55" aria-hidden="true" />
+        </Link>
+      )}
+
       {view === "faturas" ? (
         <section className="surface-panel overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Faturas por parceiro</h2>
-              <p className="mt-1 text-xs text-forest/46">Ciclos de cobrança consolidados no sistema.</p>
+              <p className="mt-1 text-xs text-forest/58">Ciclos de cobrança consolidados no sistema.</p>
             </div>
             <FileText size={18} className="text-gold" aria-hidden="true" />
           </div>
@@ -482,25 +485,25 @@ export default async function FinanceiroPage({
             <div className="px-5 py-14 text-center">
               <FileText className="mx-auto text-forest/22" size={30} aria-hidden="true" />
               <p className="mt-3 text-sm font-medium text-forest">Nenhuma fatura criada</p>
-              <p className="mt-1 text-xs text-forest/46">Os ciclos aparecerão aqui quando forem fechados.</p>
+              <p className="mt-1 text-xs text-forest/58">Os ciclos aparecerão aqui quando forem fechados.</p>
             </div>
           ) : (
             <>
-              <ul className="grid gap-3 p-4 md:hidden">
+              <ul className="grid gap-3 p-4 xl:hidden">
                 {billingCycles.map((cycle) => (
                   <li key={cycle.id}>
                     <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-ink">{cycle.company.name}</p>
-                          <p className="mt-1 text-xs text-forest/48">Período {cycle.period}</p>
+                          <p className="mt-1 text-xs text-forest/60">Período {cycle.period}</p>
                         </div>
                         <Badge tone={invoiceTone(cycle.status)}>{invoiceStatusLabel(cycle.status)}</Badge>
                       </div>
-                      <dl className="mt-4 grid grid-cols-3 gap-3 text-xs">
-                        <div><dt className="text-forest/43">Total</dt><dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.total_amount))}</dd></div>
-                        <div><dt className="text-forest/43">Pago</dt><dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.paid_amount))}</dd></div>
-                        <div><dt className="text-forest/43">Reservas</dt><dd className="mt-1 font-semibold text-forest">{cycle._count.reservations}</dd></div>
+                      <dl className="mt-4 grid gap-3 sm:grid-cols-3 text-xs">
+                        <div><dt className="text-forest/55">Total</dt><dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.total_amount))}</dd></div>
+                        <div><dt className="text-forest/55">Pago</dt><dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.paid_amount))}</dd></div>
+                        <div><dt className="text-forest/55">Reservas</dt><dd className="mt-1 font-semibold text-forest">{cycle._count.reservations}</dd></div>
                       </dl>
                       <a
                         href={`/api/documentos/fatura/${cycle.id}`}
@@ -516,16 +519,16 @@ export default async function FinanceiroPage({
                 ))}
               </ul>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto xl:block">
                 <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr>
-                    <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Parceiro</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Período</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reservas</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Total</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Pago</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
+                    <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Parceiro</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Período</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Reservas</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Total</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Pago</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
                     <th className="bg-[#faf9f6] px-5 py-3" />
                   </tr>
                 </thead>
@@ -566,7 +569,7 @@ export default async function FinanceiroPage({
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="section-heading">Fluxo do período</h2>
-                  <p className="mt-1 text-xs text-forest/46">Receitas, despesas e resultado dos lançamentos.</p>
+                  <p className="mt-1 text-xs text-forest/58">Receitas, despesas e resultado dos lançamentos.</p>
                 </div>
                 <Landmark size={18} className="text-gold" aria-hidden="true" />
               </div>
@@ -577,12 +580,12 @@ export default async function FinanceiroPage({
               <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
                 <div>
                   <h2 className="section-heading">Próximos vencimentos</h2>
-                  <p className="mt-1 text-xs text-forest/46">Agenda dos próximos 45 dias.</p>
+                  <p className="mt-1 text-xs text-forest/58">Agenda dos próximos 45 dias.</p>
                 </div>
                 <CalendarClock size={18} className="text-gold" aria-hidden="true" />
               </div>
               {upcomingDue.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-forest/46">Nenhum vencimento programado.</p>
+                <p className="px-5 py-10 text-center text-sm text-forest/58">Nenhum vencimento programado.</p>
               ) : (
                 <ul className="divide-y divide-forest/[0.075]">
                   {upcomingDue.map((entry) => (
@@ -591,7 +594,7 @@ export default async function FinanceiroPage({
                         <strong className="block text-xs text-forest">
                           {entry.due_date?.toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit" })}
                         </strong>
-                        <span className="block text-[9px] uppercase text-forest/42">
+                        <span className="block text-[11px] uppercase text-forest/55">
                           {entry.due_date?.toLocaleDateString("pt-BR", { timeZone: "UTC", month: "short" })}
                         </span>
                       </span>
@@ -599,7 +602,7 @@ export default async function FinanceiroPage({
                         <strong className="block truncate text-xs text-ink">
                           {entry.reservation?.client.name ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}
                         </strong>
-                        <span className="mt-1 block truncate text-[11px] text-forest/45">
+                        <span className="mt-1 block truncate text-[11px] text-forest/58">
                           {FINANCE_ENTRY_TYPE_LABEL[entry.type]} · {entry.reservation?.code ?? "Sem reserva"}
                         </span>
                       </span>
@@ -616,10 +619,10 @@ export default async function FinanceiroPage({
           <section className="surface-panel overflow-hidden">
             <div className="border-b border-forest/10 px-5 py-4">
               <h2 className="section-heading">Lançamentos</h2>
-              <p className="mt-1 text-xs text-forest/46">Últimos 50 registros conforme os filtros.</p>
+              <p className="mt-1 text-xs text-forest/58">Últimos 50 registros conforme os filtros.</p>
             </div>
 
-            <form action="/admin/financeiro" method="get" className="grid gap-2 border-b border-forest/10 bg-[#faf9f6] p-3 md:grid-cols-[minmax(220px,1fr)_160px_170px_auto]">
+            <form action="/admin/financeiro" method="get" className="grid gap-2 border-b border-forest/10 bg-[#faf9f6] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_170px_auto]">
               <input type="hidden" name="view" value={view} />
               <input type="hidden" name="period" value={period} />
               <label className="relative">
@@ -647,35 +650,35 @@ export default async function FinanceiroPage({
             </form>
 
             {entries.length === 0 ? (
-              <p className="px-5 py-14 text-center text-sm text-forest/46">Nenhum lançamento encontrado.</p>
+              <p className="px-5 py-14 text-center text-sm text-forest/58">Nenhum lançamento encontrado.</p>
             ) : (
               <>
-              <div className="divide-y divide-forest/10 md:hidden">
+              <div className="divide-y divide-forest/10 xl:hidden">
                 {entries.map((entry) => {
                   const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + activeCompensationAmount(entry);
                   const remaining = Math.max(0, Number(entry.amount) - paid);
                   const isOverdue = entry.status !== "pago" && entry.due_date && entry.due_date < now;
                   return <article key={entry.id} className="space-y-4 p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}</p><p className="mt-1 text-xs text-forest/52">{entry.reservation?.code ?? "Sem reserva"} · {partyName(entry)}</p></div>
+                      <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}</p><p className="mt-1 text-xs text-forest/62">{entry.reservation?.code ?? "Sem reserva"} · {partyName(entry)}</p></div>
                       <Badge tone={isOverdue ? "danger" : statusTone(entry.status)}>{isOverdue ? "Vencido" : FINANCE_ENTRY_STATUS_LABEL[entry.status]}</Badge>
                     </div>
-                    <div className="flex items-end justify-between gap-3"><div><span className="block text-xs text-forest/48">{entry.type === "receita" ? "A receber" : "A pagar"}</span><strong className={`mt-1 block text-lg ${entry.type === "receita" ? "text-success" : "text-danger"}`}>{money.format(Number(entry.amount))}</strong>{paid > 0 && remaining > 0 && <span className="mt-1 block text-xs text-forest/55">Pago {money.format(paid)} · saldo {money.format(remaining)}</span>}</div><span className="text-xs text-forest/48">{entry.due_date ? `Vence ${entry.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}</span></div>
+                    <div className="flex items-end justify-between gap-3"><div><span className="block text-xs text-forest/60">{entry.type === "receita" ? "A receber" : "A pagar"}</span><strong className={`mt-1 block text-lg ${entry.type === "receita" ? "text-success" : "text-danger"}`}>{money.format(Number(entry.amount))}</strong>{paid > 0 && remaining > 0 && <span className="mt-1 block text-xs text-forest/55">Pago {money.format(paid)} · saldo {money.format(remaining)}</span>}</div><span className="text-xs text-forest/60">{entry.due_date ? `Vence ${entry.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}</span></div>
                     {entry.payment_eligible && entry.status !== "pago" && <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
                     {entry.status === "pago" && entry.payments[0] && <a href={`/api/documentos/recibo/${entry.payments[0].id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir recibo</a>}
                   </article>;
                 })}
               </div>
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto xl:block">
                 <table className="w-full min-w-[1050px] text-sm">
                   <thead>
                     <tr>
-                      <th className="bg-white px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Data</th>
-                      <th className="bg-white px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Descrição</th>
-                      <th className="bg-white px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Contraparte</th>
-                      <th className="bg-white px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reserva</th>
-                      <th className="bg-white px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Valor</th>
-                      <th className="bg-white px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
+                      <th className="bg-white px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Data</th>
+                      <th className="bg-white px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Descrição</th>
+                      <th className="bg-white px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Contraparte</th>
+                      <th className="bg-white px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Reserva</th>
+                      <th className="bg-white px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Valor</th>
+                      <th className="bg-white px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
                       <th className="bg-white px-5 py-3" />
                     </tr>
                   </thead>
@@ -689,11 +692,11 @@ export default async function FinanceiroPage({
                           <p className="truncate text-xs font-medium text-ink">
                             {entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}
                           </p>
-                          <p className="mt-1 text-[10px] text-forest/42">{FINANCE_ENTRY_CATEGORY_LABEL[entry.category]}</p>
+                          <p className="mt-1 text-[11px] text-forest/55">{FINANCE_ENTRY_CATEGORY_LABEL[entry.category]}</p>
                         </td>
                         <td className="px-4 py-3.5">
                           <p className="text-xs text-ink/78">{partyName(entry)}</p>
-                          <p className="mt-1 text-[10px] text-forest/42">{FINANCE_PARTY_TYPE_LABEL[entry.party_type]}</p>
+                          <p className="mt-1 text-[11px] text-forest/55">{FINANCE_PARTY_TYPE_LABEL[entry.party_type]}</p>
                         </td>
                         <td className="px-4 py-3.5">
                           {entry.reservation ? (
@@ -707,7 +710,7 @@ export default async function FinanceiroPage({
                         <td className={"px-4 py-3.5 text-xs font-semibold " + (entry.type === "receita" ? "text-success" : "text-danger")}>
                           {entry.type === "receita" ? "+" : "−"} {money.format(Number(entry.amount))}
                           {activeCompensationAmount(entry) > 0 && (
-                            <span className="mt-1 block text-[10px] font-normal text-forest/42">
+                            <span className="mt-1 block text-[11px] font-normal text-forest/55">
                               Saldo {money.format(Math.max(0, Number(entry.amount) - entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) - activeCompensationAmount(entry)))}
                             </span>
                           )}

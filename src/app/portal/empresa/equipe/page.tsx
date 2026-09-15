@@ -55,12 +55,12 @@ export default async function PortalEmpresaEquipePage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Motoristas</h2>
-              <p className="mt-1 text-xs text-forest/46">{drivers.length} cadastrados.</p>
+              <p className="mt-1 text-xs text-forest/58">{drivers.length} cadastrados.</p>
             </div>
             <Users size={18} className="text-gold" aria-hidden="true" />
           </div>
           {drivers.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhum motorista cadastrado.</p>
+            <p className="px-5 py-12 text-center text-sm text-forest/58">Nenhum motorista cadastrado.</p>
           ) : (
             <ul className="divide-y divide-forest/[0.075]">
               {drivers.map((driver) => (
@@ -70,7 +70,7 @@ export default async function PortalEmpresaEquipePage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-xs text-ink">{driver.name}</strong>
-                    <span className="mt-1 block text-[10px] text-forest/44">{driver.phone ?? driver.email ?? "Contato não informado"}</span>
+                    <span className="mt-1 block text-[11px] text-forest/55">{driver.phone ?? driver.email ?? "Contato não informado"}</span>
                   </span>
                   <Badge tone={approvalTone(driver.approval_status)}>{approvalLabel(driver.approval_status)}</Badge>
                 </li>
@@ -83,12 +83,12 @@ export default async function PortalEmpresaEquipePage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Veículos</h2>
-              <p className="mt-1 text-xs text-forest/46">{vehicles.length} cadastrados.</p>
+              <p className="mt-1 text-xs text-forest/58">{vehicles.length} cadastrados.</p>
             </div>
             <CarFront size={18} className="text-gold" aria-hidden="true" />
           </div>
           {vehicles.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhum veículo cadastrado.</p>
+            <p className="px-5 py-12 text-center text-sm text-forest/58">Nenhum veículo cadastrado.</p>
           ) : (
             <ul className="divide-y divide-forest/[0.075]">
               {vehicles.map((vehicle) => (
@@ -98,7 +98,7 @@ export default async function PortalEmpresaEquipePage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-xs text-ink">{vehicle.model}</strong>
-                    <span className="mt-1 block text-[10px] text-forest/44">
+                    <span className="mt-1 block text-[11px] text-forest/55">
                       {vehicle.plate} · {vehicle.category?.label ?? vehicle.capacity + " passageiros"}
                     </span>
                   </span>
@@ -118,12 +118,12 @@ export default async function PortalEmpresaEquipePage() {
         <div className="grid gap-5 xl:grid-cols-2">
           <article className="surface-panel p-5">
             <h3 className="text-sm font-semibold text-forest">Novo motorista</h3>
-            <p className="mb-4 mt-1 text-xs text-forest/46">O cadastro segue para validação da Nativos.</p>
+            <p className="mb-4 mt-1 text-xs text-forest/58">O cadastro segue para validação da Nativos.</p>
             <DriverRegistrationForm />
           </article>
           <article className="surface-panel p-5">
             <h3 className="text-sm font-semibold text-forest">Novo veículo</h3>
-            <p className="mb-4 mt-1 text-xs text-forest/46">Informe os dados operacionais do veículo.</p>
+            <p className="mb-4 mt-1 text-xs text-forest/58">Informe os dados operacionais do veículo.</p>
             <VehicleRegistrationForm categories={categories} />
           </article>
         </div>

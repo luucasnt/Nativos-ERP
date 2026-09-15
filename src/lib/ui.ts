@@ -6,10 +6,13 @@ export const buttonClass =
 export const secondaryButtonClass =
   "focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-forest/20 bg-white px-4 py-2 text-sm font-medium text-forest transition hover:border-forest/35 hover:bg-forest/[0.035] disabled:cursor-not-allowed disabled:opacity-50";
 export const tableClass =
-  "block w-full overflow-x-auto whitespace-nowrap text-sm md:table md:overflow-visible";
+  "w-full min-w-[680px] whitespace-nowrap text-sm";
 export const thClass =
   "border-b border-[#e4e2dc] bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-forest/50 first:rounded-tl-lg last:rounded-tr-lg";
 export const tdClass =
   "border-b border-[#eceae5] px-4 py-3.5 align-middle text-sm text-ink/85 last:border-b-0";
 export const linkClass =
   "focus-ring inline-flex items-center rounded text-sm font-medium text-forest underline decoration-gold/70 underline-offset-4 transition hover:text-forest-light";
+
+export const mobileStickyActionClass =
+  "sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-y border-forest/10 bg-white/96 px-3 py-3 shadow-[0_-10px_28px_rgba(23,41,35,0.08)] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none";

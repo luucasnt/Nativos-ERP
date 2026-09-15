@@ -64,7 +64,7 @@ export function LoginScreen({
         <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full border border-gold/[0.07]" aria-hidden="true" />
 
         <Wordmark size={31} tone="cream-on-forest" priority />
-        <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.17em] text-cream/42">
+        <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.17em] text-cream/55">
           {PORTAL_CONFIG[portal].label}
         </p>
 
@@ -87,21 +87,33 @@ export function LoginScreen({
           </ul>
         </div>
 
-        <div className="relative flex items-center gap-3 border-t border-white/10 pt-5 text-[10px] text-cream/35">
+        <div className="relative flex items-center gap-3 border-t border-white/10 pt-5 text-[11px] text-cream/48">
           <span>Nativos Experiences</span>
           <span aria-hidden="true">•</span>
           <span>Trancoso, Bahia</span>
         </div>
       </section>
 
-      <section className="flex min-h-screen flex-col">
-        <div className="flex items-center justify-center border-b border-forest/8 bg-white px-5 py-4 lg:hidden">
-          <Wordmark size={25} tone="forest-on-cream" priority />
+      <section className="relative flex min-h-screen flex-col overflow-hidden">
+        <div className="relative min-h-[172px] overflow-hidden bg-forest px-5 pb-12 pt-[max(22px,env(safe-area-inset-top))] text-cream lg:hidden">
+          <div className="absolute -right-14 -top-20 h-48 w-48 rounded-full border border-white/[0.06]" aria-hidden="true" />
+          <div className="absolute -bottom-24 -left-16 h-44 w-44 rounded-full border border-gold/[0.12]" aria-hidden="true" />
+          <div className="relative mx-auto max-w-[390px]">
+            <div className="flex items-center justify-between gap-4">
+              <Wordmark size={25} tone="cream-on-forest" priority />
+              <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-cream/70">
+                {PORTAL_CONFIG[portal].label}
+              </span>
+            </div>
+            <h2 className="mt-7 max-w-[300px] text-xl font-semibold leading-tight tracking-[-0.025em] text-white">
+              {content.headline}
+            </h2>
+          </div>
         </div>
-        <div className="flex flex-1 items-start justify-center px-5 pb-8 pt-8 sm:px-8 lg:items-center lg:py-14">
+        <div className="relative z-10 -mt-8 flex flex-1 items-start justify-center px-3 pb-8 sm:px-8 lg:mt-0 lg:items-center lg:py-14">
           <LoginPanel next={next} portal={portal} />
         </div>
-        <footer className="px-5 py-5 text-center text-[10px] text-forest/35">
+        <footer className="px-5 py-5 text-center text-[11px] text-forest/35">
           Nativos ERP · Acesso restrito a usuários autorizados
         </footer>
       </section>

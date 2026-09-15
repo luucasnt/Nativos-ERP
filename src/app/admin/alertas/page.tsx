@@ -34,23 +34,23 @@ export default async function AlertasPage() {
         <p className="text-forest/60">Nenhum alerta ativo.</p>
       ) : (
         <>
-          <ul className="grid gap-3 md:hidden">
+          <ul className="grid gap-3 xl:hidden">
             {alerts.map((alert) => (
               <li key={alert.id} className="surface-panel p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${SEVERITY_CLASS[alert.severity]}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${SEVERITY_CLASS[alert.severity]}`}>
                     {SEVERITY_LABEL[alert.severity]}
                   </span>
-                  <time className="text-[10px] text-forest/42">{alert.created_at.toLocaleString("pt-BR")}</time>
+                  <time className="text-[11px] text-forest/55">{alert.created_at.toLocaleString("pt-BR")}</time>
                 </div>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-forest/50">{alert.type}</p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-forest/62">{alert.type}</p>
                 <p className="mt-2 text-sm leading-6 text-ink">{alert.message}</p>
                 <div className="mt-4"><ArchiveAlertButton alertId={alert.id} /></div>
               </li>
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto xl:block">
             <table className={tableClass}>
           <thead>
             <tr>

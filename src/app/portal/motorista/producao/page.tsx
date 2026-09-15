@@ -40,7 +40,7 @@ export default async function MotoristaProducaoPage() {
         <h1 className="page-heading mt-1">Minha produção</h1>
         <p className="page-description">Serviços concluídos e remuneração calculada automaticamente conforme seu modelo de pagamento.</p>
       </header>
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={BriefcaseBusiness} label="Serviços concluídos" value={String(services.length)} accent="forest" />
         <MetricCard icon={CalendarDays} label="Diárias produzidas" value={String(days)} accent="gold" />
         <MetricCard icon={WalletCards} label="Remuneração calculada" value={money.format(earned)} accent="success" />
@@ -49,20 +49,42 @@ export default async function MotoristaProducaoPage() {
       <section className="surface-panel overflow-hidden">
         <div className="border-b border-forest/10 px-5 py-4">
           <h2 className="section-heading">Produção por serviço</h2>
-          <p className="mt-1 text-xs text-forest/46">O valor final é gerado no encerramento do serviço e protegido contra duplicidade.</p>
+          <p className="mt-1 text-xs text-forest/58">O valor final é gerado no encerramento do serviço e protegido contra duplicidade.</p>
         </div>
-        {services.length === 0 ? <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhum serviço concluído neste mês.</p> : (
-          <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-sm"><thead><tr>
-            {['Data', 'Reserva', 'Serviço', 'Valor do serviço'].map((label) => <th key={label} className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">{label}</th>)}
+        {services.length === 0 ? <p className="px-5 py-12 text-center text-sm text-forest/58">Nenhum serviço concluído neste mês.</p> : (<>
+          <ul className="divide-y divide-forest/[0.075] xl:hidden">
+            {services.map((service) => (
+              <li key={service.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-forest/60">
+                      {(service.completed_at ?? service.scheduled_date)?.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) ?? "—"}
+                    </p>
+                    <strong className="mt-1 block truncate text-sm text-forest">
+                      Reserva {service.reservation.code}
+                    </strong>
+                  </div>
+                  <strong className="shrink-0 text-sm text-forest">
+                    {money.format(Number(service.price))}
+                  </strong>
+                </div>
+                <p className="mt-3 text-sm text-forest/65">
+                  {SERVICE_TYPE_LABEL[service.type] ?? service.type}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto xl:block"><table className="w-full min-w-[620px] text-sm"><thead><tr>
+            {['Data', 'Reserva', 'Serviço', 'Valor do serviço'].map((label) => <th key={label} className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">{label}</th>)}
           </tr></thead><tbody>{services.map((service) => <tr key={service.id} className="border-t border-forest/[0.075]">
             <td className="px-5 py-3.5 text-xs text-forest/55">{(service.completed_at ?? service.scheduled_date)?.toLocaleDateString('pt-BR', { timeZone: 'America/Bahia' }) ?? '—'}</td>
             <td className="px-5 py-3.5 text-xs font-semibold text-forest">{service.reservation.code}</td>
             <td className="px-5 py-3.5 text-xs text-forest/65">{SERVICE_TYPE_LABEL[service.type] ?? service.type}</td>
             <td className="px-5 py-3.5 text-xs font-semibold text-forest">{money.format(Number(service.price))}</td>
           </tr>)}</tbody></table></div>
-        )}
+        </>)}
       </section>
-      <p className="text-xs text-forest/45">Despesas aprovadas aparecem no <Link href="/portal/motorista/financeiro" className="font-semibold text-forest underline">Financeiro</Link> e não alteram silenciosamente a produção bruta.</p>
+      <p className="text-xs text-forest/58">Despesas aprovadas aparecem no <Link href="/portal/motorista/financeiro" className="font-semibold text-forest underline">Financeiro</Link> e não alteram silenciosamente a produção bruta.</p>
     </div>
   );
 }

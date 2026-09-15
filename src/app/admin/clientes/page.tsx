@@ -28,19 +28,19 @@ export default async function ClientesPage() {
         <p className="text-forest/60">Nenhum cliente cadastrado ainda.</p>
       ) : (
         <>
-          <ul className="grid gap-3 md:hidden">
+          <ul className="grid gap-3 xl:hidden">
             {clients.map((client) => (
               <li key={client.id} className="surface-panel p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{client.name}</p>
-                    <p className="mt-1 text-xs text-forest/48">{client.document ?? "Documento não informado"}</p>
+                    <p className="mt-1 text-xs text-forest/60">{client.document ?? "Documento não informado"}</p>
                   </div>
-                  <span className="rounded-full bg-forest/[0.07] px-2.5 py-1 text-[10px] font-semibold text-forest/65">
+                  <span className="rounded-full bg-forest/[0.07] px-2.5 py-1 text-[11px] font-semibold text-forest/65">
                     {client.origin === "proprio" ? "Próprio" : "Parceiro"}
                   </span>
                 </div>
-                <p className="mt-3 text-xs text-forest/52">
+                <p className="mt-3 text-xs text-forest/62">
                   Parceiro: <strong className="font-medium text-forest">{client.origin_partner?.name ?? "—"}</strong>
                 </p>
                 <Link
@@ -53,7 +53,7 @@ export default async function ClientesPage() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto xl:block">
             <table className={tableClass}>
             <thead>
               <tr>

@@ -60,23 +60,23 @@ export function LoginPanel({ next, portal }: { next?: string; portal: LoginPorta
 
   return (
     <div className="page-enter w-full max-w-[390px]">
-      <div className="surface-panel bg-white p-6 shadow-[0_14px_44px_rgba(23,41,35,0.08)] sm:p-8">
+      <div className="surface-elevated bg-white p-5 sm:p-8">
         <div className="mb-6 text-center">
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-gold/35 bg-gold/10 text-forest">
             <Icon size={21} strokeWidth={1.8} aria-hidden="true" />
           </span>
-          <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold">
+          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#806538]">
             {config.label}
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-forest">{config.title}</h1>
-          <p className="mt-3 text-xs font-medium text-forest/70">{config.welcome}</p>
-          <p className="mt-1 text-sm text-forest/52">{config.description}</p>
+          <p className="mt-3 text-sm font-medium text-forest/78">{config.welcome}</p>
+          <p className="mt-1 text-sm text-forest/62">{config.description}</p>
         </div>
 
         <LoginForm next={next} portal={portal} />
 
         <div className="mt-6 border-t border-forest/10 pt-5">
-          <div className="flex items-center justify-center gap-2 text-[11px] text-forest/46">
+          <div className="flex items-center justify-center gap-2 text-xs text-forest/58">
             <ShieldCheck size={14} aria-hidden="true" />
             Ambiente seguro e protegido
           </div>

@@ -9,7 +9,7 @@ export default async function ComissoesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Comissões padrão</h1>
         <Link href="/admin/configuracoes/comissoes/nova" className={buttonClass}>
           Nova regra
@@ -21,6 +21,10 @@ export default async function ComissoesPage() {
         individualmente.
       </p>
 
+      <div className="grid gap-3 md:hidden">
+        {rules.map((rule) => <article key={rule.id} className="surface-panel p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-forest">{rule.target === "company" ? "Empresa" : "Motorista"}</p><p className="mt-1 text-xs text-forest/60">{rule.category_key}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${rule.active ? "bg-success-light text-success" : "bg-forest/[0.06] text-forest/65"}`}>{rule.active ? "Ativa" : "Inativa"}</span></div><div className="mt-4 flex items-end justify-between"><div><span className="text-xs text-forest/60">Comissão</span><strong className="mt-1 block text-xl text-forest">{rule.commission_percent.toString()}%</strong></div><Link href={`/admin/configuracoes/comissoes/${rule.id}`} className={linkClass}>Editar regra</Link></div></article>)}
+      </div>
+      <div className="hidden max-w-full overflow-x-auto rounded-xl border border-forest/10 md:block">
       <table className={tableClass}>
         <thead>
           <tr>
@@ -32,14 +36,14 @@ export default async function ComissoesPage() {
           </tr>
         </thead>
         <tbody>
-          {rules.map((r) => (
-            <tr key={r.id}>
-              <td className={tdClass}>{r.target === "company" ? "Empresa" : "Motorista"}</td>
-              <td className={tdClass}>{r.category_key}</td>
-              <td className={tdClass}>{r.commission_percent.toString()}%</td>
-              <td className={tdClass}>{r.active ? "Ativa" : "Inativa"}</td>
+          {rules.map((rule) => (
+            <tr key={rule.id}>
+              <td className={tdClass}>{rule.target === "company" ? "Empresa" : "Motorista"}</td>
+              <td className={tdClass}>{rule.category_key}</td>
+              <td className={tdClass}>{rule.commission_percent.toString()}%</td>
+              <td className={tdClass}>{rule.active ? "Ativa" : "Inativa"}</td>
               <td className={tdClass}>
-                <Link href={`/admin/configuracoes/comissoes/${r.id}`} className={linkClass}>
+                <Link href={`/admin/configuracoes/comissoes/${rule.id}`} className={linkClass}>
                   Editar
                 </Link>
               </td>
@@ -47,6 +51,7 @@ export default async function ComissoesPage() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

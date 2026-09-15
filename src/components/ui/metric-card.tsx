@@ -28,7 +28,7 @@ const ACCENT_CLASSES: Record<NonNullable<MetricCardProps["accent"]>, string> = {
 const TREND_TONE_CLASSES: Record<NonNullable<Trend["tone"]>, string> = {
   positive: "text-success",
   negative: "text-danger",
-  neutral: "text-forest/45",
+  neutral: "text-forest/58",
 };
 
 export function MetricCard({
@@ -40,7 +40,8 @@ export function MetricCard({
   accent = "forest",
 }: MetricCardProps) {
   return (
-    <article className="surface-panel min-w-0 p-4">
+    <article className="surface-panel relative min-w-0 overflow-hidden p-4 sm:p-[18px]">
+      <span className={`absolute inset-x-0 top-0 h-0.5 ${accent === "danger" ? "bg-danger" : accent === "warning" ? "bg-warning" : accent === "success" ? "bg-success" : accent === "info" ? "bg-info" : accent === "gold" ? "bg-gold" : "bg-forest"}`} aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${ACCENT_CLASSES[accent]}`}>
           <Icon size={16} strokeWidth={1.9} aria-hidden="true" />
@@ -52,10 +53,10 @@ export function MetricCard({
           />
         )}
       </div>
-      <p className="mt-3 truncate text-xs font-medium text-forest/52">{label}</p>
-      <p className="mt-0.5 text-[26px] font-semibold leading-tight tracking-[-0.035em] text-forest">{value}</p>
+      <p className="mt-3 text-[13px] font-medium leading-5 text-forest/62">{label}</p>
+      <p className="mt-0.5 break-words text-xl font-semibold leading-tight tracking-[-0.035em] text-forest sm:text-[26px]">{value}</p>
       {trend && (
-        <p className={`mt-2 truncate text-[11px] font-medium ${TREND_TONE_CLASSES[trend.tone ?? "neutral"]}`}>
+        <p className={`mt-2 text-xs font-medium leading-4 ${TREND_TONE_CLASSES[trend.tone ?? "neutral"]}`}>
           {trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "•"} {trend.label}
         </p>
       )}

@@ -5,6 +5,7 @@ import {
   completeService,
   startService,
 } from "@/lib/services/service-execution";
+import { CheckCircle2, LoaderCircle, Play } from "lucide-react";
 import { buttonClass, secondaryButtonClass } from "@/lib/ui";
 
 export function ServiceExecutionActions({
@@ -35,7 +36,8 @@ export function ServiceExecutionActions({
           }
           className={`${buttonClass} min-h-12 w-full px-5 text-sm sm:w-auto`}
         >
-          Iniciar
+          {isPending ? <LoaderCircle className="animate-spin" size={17} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+          {isPending ? "Iniciando serviço..." : "Iniciar serviço"}
         </button>
       )}
       {executionStatus === "em_andamento" && (
@@ -50,10 +52,11 @@ export function ServiceExecutionActions({
           }
           className={`${secondaryButtonClass} min-h-12 w-full px-5 text-sm sm:w-auto`}
         >
-          Finalizar
+          {isPending ? <LoaderCircle className="animate-spin" size={17} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
+          {isPending ? "Finalizando..." : "Finalizar serviço"}
         </button>
       )}
-      {error && <span className="text-xs leading-5 text-red-700">{error}</span>}
+      {error && <span role="alert" className="rounded-lg bg-danger-light px-3 py-2 text-xs leading-5 text-danger">{error}</span>}
     </div>
   );
 }

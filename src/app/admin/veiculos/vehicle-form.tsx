@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { VehicleFormState } from "./actions";
-import { buttonClass, inputClass, labelClass, secondaryButtonClass } from "@/lib/ui";
+import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
 
 const initialState: VehicleFormState = { error: null };
 
@@ -32,7 +32,7 @@ export function VehicleForm({ action, categories, suppliers, defaultValues }: Ve
 
   return (
     <form action={formAction} className="flex max-w-xl flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="plate" className={labelClass}>
             Placa *
@@ -62,10 +62,10 @@ export function VehicleForm({ action, categories, suppliers, defaultValues }: Ve
         <div className="flex flex-col gap-1">
           <label htmlFor="initial_odometer_km" className={labelClass}>KM atual no cadastro *</label>
           <input id="initial_odometer_km" name="initial_odometer_km" type="number" min="0" step="1" required inputMode="numeric" defaultValue={defaultValues?.initial_odometer_km ?? ""} className={inputClass} placeholder="Ex.: 48.100" />
-          <p className="text-[11px] text-forest/45">Será a base para o cálculo de consumo nos próximos abastecimentos.</p>
+          <p className="text-[11px] text-forest/58">Será a base para o cálculo de consumo nos próximos abastecimentos.</p>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="category_id" className={labelClass}>
             Categoria
@@ -151,11 +151,11 @@ export function VehicleForm({ action, categories, suppliers, defaultValues }: Ve
       </div>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href="/admin/veiculos" className={secondaryButtonClass}>
+        <Link href="/admin/veiculos" className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

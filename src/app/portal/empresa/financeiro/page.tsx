@@ -112,42 +112,42 @@ export default async function PortalEmpresaFinanceiroPage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Minhas faturas</h2>
-              <p className="mt-1 text-xs text-forest/46">Ciclos de cobrança vinculados à empresa.</p>
+              <p className="mt-1 text-xs text-forest/58">Ciclos de cobrança vinculados à empresa.</p>
             </div>
             <FileText size={18} className="text-gold" aria-hidden="true" />
           </div>
           {billingCycles.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-forest/48">Nenhuma fatura emitida até o momento.</p>
+            <p className="px-5 py-10 text-center text-sm text-forest/60">Nenhuma fatura emitida até o momento.</p>
           ) : (
             <>
-              <ul className="grid gap-3 p-4 md:hidden">
+              <ul className="grid gap-3 p-4 xl:hidden">
                 {billingCycles.map((cycle) => (
                   <li key={cycle.id}>
                     <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs text-forest/44">Período</p>
+                          <p className="text-xs text-forest/55">Período</p>
                           <p className="mt-1 font-semibold text-forest">{cycle.period}</p>
                         </div>
-                        <span className="rounded-full bg-forest/[0.07] px-2.5 py-1 text-[10px] font-semibold capitalize text-forest/65">
+                        <span className="rounded-full bg-forest/[0.07] px-2.5 py-1 text-[11px] font-semibold capitalize text-forest/65">
                           {cycle.status.replaceAll("_", " ")}
                         </span>
                       </div>
                       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
                         <div>
-                          <dt className="text-forest/43">Total</dt>
+                          <dt className="text-forest/55">Total</dt>
                           <dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.total_amount))}</dd>
                         </div>
                         <div>
-                          <dt className="text-forest/43">Pago</dt>
+                          <dt className="text-forest/55">Pago</dt>
                           <dd className="mt-1 font-semibold text-forest">{money.format(Number(cycle.paid_amount))}</dd>
                         </div>
                         <div>
-                          <dt className="text-forest/43">Vencimento</dt>
+                          <dt className="text-forest/55">Vencimento</dt>
                           <dd className="mt-1 font-semibold text-forest">{dueDate(cycle)}</dd>
                         </div>
                         <div>
-                          <dt className="text-forest/43">Reservas</dt>
+                          <dt className="text-forest/55">Reservas</dt>
                           <dd className="mt-1 font-semibold text-forest">{cycle._count.reservations}</dd>
                         </div>
                       </dl>
@@ -165,17 +165,17 @@ export default async function PortalEmpresaFinanceiroPage() {
                 ))}
               </ul>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto xl:block">
                 <table className="w-full min-w-[650px] text-sm">
               <thead>
                 <tr>
-                  <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Período</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reservas</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Total</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Pago</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Vencimento</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
-                  <th className="bg-[#faf9f6] px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Documento</th>
+                  <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Período</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Reservas</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Total</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Pago</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Vencimento</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
+                  <th className="bg-[#faf9f6] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Documento</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,7 +223,7 @@ export default async function PortalEmpresaFinanceiroPage() {
       <section className="surface-panel overflow-hidden">
         <div className="border-b border-forest/10 px-5 py-4">
           <h2 className="section-heading">Extrato</h2>
-          <p className="mt-1 text-xs text-forest/46">Histórico dos lançamentos vinculados à empresa.</p>
+          <p className="mt-1 text-xs text-forest/58">Histórico dos lançamentos vinculados à empresa.</p>
         </div>
         <div className="p-4 md:p-5">
           <FinanceExtractTable entries={extract} />
@@ -233,7 +233,7 @@ export default async function PortalEmpresaFinanceiroPage() {
       {isSupplier && (
         <section className="surface-panel p-5">
           <h2 className="section-heading">Solicitar repasse</h2>
-          <p className="mb-4 mt-1 text-xs leading-5 text-forest/46">
+          <p className="mb-4 mt-1 text-xs leading-5 text-forest/58">
             Selecione lançamentos elegíveis e envie o pedido para a equipe financeira.
           </p>
           <RepasseRequestForm

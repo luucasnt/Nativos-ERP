@@ -85,13 +85,13 @@ export default async function PortalMotoristaHomePage() {
   return (
     <div className="mx-auto max-w-[1180px] space-y-4 sm:space-y-5">
       <header className="rounded-xl bg-forest px-4 py-4 text-cream sm:px-5 sm:py-5 md:bg-transparent md:px-0 md:py-0 md:text-ink">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gold">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-gold">
           Portal do motorista
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-forest">
           Olá, {firstName}
         </h1>
-        <p className="mt-1 text-xs text-cream/58 md:text-forest/52">
+        <p className="mt-1 text-xs text-cream/58 md:text-forest/62">
           {new Intl.DateTimeFormat("pt-BR", {
             timeZone: "America/Bahia",
             weekday: "long",
@@ -102,7 +102,7 @@ export default async function PortalMotoristaHomePage() {
       </header>
 
       {nextService ? (
-        <section className="surface-panel overflow-hidden">
+        <section className="surface-elevated overflow-hidden">
           <div className="flex items-center justify-between border-b border-forest/10 bg-[#faf9f6] px-4 py-3.5 sm:px-5">
             <div>
               <p className="eyebrow">Próximo serviço</p>
@@ -130,7 +130,7 @@ export default async function PortalMotoristaHomePage() {
                   <span className="text-3xl font-semibold tracking-[-0.04em] text-forest">
                     {nextService.scheduled_time ?? "—"}
                   </span>
-                  <span className="text-xs text-forest/46">
+                  <span className="text-xs text-forest/58">
                     {nextService.scheduled_date?.toLocaleDateString("pt-BR", {
                       timeZone: "UTC",
                       day: "2-digit",
@@ -147,14 +147,14 @@ export default async function PortalMotoristaHomePage() {
                       aria-hidden="true"
                     />
                     <div>
-                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                      <dt className="text-[11px] uppercase tracking-[0.1em] text-forest/55">
                         Passageiro
                       </dt>
                       <dd className="mt-0.5 font-medium text-ink">
                         {nextService.reservation.client.name}
                       </dd>
                       {nextService.reservation.client.phone && (
-                        <dd className="mt-1 text-xs text-forest/52">
+                        <dd className="mt-1 text-xs text-forest/62">
                           {nextService.reservation.client.phone}
                         </dd>
                       )}
@@ -167,7 +167,7 @@ export default async function PortalMotoristaHomePage() {
                       aria-hidden="true"
                     />
                     <div className="min-w-0 flex-1">
-                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                      <dt className="text-[11px] uppercase tracking-[0.1em] text-forest/55">
                         Rota
                       </dt>
                       <dd className="mt-1 grid gap-2 rounded-lg bg-forest/[0.04] p-3 text-xs leading-5 text-ink/82 sm:text-sm">
@@ -193,7 +193,7 @@ export default async function PortalMotoristaHomePage() {
                       aria-hidden="true"
                     />
                     <div>
-                      <dt className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                      <dt className="text-[11px] uppercase tracking-[0.1em] text-forest/55">
                         Reserva e veículo
                       </dt>
                       <dd className="mt-0.5 text-ink/82">
@@ -278,7 +278,7 @@ export default async function PortalMotoristaHomePage() {
 
             <div className="mt-5 grid grid-cols-2 gap-2 border-t border-forest/10 pt-4 sm:grid-cols-3">
               <div className="rounded-lg bg-forest/[0.045] p-3">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                <p className="text-[11px] uppercase tracking-[0.1em] text-forest/55">
                   Passageiros
                 </p>
                 <p className="mt-1 text-sm font-semibold text-forest">
@@ -286,7 +286,7 @@ export default async function PortalMotoristaHomePage() {
                 </p>
               </div>
               <div className="col-span-2 rounded-lg bg-forest/[0.045] p-3 sm:col-span-1">
-                <p className="flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                <p className="flex items-center gap-1 text-[11px] uppercase tracking-[0.1em] text-forest/55">
                   <BriefcaseBusiness size={12} aria-hidden="true" /> Bagagens
                 </p>
                 <p className="mt-1 text-sm font-semibold text-forest">
@@ -296,7 +296,7 @@ export default async function PortalMotoristaHomePage() {
                 </p>
               </div>
               <div className="rounded-lg bg-forest/[0.045] p-3">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-forest/40">
+                <p className="text-[11px] uppercase tracking-[0.1em] text-forest/55">
                   Voo
                 </p>
                 <p className="mt-1 text-sm font-semibold text-forest">
@@ -316,7 +316,7 @@ export default async function PortalMotoristaHomePage() {
           <h2 className="mt-3 text-sm font-semibold text-forest">
             Nenhum serviço agendado
           </h2>
-          <p className="mt-1 text-xs text-forest/46">
+          <p className="mt-1 text-xs text-forest/58">
             Sua agenda está livre no momento.
           </p>
         </section>
@@ -327,7 +327,7 @@ export default async function PortalMotoristaHomePage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Hoje</h2>
-              <p className="mt-1 text-xs text-forest/46">
+              <p className="mt-1 text-xs text-forest/58">
                 {remainingTodayServices.length} após o próximo atendimento.
               </p>
             </div>
@@ -340,7 +340,7 @@ export default async function PortalMotoristaHomePage() {
             </Link>
           </div>
           {remainingTodayServices.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-forest/46">
+            <p className="px-5 py-10 text-center text-sm text-forest/58">
               Nenhum outro serviço hoje.
             </p>
           ) : (
@@ -363,7 +363,7 @@ export default async function PortalMotoristaHomePage() {
                       <strong className="block truncate text-xs text-ink">
                         {service.reservation.client.name}
                       </strong>
-                      <span className="mt-1 block truncate text-[11px] text-forest/45">
+                      <span className="mt-1 block truncate text-[11px] text-forest/58">
                         {service.pickup_location ?? "Origem a definir"} →{" "}
                         {service.dropoff_location ?? "Destino a definir"}
                       </span>
@@ -385,14 +385,14 @@ export default async function PortalMotoristaHomePage() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Link
               href="/portal/motorista/servicos"
-              className="focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-[11px] font-medium text-forest hover:bg-forest/[0.055]"
+              className="interactive-panel focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-xs font-semibold text-forest hover:bg-forest/[0.055]"
             >
               <CalendarDays size={18} aria-hidden="true" />
               Abrir agenda
             </Link>
             <Link
               href="/portal/motorista/despesas"
-              className="focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-[11px] font-medium text-forest hover:bg-forest/[0.055]"
+              className="interactive-panel focus-ring flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-forest/10 bg-[#faf9f6] text-center text-xs font-semibold text-forest hover:bg-forest/[0.055]"
             >
               <ReceiptText size={18} aria-hidden="true" />
               Registrar despesa

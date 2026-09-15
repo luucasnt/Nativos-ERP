@@ -251,7 +251,7 @@ export default async function AdminHomePage() {
           <div className="flex items-center justify-between gap-3 border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Operação de hoje</h2>
-              <p className="mt-1 text-xs text-forest/46">Serviços ordenados por horário.</p>
+              <p className="mt-1 text-xs text-forest/58">Serviços ordenados por horário.</p>
             </div>
             <Link
               href="/admin/reservas"
@@ -266,11 +266,11 @@ export default async function AdminHomePage() {
             <div className="px-5 py-14 text-center">
               <CalendarDays className="mx-auto text-forest/22" size={30} aria-hidden="true" />
               <p className="mt-3 text-sm font-medium text-forest">Agenda livre hoje</p>
-              <p className="mt-1 text-xs text-forest/46">Nenhum serviço está programado.</p>
+              <p className="mt-1 text-xs text-forest/58">Nenhum serviço está programado.</p>
             </div>
           ) : (
             <>
-              <ul className="divide-y divide-forest/[0.075] md:hidden">
+              <ul className="divide-y divide-forest/[0.075] xl:hidden">
                 {todayServices.map((service) => (
                   <li key={service.id}>
                     <Link
@@ -283,7 +283,7 @@ export default async function AdminHomePage() {
                             <strong className="text-base font-semibold text-forest">
                               {service.scheduled_time ?? "—"}
                             </strong>
-                            <span className="text-[11px] font-medium text-forest/48">
+                            <span className="text-[11px] font-medium text-forest/60">
                               {service.reservation.code}
                             </span>
                           </span>
@@ -303,7 +303,7 @@ export default async function AdminHomePage() {
                             <span className="block truncate">
                               {service.pickup_location ?? "Origem não informada"}
                             </span>
-                            <span className="mt-0.5 block truncate text-forest/42">
+                            <span className="mt-0.5 block truncate text-forest/55">
                               até {service.dropoff_location ?? "destino não informado"}
                             </span>
                           </span>
@@ -327,15 +327,15 @@ export default async function AdminHomePage() {
                 ))}
               </ul>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr>
-                    <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Horário</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reserva</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Passageiro e rota</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Recurso</th>
-                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
+                    <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Horário</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Reserva</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Passageiro e rota</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Recurso</th>
+                    <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
                     <th className="bg-[#faf9f6] px-5 py-3" />
                   </tr>
                 </thead>
@@ -346,7 +346,7 @@ export default async function AdminHomePage() {
                       <td className="px-4 py-3.5 text-xs font-medium text-forest/66">{service.reservation.code}</td>
                       <td className="max-w-[340px] px-4 py-3.5">
                         <p className="truncate font-medium text-ink">{service.reservation.client.name}</p>
-                        <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-forest/45">
+                        <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-forest/58">
                           <MapPin size={11} aria-hidden="true" />
                           {service.pickup_location ?? "Origem não informada"}
                           <ArrowRight size={10} aria-hidden="true" />
@@ -355,7 +355,7 @@ export default async function AdminHomePage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="text-xs text-ink/76">{service.driver?.name ?? "Motorista a definir"}</p>
-                        <p className="mt-1 text-[11px] text-forest/43">{service.vehicle ? `${service.vehicle.model} · ${service.vehicle.plate}` : "Veículo a definir"}</p>
+                        <p className="mt-1 text-[11px] text-forest/55">{service.vehicle ? `${service.vehicle.model} · ${service.vehicle.plate}` : "Veículo a definir"}</p>
                       </td>
                       <td className="px-4 py-3.5">
                         <Badge tone={executionTone(service.execution_status)}>
@@ -380,16 +380,16 @@ export default async function AdminHomePage() {
           )}
         </section>
 
-        <aside className="surface-panel overflow-hidden">
+        <aside className="surface-elevated overflow-hidden">
           <div className="border-b border-forest/10 px-5 py-4">
             <h2 className="section-heading">Ações necessárias</h2>
-            <p className="mt-1 text-xs text-forest/46">Prioridades para manter o dia fluindo.</p>
+            <p className="mt-1 text-xs text-forest/58">Prioridades para manter o dia fluindo.</p>
           </div>
           {attentionItems.length === 0 ? (
             <div className="px-5 py-10 text-center">
               <CheckCircle2 className="mx-auto text-success/55" size={29} aria-hidden="true" />
               <p className="mt-3 text-sm font-medium text-forest">Operação em dia</p>
-              <p className="mt-1 text-xs text-forest/46">Nenhuma pendência crítica agora.</p>
+              <p className="mt-1 text-xs text-forest/58">Nenhuma pendência crítica agora.</p>
             </div>
           ) : (
             <ul className="divide-y divide-forest/[0.075]">
@@ -402,9 +402,9 @@ export default async function AdminHomePage() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
                         <strong className="text-xs font-semibold text-forest">{label}</strong>
-                        <span className="rounded-full bg-warning-light px-2 py-0.5 text-[10px] font-semibold text-warning">{count}</span>
+                        <span className="rounded-full bg-warning-light px-2 py-0.5 text-[11px] font-semibold text-warning">{count}</span>
                       </span>
-                      <span className="mt-1 block text-[11px] leading-4 text-forest/48">{description}</span>
+                      <span className="mt-1 block text-[11px] leading-4 text-forest/60">{description}</span>
                     </span>
                   </Link>
                 </li>
@@ -419,19 +419,19 @@ export default async function AdminHomePage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Próximos 7 dias</h2>
-              <p className="mt-1 text-xs text-forest/46">Antecipe alocações e confirmações.</p>
+              <p className="mt-1 text-xs text-forest/58">Antecipe alocações e confirmações.</p>
             </div>
             <CalendarRange size={18} className="text-gold" aria-hidden="true" />
           </div>
           {upcomingServices.length === 0 ? (
-            <p className="px-5 py-9 text-center text-sm text-forest/48">Nenhum serviço futuro programado.</p>
+            <p className="px-5 py-9 text-center text-sm text-forest/60">Nenhum serviço futuro programado.</p>
           ) : (
             <ul className="grid divide-y divide-forest/[0.075] md:grid-cols-2 md:divide-x md:divide-y-0">
               {upcomingServices.slice(0, 6).map((service) => (
                 <li key={service.id} className="min-w-0 px-5 py-3.5 md:[&:nth-child(n+3)]:border-t md:[&:nth-child(odd)]:border-l-0">
                   <div className="flex items-start gap-3">
                     <span className="min-w-12 rounded-lg bg-forest/[0.055] px-2 py-1.5 text-center">
-                      <span className="block text-[10px] uppercase text-forest/44">
+                      <span className="block text-[11px] uppercase text-forest/55">
                         {service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC", weekday: "short" })}
                       </span>
                       <strong className="block text-sm text-forest">
@@ -440,10 +440,10 @@ export default async function AdminHomePage() {
                     </span>
                     <span className="min-w-0">
                       <strong className="block truncate text-xs text-ink">{service.reservation.client.name}</strong>
-                      <span className="mt-1 block truncate text-[11px] text-forest/48">
+                      <span className="mt-1 block truncate text-[11px] text-forest/60">
                         {service.scheduled_time ?? "—"} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                       </span>
-                      <span className="mt-1 block truncate text-[11px] text-forest/42">{service.driver?.name ?? "Motorista a definir"}</span>
+                      <span className="mt-1 block truncate text-[11px] text-forest/55">{service.driver?.name ?? "Motorista a definir"}</span>
                     </span>
                   </div>
                 </li>
@@ -454,17 +454,17 @@ export default async function AdminHomePage() {
 
         <section className="surface-panel p-5">
           <h2 className="section-heading">Capacidade disponível</h2>
-          <p className="mt-1 text-xs text-forest/46">Recursos aprovados e ativos.</p>
+          <p className="mt-1 text-xs text-forest/58">Recursos aprovados e ativos.</p>
           <dl className="mt-5 grid grid-cols-2 gap-3">
             <div className="rounded-lg border border-forest/10 bg-[#faf9f6] p-3">
-              <dt className="flex items-center gap-2 text-[11px] text-forest/48">
+              <dt className="flex items-center gap-2 text-[11px] text-forest/60">
                 <UserRoundCheck size={14} aria-hidden="true" />
                 Motoristas
               </dt>
               <dd className="mt-2 text-2xl font-semibold text-forest">{activeDrivers}</dd>
             </div>
             <div className="rounded-lg border border-forest/10 bg-[#faf9f6] p-3">
-              <dt className="flex items-center gap-2 text-[11px] text-forest/48">
+              <dt className="flex items-center gap-2 text-[11px] text-forest/60">
                 <CarFront size={14} aria-hidden="true" />
                 Veículos
               </dt>

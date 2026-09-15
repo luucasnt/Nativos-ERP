@@ -9,13 +9,15 @@ export default async function ContratosPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Cláusulas de contrato</h1>
         <Link href="/admin/configuracoes/contratos/novo" className={buttonClass}>
           Nova cláusula
         </Link>
       </div>
 
+      <div className="grid gap-3 md:hidden">{clauses.map((clause) => <article key={clause.id} className="surface-panel p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#806538]">{clause.category}</p><h2 className="mt-1 text-sm font-semibold text-forest">{clause.title}</h2></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${clause.active ? "bg-success-light text-success" : "bg-forest/[0.06] text-forest/65"}`}>{clause.active ? "Ativa" : "Inativa"}</span></div><div className="mt-4 flex items-center justify-between"><span className="text-xs text-forest/60">Ordem {clause.order}</span><Link href={`/admin/configuracoes/contratos/${clause.id}`} className={linkClass}>Editar cláusula</Link></div></article>)}</div>
+      <div className="hidden max-w-full overflow-x-auto rounded-xl border border-forest/10 md:block">
       <table className={tableClass}>
         <thead>
           <tr>
@@ -27,14 +29,14 @@ export default async function ContratosPage() {
           </tr>
         </thead>
         <tbody>
-          {clauses.map((c) => (
-            <tr key={c.id}>
-              <td className={tdClass}>{c.category}</td>
-              <td className={tdClass}>{c.order}</td>
-              <td className={tdClass}>{c.title}</td>
-              <td className={tdClass}>{c.active ? "Ativa" : "Inativa"}</td>
+          {clauses.map((clause) => (
+            <tr key={clause.id}>
+              <td className={tdClass}>{clause.category}</td>
+              <td className={tdClass}>{clause.order}</td>
+              <td className={tdClass}>{clause.title}</td>
+              <td className={tdClass}>{clause.active ? "Ativa" : "Inativa"}</td>
               <td className={tdClass}>
-                <Link href={`/admin/configuracoes/contratos/${c.id}`} className={linkClass}>
+                <Link href={`/admin/configuracoes/contratos/${clause.id}`} className={linkClass}>
                   Editar
                 </Link>
               </td>
@@ -42,6 +44,7 @@ export default async function ContratosPage() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

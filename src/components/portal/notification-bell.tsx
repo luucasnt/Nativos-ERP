@@ -25,7 +25,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
       >
         <Bell size={16} aria-hidden="true" />
         {notifications.length > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[9px] font-bold text-forest-dark">
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[11px] font-bold text-forest-dark">
             {notifications.length > 9 ? "9+" : notifications.length}
           </span>
         )}
@@ -36,14 +36,14 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
           <div className="flex items-center justify-between border-b border-forest/10 px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-forest">Avisos</p>
-              <p className="mt-0.5 text-[10px] text-forest/42">{notifications.length} não lidos</p>
+              <p className="mt-0.5 text-[11px] text-forest/55">{notifications.length} não lidos</p>
             </div>
             {notifications.length > 0 && (
               <button
                 type="button"
                 disabled={isPending}
                 onClick={() => startTransition(() => markAllNotificationsReadPortal())}
-                className="focus-ring inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold text-forest/58 hover:bg-forest/5 hover:text-forest"
+                className="focus-ring inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-semibold text-forest/58 hover:bg-forest/5 hover:text-forest"
               >
                 <CheckCheck size={13} aria-hidden="true" />
                 Marcar todos
@@ -53,20 +53,20 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
 
           <ul className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <li className="px-4 py-10 text-center text-xs text-forest/45">Nenhum aviso novo.</li>
+              <li className="px-4 py-10 text-center text-xs text-forest/58">Nenhum aviso novo.</li>
             ) : (
               notifications.map((notification) => (
                 <li key={notification.id} className="border-b border-forest/[0.075] px-4 py-3 last:border-b-0">
                   <p className="text-xs leading-5 text-ink/82">{notification.message}</p>
                   <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-[10px] text-forest/38">
+                    <span className="text-[11px] text-forest/38">
                       {new Date(notification.created_at).toLocaleString("pt-BR")}
                     </span>
                     <button
                       type="button"
                       disabled={isPending}
                       onClick={() => startTransition(() => markNotificationReadPortal(notification.id))}
-                      className="focus-ring rounded text-[10px] font-semibold text-forest/55 hover:text-forest"
+                      className="focus-ring rounded text-[11px] font-semibold text-forest/55 hover:text-forest"
                     >
                       Marcar como lido
                     </button>

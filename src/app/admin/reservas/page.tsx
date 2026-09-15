@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Prisma, ReservationStatus } from "@prisma/client";
-import { CalendarDays, ChevronLeft, ChevronRight, Filter, Plus, Search } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { SectionNavigation } from "@/components/ui/section-navigation";
 import { prisma } from "@/lib/prisma";
 import { RESERVATION_STATUS_LABEL } from "@/lib/reservations/status-labels";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
@@ -96,6 +97,13 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
   const partners = companies.filter((company) => company.roles.includes("parceiro"));
   const suppliers = companies.filter((company) => company.roles.includes("fornecedor"));
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const activeAdvancedFilters = [
+    params.de,
+    params.ate,
+    params.parceiro,
+    params.fornecedor,
+    params.financeiro,
+  ].filter(Boolean).length;
 
   return <div className="mx-auto max-w-[1480px] space-y-5">
     <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -103,15 +111,43 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
       <Link href="/admin/reservas/novo" className={`${buttonClass} w-full sm:w-auto`}><Plus size={16} /> Nova reserva</Link>
     </header>
 
-    <nav aria-label="Status das reservas" className="flex gap-1 overflow-x-auto border-b border-forest/10">
-      {TABS.map((item) => <Link key={item.key} href={listHref(params, { tab: item.key, page: undefined })} aria-current={tab.key === item.key ? "page" : undefined} className={`focus-ring relative flex shrink-0 items-center gap-2 px-3 pb-3 pt-1 text-sm font-medium ${tab.key === item.key ? "text-forest" : "text-forest/52 hover:text-forest"}`}>
-        {item.label}<span className="rounded-full bg-forest/[0.06] px-2 py-0.5 text-xs">{tabCount(item)}</span>{tab.key === item.key && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gold" />}
-      </Link>)}
-    </nav>
+    <SectionNavigation
+      activeKey={tab.key}
+      ariaLabel="Status das reservas"
+      mobileLabel="Mostrar reservas"
+      items={TABS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        count: tabCount(item),
+        href: listHref(params, { tab: item.key, page: undefined }),
+      }))}
+    />
 
-    <form action="/admin/reservas" method="get" className="surface-panel grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,1.5fr)_145px_145px_180px_180px_180px_auto]">
+    <form action="/admin/reservas" method="get" className="surface-panel p-3 lg:hidden">
       <input type="hidden" name="tab" value={tab.key} />
-      <label className="relative md:col-span-2 xl:col-span-1"><span className="sr-only">Buscar reserva</span><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-forest/42" /><input name="q" defaultValue={query} placeholder="Código, cliente, telefone, rota..." className={`${inputClass} pl-9`} /></label>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <label className="relative"><span className="sr-only">Buscar reserva</span><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-forest/55" /><input name="q" defaultValue={query} placeholder="Código, cliente ou rota" className={`${inputClass} pl-9`} /></label>
+        <button type="submit" className={`${secondaryButtonClass} px-3`} aria-label="Buscar"><Search size={17} /></button>
+      </div>
+      <details className="group mt-2 border-t border-forest/10 pt-2">
+        <summary className="focus-ring flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg px-2 text-sm font-medium text-forest [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2"><SlidersHorizontal size={16} /> Mais filtros</span>
+          {activeAdvancedFilters > 0 && <span className="rounded-full bg-gold/15 px-2 py-1 text-xs text-forest">{activeAdvancedFilters} ativos</span>}
+        </summary>
+        <div className="mt-3 grid gap-3 border-t border-forest/10 pt-3">
+          <label className="grid gap-1"><span className="text-xs font-medium text-forest/65">Data inicial</span><input type="date" name="de" defaultValue={params.de ?? ""} className={inputClass} /></label>
+          <label className="grid gap-1"><span className="text-xs font-medium text-forest/65">Data final</span><input type="date" name="ate" defaultValue={params.ate ?? ""} className={inputClass} /></label>
+          <label className="grid gap-1"><span className="text-xs font-medium text-forest/65">Parceiro</span><select name="parceiro" defaultValue={params.parceiro ?? ""} className={inputClass}><option value="">Todos os parceiros</option>{partners.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label className="grid gap-1"><span className="text-xs font-medium text-forest/65">Fornecedor</span><select name="fornecedor" defaultValue={params.fornecedor ?? ""} className={inputClass}><option value="">Todos os fornecedores</option>{suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label className="grid gap-1"><span className="text-xs font-medium text-forest/65">Situação financeira</span><select name="financeiro" defaultValue={params.financeiro ?? ""} className={inputClass}><option value="">Qualquer financeiro</option><option value="aberto">Com saldo em aberto</option><option value="pago">Com pagamento</option></select></label>
+          <div className="grid grid-cols-2 gap-2"><Link href={`/admin/reservas?tab=${tab.key}`} className={secondaryButtonClass}>Limpar</Link><button type="submit" className={buttonClass}><Filter size={15} /> Aplicar</button></div>
+        </div>
+      </details>
+    </form>
+
+    <form action="/admin/reservas" method="get" className="surface-panel hidden gap-3 p-4 lg:grid lg:grid-cols-2 xl:grid-cols-4">
+      <input type="hidden" name="tab" value={tab.key} />
+      <label className="relative lg:col-span-2"><span className="sr-only">Buscar reserva</span><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-forest/55" /><input name="q" defaultValue={query} placeholder="Código, cliente, telefone, rota..." className={`${inputClass} pl-9`} /></label>
       <input aria-label="Data inicial" type="date" name="de" defaultValue={params.de ?? ""} className={inputClass} />
       <input aria-label="Data final" type="date" name="ate" defaultValue={params.ate ?? ""} className={inputClass} />
       <select aria-label="Parceiro" name="parceiro" defaultValue={params.parceiro ?? ""} className={inputClass}><option value="">Todos os parceiros</option>{partners.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
@@ -122,19 +158,19 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
 
     {reservations.length === 0 ? <section className="surface-panel px-5 py-14 text-center"><CalendarDays className="mx-auto text-forest/25" size={34} /><h2 className="mt-3 text-base font-semibold text-forest">Nenhuma reserva encontrada</h2><p className="mt-1 text-sm text-forest/55">Ajuste os filtros ou cadastre uma nova reserva.</p><div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row"><Link href={`/admin/reservas?tab=${tab.key}`} className={secondaryButtonClass}>Limpar filtros</Link><Link href="/admin/reservas/novo" className={buttonClass}>Nova reserva</Link></div></section> :
       <section className="surface-panel overflow-hidden">
-        <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[980px] text-sm"><thead><tr>{["Reserva","Próximo serviço","Rota","Parceiro / fornecedor","Valor","Status",""].map((label) => <th key={label} className="bg-[#faf9f6] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-forest/48">{label}</th>)}</tr></thead><tbody>
+        <div className="hidden overflow-x-auto xl:block"><table className="w-full min-w-[980px] text-sm"><thead><tr>{["Reserva","Próximo serviço","Rota","Parceiro / fornecedor","Valor","Status",""].map((label) => <th key={label} className="bg-[#faf9f6] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-forest/60">{label}</th>)}</tr></thead><tbody>
           {reservations.map((reservation) => { const service = reservation.services[0]; const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <tr key={reservation.id} className="border-t border-forest/[0.075] align-middle hover:bg-forest/[0.022]">
             <td className="px-4 py-4"><strong className="block text-forest">{reservation.code}</strong><span className="mt-1 block text-sm text-forest/58">{reservation.client.name}</span></td>
-            <td className="px-4 py-4 text-sm text-forest/68">{service?.scheduled_date ? service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Sem data"}{service?.scheduled_time ? ` · ${service.scheduled_time}` : ""}<span className="mt-1 block text-xs text-forest/45">{service ? SERVICE_TYPE_LABEL[service.type] : "Sem serviço"}</span></td>
-            <td className="max-w-[240px] px-4 py-4 text-sm text-forest/68"><span className="block truncate">{service?.pickup_location ?? "—"}</span><span className="block truncate text-xs text-forest/45">{service?.dropoff_location ? `para ${service.dropoff_location}` : ""}</span></td>
-            <td className="px-4 py-4 text-sm text-forest/68">{reservation.origin_partner?.name ?? "Cliente direto"}<span className="mt-1 block text-xs text-forest/45">{service?.supplier?.name ?? "Operação própria"}</span></td>
+            <td className="px-4 py-4 text-sm text-forest/68">{service?.scheduled_date ? service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Sem data"}{service?.scheduled_time ? ` · ${service.scheduled_time}` : ""}<span className="mt-1 block text-xs text-forest/58">{service ? SERVICE_TYPE_LABEL[service.type] : "Sem serviço"}</span></td>
+            <td className="max-w-[240px] px-4 py-4 text-sm text-forest/68"><span className="block truncate">{service?.pickup_location ?? "—"}</span><span className="block truncate text-xs text-forest/58">{service?.dropoff_location ? `para ${service.dropoff_location}` : ""}</span></td>
+            <td className="px-4 py-4 text-sm text-forest/68">{reservation.origin_partner?.name ?? "Cliente direto"}<span className="mt-1 block text-xs text-forest/58">{service?.supplier?.name ?? "Operação própria"}</span></td>
             <td className="px-4 py-4 font-semibold text-forest">{money.format(totalValue)}</td><td className="px-4 py-4"><Badge tone={statusTone(reservation.status)}>{RESERVATION_STATUS_LABEL[reservation.status]}</Badge>{reservation.has_partial_cancellation && <span className="mt-1 block text-xs text-warning">Cancelamento parcial</span>}</td>
             <td className="px-4 py-4 text-right"><Link href={`/admin/reservas/${reservation.id}`} className="focus-ring rounded text-sm font-semibold text-forest hover:text-forest-light">Abrir</Link></td>
           </tr>; })}
         </tbody></table></div>
-        <div className="divide-y divide-forest/10 md:hidden">{reservations.map((reservation) => { const service = reservation.services[0]; const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <Link key={reservation.id} href={`/admin/reservas/${reservation.id}`} className="focus-ring block p-4 active:bg-forest/[0.035]">
+        <div className="divide-y divide-forest/10 xl:hidden">{reservations.map((reservation) => { const service = reservation.services[0]; const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <Link key={reservation.id} href={`/admin/reservas/${reservation.id}`} className="focus-ring block p-4 active:bg-forest/[0.035]">
           <div className="flex items-start justify-between gap-3"><div><strong className="text-base text-forest">{reservation.code}</strong><p className="mt-1 text-sm font-medium text-ink">{reservation.client.name}</p></div><Badge tone={statusTone(reservation.status)}>{RESERVATION_STATUS_LABEL[reservation.status]}</Badge></div>
-          <div className="mt-4 grid grid-cols-[82px_1fr] gap-x-3 gap-y-2 text-sm"><span className="text-forest/48">Data</span><span className="font-medium text-forest">{service?.scheduled_date ? service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Sem data"}{service?.scheduled_time ? ` · ${service.scheduled_time}` : ""}</span><span className="text-forest/48">Rota</span><span className="truncate text-forest/72">{service?.pickup_location ?? "—"}{service?.dropoff_location ? ` → ${service.dropoff_location}` : ""}</span><span className="text-forest/48">Valor</span><strong className="text-forest">{money.format(totalValue)}</strong></div>
+          <div className="mt-4 grid grid-cols-[82px_1fr] gap-x-3 gap-y-2 text-sm"><span className="text-forest/60">Data</span><span className="font-medium text-forest">{service?.scheduled_date ? service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Sem data"}{service?.scheduled_time ? ` · ${service.scheduled_time}` : ""}</span><span className="text-forest/60">Rota</span><span className="truncate text-forest/72">{service?.pickup_location ?? "—"}{service?.dropoff_location ? ` → ${service.dropoff_location}` : ""}</span><span className="text-forest/60">Valor</span><strong className="text-forest">{money.format(totalValue)}</strong></div>
         </Link>; })}</div>
       </section>}
 

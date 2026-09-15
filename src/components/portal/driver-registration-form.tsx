@@ -17,7 +17,7 @@ export function DriverRegistrationForm() {
         </label>
         <input id="name" name="name" required className={inputClass} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="document" className={labelClass}>
             Documento
@@ -45,7 +45,7 @@ export function DriverRegistrationForm() {
       <button type="submit" disabled={pending} className={buttonClass}>
         {pending ? "Enviando…" : "Cadastrar motorista"}
       </button>
-      <p className="text-xs text-forest/50">
+      <p className="text-xs text-forest/62">
         O cadastro fica pendente até a aprovação da equipe Nativos.
       </p>
     </form>

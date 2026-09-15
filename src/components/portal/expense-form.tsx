@@ -45,7 +45,7 @@ export function ExpenseForm({
           <option value="">Despesa do motorista, sem veículo</option>
           {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.label}</option>)}
         </select>
-        <p className="text-[11px] text-forest/45">Obrigatório para abastecimento, lavagem e manutenção. Alimentação e outras despesas do motorista podem ficar sem veículo.</p>
+        <p className="text-[11px] text-forest/58">Obrigatório para abastecimento, lavagem e manutenção. Alimentação e outras despesas do motorista podem ficar sem veículo.</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">

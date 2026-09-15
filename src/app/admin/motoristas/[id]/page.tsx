@@ -33,7 +33,7 @@ export default async function EditarMotoristaPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Editar motorista</h1>
         {driver.approval_status === "pendente" && (
           <ApprovalActions

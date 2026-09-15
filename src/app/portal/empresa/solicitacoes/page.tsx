@@ -37,7 +37,7 @@ export default async function PortalEmpresaSolicitacoesPage() {
         <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
           <div>
             <h2 className="section-heading">Histórico</h2>
-            <p className="mt-1 text-xs text-forest/46">Últimos {Math.min(requests.length, 100)} protocolos.</p>
+            <p className="mt-1 text-xs text-forest/58">Últimos {Math.min(requests.length, 100)} protocolos.</p>
           </div>
           <Inbox size={18} className="text-gold" aria-hidden="true" />
         </div>

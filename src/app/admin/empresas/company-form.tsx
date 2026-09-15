@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import type { CompanyFormState } from "./actions";
-import { buttonClass, inputClass, labelClass, secondaryButtonClass } from "@/lib/ui";
+import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
 
 const initialState: CompanyFormState = { error: null };
 
@@ -89,7 +89,7 @@ export function CompanyForm({
             className={inputClass}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="document" className={labelClass}>
               Documento (CPF/CNPJ)
@@ -116,7 +116,7 @@ export function CompanyForm({
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="contact_name" className={labelClass}>
               Contato
@@ -212,7 +212,7 @@ export function CompanyForm({
       </fieldset>
 
       {isParceiro && (
-        <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+        <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
           <legend className="font-serif text-lg text-forest">Parceiro</legend>
           <div className="flex flex-col gap-1">
             <label htmlFor="modelo_parceiro" className={labelClass}>
@@ -277,7 +277,7 @@ export function CompanyForm({
             />
             Faturamento habilitado
           </label>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label htmlFor="billing_limit" className={labelClass}>
                 Limite de faturamento (R$)
@@ -319,7 +319,7 @@ export function CompanyForm({
       )}
 
       {isFornecedor && (
-        <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+        <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
           <legend className="font-serif text-lg text-forest">Fornecedor</legend>
           <label className="flex items-center gap-2 text-sm text-forest/80">
             <input
@@ -361,9 +361,9 @@ export function CompanyForm({
         </fieldset>
       )}
 
-      <fieldset className="flex flex-col gap-4 rounded-sm border border-forest/10 p-4">
+      <fieldset className="flex flex-col gap-4 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">PIX</legend>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="pix_key_type" className={labelClass}>
               Tipo de chave
@@ -408,11 +408,11 @@ export function CompanyForm({
       </fieldset>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href="/admin/empresas" className={secondaryButtonClass}>
+        <Link href="/admin/empresas" className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

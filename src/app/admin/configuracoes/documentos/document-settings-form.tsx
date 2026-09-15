@@ -25,7 +25,7 @@ export function DocumentSettingsForm({
         <input type="checkbox" name="os_default" defaultChecked={osDefault} />
         Exibir valor do serviço na ordem de serviço do motorista por padrão
       </label>
-      <p className="text-xs text-forest/50">
+      <p className="text-xs text-forest/62">
         Cada reserva (voucher) ou serviço (ordem de serviço) pode substituir
         este padrão individualmente.
       </p>

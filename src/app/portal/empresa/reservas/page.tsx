@@ -79,7 +79,7 @@ export default async function PortalEmpresaReservasPage() {
         <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
           <div>
             <h2 className="section-heading">Minhas reservas</h2>
-            <p className="mt-1 text-xs text-forest/46">{reservations.length} registros vinculados.</p>
+            <p className="mt-1 text-xs text-forest/58">{reservations.length} registros vinculados.</p>
           </div>
           <CalendarDays size={18} className="text-gold" aria-hidden="true" />
         </div>
@@ -88,11 +88,11 @@ export default async function PortalEmpresaReservasPage() {
           <div className="px-5 py-14 text-center">
             <CalendarDays size={30} className="mx-auto text-forest/22" aria-hidden="true" />
             <p className="mt-3 text-sm font-medium text-forest">Nenhuma reserva ainda</p>
-            <p className="mt-1 text-xs text-forest/46">Envie sua primeira solicitação abaixo.</p>
+            <p className="mt-1 text-xs text-forest/58">Envie sua primeira solicitação abaixo.</p>
           </div>
         ) : (
           <>
-            <ul className="divide-y divide-forest/[0.075] md:hidden">
+            <ul className="divide-y divide-forest/[0.075] xl:hidden">
               {reservations.map((reservation) => (
                 <li key={reservation.id} className="p-4">
                   <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
@@ -107,11 +107,11 @@ export default async function PortalEmpresaReservasPage() {
                     </div>
                     <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <dt className="text-forest/43">Serviços</dt>
+                        <dt className="text-forest/55">Serviços</dt>
                         <dd className="mt-1 font-semibold text-forest">{reservation._count.services}</dd>
                       </div>
                       <div>
-                        <dt className="text-forest/43">Solicitada em</dt>
+                        <dt className="text-forest/55">Solicitada em</dt>
                         <dd className="mt-1 font-semibold text-forest">
                           {reservation.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}
                         </dd>
@@ -131,16 +131,16 @@ export default async function PortalEmpresaReservasPage() {
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr>
-                  <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Código</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Passageiro</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Serviços</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Criada em</th>
-                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
-                  <th className="bg-[#faf9f6] px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Documento</th>
+                  <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Código</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Passageiro</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Serviços</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Criada em</th>
+                  <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
+                  <th className="bg-[#faf9f6] px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Documento</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,11 +179,11 @@ export default async function PortalEmpresaReservasPage() {
 
       <section className="surface-panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
-          <div><h2 className="section-heading">Próximos serviços</h2><p className="mt-1 text-xs text-forest/46">Acompanhe a agenda operacional das suas reservas.</p></div>
+          <div><h2 className="section-heading">Próximos serviços</h2><p className="mt-1 text-xs text-forest/58">Acompanhe a agenda operacional das suas reservas.</p></div>
           <Route size={18} className="text-gold" aria-hidden="true" />
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          {upcomingServices.length === 0 ? <p className="text-sm text-forest/50 sm:col-span-2 lg:col-span-4">Nenhum serviço agendado no momento.</p> : upcomingServices.map((service) => (
+          {upcomingServices.length === 0 ? <p className="text-sm text-forest/62 sm:col-span-2 lg:col-span-4">Nenhum serviço agendado no momento.</p> : upcomingServices.map((service) => (
             <article key={service.id} className="rounded-lg border border-forest/10 bg-[#faf9f6] p-3">
               <p className="text-xs font-semibold text-forest">{service.reservation.code}</p>
               <p className="mt-1 text-sm font-medium text-ink">{service.reservation.client.name}</p>
@@ -202,13 +202,13 @@ export default async function PortalEmpresaReservasPage() {
         <div className="grid gap-4 xl:grid-cols-3">
           <article className="surface-panel p-5">
             <h3 className="text-sm font-semibold text-forest">Nova reserva</h3>
-            <p className="mb-4 mt-1 text-xs leading-5 text-forest/48">Informe o cliente e descreva o serviço desejado.</p>
+            <p className="mb-4 mt-1 text-xs leading-5 text-forest/60">Informe o cliente e descreva o serviço desejado.</p>
             <NovaReservaRequestForm dedupeKey={crypto.randomUUID()} clients={clients} />
           </article>
 
           <article className="surface-panel p-5">
             <h3 className="text-sm font-semibold text-forest">Alterar reserva</h3>
-            <p className="mb-4 mt-1 text-xs leading-5 text-forest/48">Solicite ajustes em uma reserva já criada.</p>
+            <p className="mb-4 mt-1 text-xs leading-5 text-forest/60">Solicite ajustes em uma reserva já criada.</p>
             <ReservationRequestForm
               dedupeKey={crypto.randomUUID()}
               reservations={reservations}
@@ -221,7 +221,7 @@ export default async function PortalEmpresaReservasPage() {
 
           <article className="surface-panel p-5">
             <h3 className="text-sm font-semibold text-forest">Cancelar reserva</h3>
-            <p className="mb-4 mt-1 text-xs leading-5 text-forest/48">Envie o motivo para análise da equipe.</p>
+            <p className="mb-4 mt-1 text-xs leading-5 text-forest/60">Envie o motivo para análise da equipe.</p>
             <ReservationRequestForm
               dedupeKey={crypto.randomUUID()}
               reservations={reservations}
@@ -235,7 +235,7 @@ export default async function PortalEmpresaReservasPage() {
       </section>
 
       <section className="surface-panel p-5">
-        <div className="mb-4 flex items-center gap-2"><Plus size={17} className="text-gold" aria-hidden="true" /><div><h2 className="section-heading">Cadastro de clientes</h2><p className="mt-1 text-xs text-forest/46">Mantenha seus passageiros prontos para novas solicitações.</p></div></div>
+        <div className="mb-4 flex items-center gap-2"><Plus size={17} className="text-gold" aria-hidden="true" /><div><h2 className="section-heading">Cadastro de clientes</h2><p className="mt-1 text-xs text-forest/58">Mantenha seus passageiros prontos para novas solicitações.</p></div></div>
         <ClientRegistrationForm />
       </section>
 

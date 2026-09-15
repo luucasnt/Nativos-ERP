@@ -38,6 +38,8 @@ export default async function AdminLayout({
       userName={user.display_name ?? user.native_name ?? user.email}
       nav={nav}
       badges={{ alertas, solicitacoes, despesas }}
+      mobileNav="bottom"
+      entitySearch
     >
       {children}
     </AppShell>

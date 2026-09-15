@@ -36,7 +36,7 @@ export function RegisterPaymentForm({
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  return <div className="min-w-[210px]">
+  return <div className="w-full min-w-0 lg:min-w-[210px]">
     <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="focus-ring inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-forest/15 bg-white px-3 text-sm font-semibold text-forest hover:border-forest/30">
       Informar pagamento <ChevronDown size={15} className={open ? "rotate-180 transition" : "transition"} />
     </button>

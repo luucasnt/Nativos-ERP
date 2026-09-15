@@ -70,7 +70,7 @@ export default async function PortalMotoristaFinanceiroPage() {
       <section className="surface-panel overflow-hidden">
         <div className="border-b border-forest/10 px-5 py-4">
           <h2 className="section-heading">Meu extrato</h2>
-          <p className="mt-1 text-xs text-forest/46">Lançamentos vinculados ao seu cadastro.</p>
+          <p className="mt-1 text-xs text-forest/58">Lançamentos vinculados ao seu cadastro.</p>
         </div>
         <div className="p-4 md:p-5">
           <FinanceExtractTable entries={extract} />
@@ -79,7 +79,7 @@ export default async function PortalMotoristaFinanceiroPage() {
 
       <section className="surface-panel p-5">
         <h2 className="section-heading">Solicitar repasse</h2>
-        <p className="mb-4 mt-1 text-xs leading-5 text-forest/46">
+        <p className="mb-4 mt-1 text-xs leading-5 text-forest/58">
           Selecione os lançamentos e envie o pedido à equipe financeira.
         </p>
         <RepasseRequestForm

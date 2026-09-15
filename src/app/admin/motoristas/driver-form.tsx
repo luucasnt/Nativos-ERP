@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import type { DriverFormState } from "./actions";
-import { buttonClass, inputClass, labelClass, secondaryButtonClass } from "@/lib/ui";
+import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
 
 const initialState: DriverFormState = { error: null };
 
@@ -65,7 +65,7 @@ export function DriverForm({
           className={inputClass}
         />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="document" className={labelClass}>
             Documento
@@ -89,7 +89,7 @@ export function DriverForm({
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="email" className={labelClass}>
             E-mail
@@ -133,7 +133,7 @@ export function DriverForm({
       </div>
 
       {ownerType === "terceirizado" && (
-        <div className="flex flex-col gap-3 rounded-sm border border-forest/10 p-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-forest/10 p-4">
           <div className="flex flex-col gap-1">
             <label htmlFor="supplier_id" className={labelClass}>
               Fornecedor *
@@ -226,11 +226,11 @@ export function DriverForm({
       )}
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href="/admin/motoristas" className={secondaryButtonClass}>
+        <Link href="/admin/motoristas" className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

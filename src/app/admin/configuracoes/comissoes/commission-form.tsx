@@ -93,11 +93,11 @@ export function CommissionForm({ action, companyCategories, defaultValues }: Com
       </label>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href="/admin/configuracoes/comissoes" className={secondaryButtonClass}>
+        <Link href="/admin/configuracoes/comissoes" className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

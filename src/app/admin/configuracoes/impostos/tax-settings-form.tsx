@@ -24,7 +24,7 @@ export function TaxSettingsForm({ percentual }: { percentual: number | null }) {
           className={inputClass}
         />
       </div>
-      <p className="text-xs text-forest/50">
+      <p className="text-xs text-forest/62">
         Enquanto este campo estiver vazio, nenhuma reserva com nota fiscal
         calcula imposto automaticamente — a menos que você defina uma
         alíquota específica diretamente naquela reserva.

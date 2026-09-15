@@ -46,7 +46,7 @@ export function ChangeRequestsTable({
 }) {
   if (requests.length === 0) {
     return (
-      <p className="py-10 text-center text-sm text-forest/46">
+      <p className="py-10 text-center text-sm text-forest/58">
         Nenhuma solicitação enviada ainda.
       </p>
     );
@@ -56,7 +56,7 @@ export function ChangeRequestsTable({
 
   return (
     <>
-      <ul className="divide-y divide-forest/[0.075] md:hidden">
+      <ul className="divide-y divide-forest/[0.075] xl:hidden">
         {requests.map((request) => {
           const overdue = isChangeRequestOverdue({
             createdAt: request.created_at,
@@ -84,14 +84,14 @@ export function ChangeRequestsTable({
                 </div>
               </div>
               <div className="mt-3 rounded-lg bg-[#faf9f6] p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-forest/42">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-forest/55">
                   Resposta
                 </p>
                 <p className="mt-1 text-xs leading-5 text-forest/65">
                   {request.response_note ?? "Aguardando atualização."}
                 </p>
               </div>
-              <p className="mt-2 text-[11px] text-forest/42">
+              <p className="mt-2 text-[11px] text-forest/55">
                 Enviada em{" "}
                 {request.created_at.toLocaleDateString("pt-BR", {
                   timeZone: "America/Bahia",
@@ -102,23 +102,23 @@ export function ChangeRequestsTable({
         })}
       </ul>
 
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto xl:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Protocolo
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Tipo
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Enviada em
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Status
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Resposta
               </th>
             </tr>
@@ -142,7 +142,7 @@ export function ChangeRequestsTable({
                   <td className="px-4 py-3.5 text-xs text-ink/75">
                     {requestTypeLabel(request.type)}
                   </td>
-                  <td className="px-4 py-3.5 text-xs text-forest/48">
+                  <td className="px-4 py-3.5 text-xs text-forest/60">
                     {request.created_at.toLocaleDateString("pt-BR", {
                       timeZone: "America/Bahia",
                     })}

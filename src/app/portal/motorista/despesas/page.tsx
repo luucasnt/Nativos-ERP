@@ -63,7 +63,7 @@ export default async function PortalMotoristaDespesasPage() {
           <div className="flex items-center justify-between border-b border-forest/10 px-5 py-4">
             <div>
               <h2 className="section-heading">Histórico</h2>
-              <p className="mt-1 text-xs text-forest/46">
+              <p className="mt-1 text-xs text-forest/58">
                 Últimos {expenses.length} lançamentos.
               </p>
             </div>
@@ -71,12 +71,12 @@ export default async function PortalMotoristaDespesasPage() {
           </div>
 
           {expenses.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-forest/46">
+            <p className="px-5 py-12 text-center text-sm text-forest/58">
               Nenhuma despesa registrada.
             </p>
           ) : (
             <>
-              <ul className="divide-y divide-forest/[0.075] md:hidden">
+              <ul className="divide-y divide-forest/[0.075] xl:hidden">
                 {expenses.map((expense) => (
                   <li key={expense.id} className="px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
@@ -84,7 +84,7 @@ export default async function PortalMotoristaDespesasPage() {
                         <p className="text-sm font-semibold text-forest">
                           {expense.service?.reservation.code ?? "Despesa avulsa"}
                         </p>
-                        <p className="mt-1 truncate text-xs text-forest/50">
+                        <p className="mt-1 truncate text-xs text-forest/62">
                           {expense.service ? (SERVICE_TYPE_LABEL[expense.service.type] ?? expense.service.type) : expense.vehicle ? `${expense.vehicle.plate} · ${expense.vehicle.model}` : "Despesa de veículo"}
                         </p>
                       </div>
@@ -94,7 +94,7 @@ export default async function PortalMotoristaDespesasPage() {
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#faf9f6] p-3 text-xs">
                       <div>
-                        <dt className="text-[10px] uppercase tracking-[0.08em] text-forest/42">
+                        <dt className="text-[11px] uppercase tracking-[0.08em] text-forest/55">
                           Categoria
                         </dt>
                         <dd className="mt-1 text-forest/75">
@@ -102,17 +102,17 @@ export default async function PortalMotoristaDespesasPage() {
                         </dd>
                       </div>
                       <div className="text-right">
-                        <dt className="text-[10px] uppercase tracking-[0.08em] text-forest/42">
+                        <dt className="text-[11px] uppercase tracking-[0.08em] text-forest/55">
                           Valor
                         </dt>
                         <dd className="mt-1 font-semibold text-forest">
                           {money.format(Number(expense.amount))}
                         </dd>
                       </div>
-                      {expense.odometer_km != null && <div><dt className="text-[10px] uppercase tracking-[0.08em] text-forest/42">Odômetro</dt><dd className="mt-1 text-forest/75">{expense.odometer_km.toLocaleString("pt-BR")} km</dd></div>}
-                      {expense.calculated_km_per_liter != null && <div className="text-right"><dt className="text-[10px] uppercase tracking-[0.08em] text-forest/42">Consumo</dt><dd className="mt-1 font-semibold text-forest">{Number(expense.calculated_km_per_liter).toFixed(2)} km/l</dd></div>}
+                      {expense.odometer_km != null && <div><dt className="text-[11px] uppercase tracking-[0.08em] text-forest/55">Odômetro</dt><dd className="mt-1 text-forest/75">{expense.odometer_km.toLocaleString("pt-BR")} km</dd></div>}
+                      {expense.calculated_km_per_liter != null && <div className="text-right"><dt className="text-[11px] uppercase tracking-[0.08em] text-forest/55">Consumo</dt><dd className="mt-1 font-semibold text-forest">{Number(expense.calculated_km_per_liter).toFixed(2)} km/l</dd></div>}
                     </dl>
-                    <p className="mt-2 text-[11px] text-forest/42">
+                    <p className="mt-2 text-[11px] text-forest/55">
                       Enviada em{" "}
                       {expense.created_at.toLocaleDateString("pt-BR", {
                         timeZone: "America/Bahia",
@@ -122,23 +122,23 @@ export default async function PortalMotoristaDespesasPage() {
                 ))}
               </ul>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto xl:block">
                 <table className="w-full min-w-[650px] text-sm">
                   <thead>
                     <tr>
-                      <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+                      <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                         Data
                       </th>
-                      <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+                      <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                         Serviço
                       </th>
-                      <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+                      <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                         Categoria
                       </th>
-                      <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+                      <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                         Valor
                       </th>
-                      <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+                      <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                         Status
                       </th>
                     </tr>
@@ -158,7 +158,7 @@ export default async function PortalMotoristaDespesasPage() {
                           <p className="text-xs font-medium text-ink">
                             {expense.service?.reservation.code ?? "Despesa avulsa"}
                           </p>
-                          <p className="mt-1 text-[10px] text-forest/42">
+                          <p className="mt-1 text-[11px] text-forest/55">
                             {expense.service ? (SERVICE_TYPE_LABEL[expense.service.type] ?? expense.service.type) : expense.vehicle ? `${expense.vehicle.plate} · ${expense.vehicle.model}` : "Despesa de veículo"}
                           </p>
                         </td>
@@ -187,7 +187,7 @@ export default async function PortalMotoristaDespesasPage() {
             <Plus size={17} className="text-gold" aria-hidden="true" />
             <h2 className="section-heading">Registrar despesa</h2>
           </div>
-          <p className="mb-4 mt-1 text-xs leading-5 text-forest/46">
+          <p className="mb-4 mt-1 text-xs leading-5 text-forest/58">
             A reserva é opcional. Para despesas avulsas, selecione apenas o veículo.
           </p>
           <ExpenseForm

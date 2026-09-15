@@ -202,7 +202,7 @@ export default async function PortalEmpresaHomePage() {
               <div className="flex items-center justify-between gap-3 border-b border-forest/10 px-5 py-4">
                 <div>
                   <h2 className="section-heading">Próximas reservas</h2>
-                  <p className="mt-1 text-xs text-forest/46">Atualizações mais recentes da sua conta.</p>
+                  <p className="mt-1 text-xs text-forest/58">Atualizações mais recentes da sua conta.</p>
                 </div>
                 <Link href="/portal/empresa/reservas" className="focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-forest">
                   Ver todas
@@ -210,10 +210,10 @@ export default async function PortalEmpresaHomePage() {
                 </Link>
               </div>
               {reservations.length === 0 ? (
-                <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhuma reserva vinculada ainda.</p>
+                <p className="px-5 py-12 text-center text-sm text-forest/58">Nenhuma reserva vinculada ainda.</p>
               ) : (
                 <>
-                  <ul className="divide-y divide-forest/[0.075] md:hidden">
+                  <ul className="divide-y divide-forest/[0.075] xl:hidden">
                     {reservations.map((reservation) => (
                       <li key={reservation.id} className="p-4">
                         <article className="rounded-xl border border-forest/10 bg-[#faf9f6] p-4">
@@ -226,7 +226,7 @@ export default async function PortalEmpresaHomePage() {
                               {RESERVATION_STATUS_LABEL[reservation.status]}
                             </Badge>
                           </div>
-                          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-forest/52">
+                          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-forest/62">
                             <span>{reservation._count.services} serviço(s)</span>
                             <a
                               href={`/api/documentos/voucher/${reservation.id}`}
@@ -242,14 +242,14 @@ export default async function PortalEmpresaHomePage() {
                     ))}
                   </ul>
 
-                  <div className="hidden overflow-x-auto md:block">
+                  <div className="hidden overflow-x-auto xl:block">
                     <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr>
-                        <th className="bg-[#faf9f6] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Reserva</th>
-                        <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Passageiro</th>
-                        <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Serviços</th>
-                        <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">Status</th>
+                        <th className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Reserva</th>
+                        <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Passageiro</th>
+                        <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Serviços</th>
+                        <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">Status</th>
                         <th className="bg-[#faf9f6] px-5 py-3" />
                       </tr>
                     </thead>
@@ -289,7 +289,7 @@ export default async function PortalEmpresaHomePage() {
               <div className="flex items-center justify-between gap-3 border-b border-forest/10 px-5 py-4">
                 <div>
                   <h2 className="section-heading">Próximos serviços</h2>
-                  <p className="mt-1 text-xs text-forest/46">Agenda confirmada e aguardando resposta.</p>
+                  <p className="mt-1 text-xs text-forest/58">Agenda confirmada e aguardando resposta.</p>
                 </div>
                 <Link href="/portal/empresa/operacao" className="focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-forest">
                   Ver operação
@@ -297,7 +297,7 @@ export default async function PortalEmpresaHomePage() {
                 </Link>
               </div>
               {supplierServices.length === 0 ? (
-                <p className="px-5 py-12 text-center text-sm text-forest/46">Nenhum serviço programado.</p>
+                <p className="px-5 py-12 text-center text-sm text-forest/58">Nenhum serviço programado.</p>
               ) : (
                 <ul className="divide-y divide-forest/[0.075]">
                   {supplierServices.map((service) => (
@@ -306,14 +306,14 @@ export default async function PortalEmpresaHomePage() {
                         <strong className="text-xs text-forest">
                           {service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "short" }) ?? "A definir"}
                         </strong>
-                        <span className="text-[10px] text-forest/44">{service.scheduled_time ?? "—"}</span>
+                        <span className="text-[11px] text-forest/55">{service.scheduled_time ?? "—"}</span>
                       </span>
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-xs text-ink">{service.reservation.client.name}</strong>
-                        <span className="mt-1 block truncate text-[11px] text-forest/48">
+                        <span className="mt-1 block truncate text-[11px] text-forest/60">
                           {service.reservation.code} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                         </span>
-                        <span className="mt-1 block truncate text-[11px] text-forest/42">
+                        <span className="mt-1 block truncate text-[11px] text-forest/55">
                           {service.driver?.name ?? "Motorista a definir"}
                         </span>
                       </span>
@@ -328,10 +328,10 @@ export default async function PortalEmpresaHomePage() {
           )}
         </div>
 
-        <aside className="surface-panel overflow-hidden">
+        <aside className="surface-elevated overflow-hidden">
           <div className="border-b border-forest/10 px-5 py-4">
             <h2 className="section-heading">Ações necessárias</h2>
-            <p className="mt-1 text-xs text-forest/46">Atalhos para as tarefas mais importantes.</p>
+            <p className="mt-1 text-xs text-forest/58">Atalhos para as tarefas mais importantes.</p>
           </div>
           <ul className="divide-y divide-forest/[0.075]">
             {isSupplier && (
@@ -342,7 +342,7 @@ export default async function PortalEmpresaHomePage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block text-xs text-forest">Confirmar serviços</strong>
-                    <span className="mt-1 block text-[11px] text-forest/47">{pendingAcceptance} aguardando sua resposta</span>
+                    <span className="mt-1 block text-[11px] text-forest/58">{pendingAcceptance} aguardando sua resposta</span>
                   </span>
                   <ArrowRight size={14} className="mt-2 text-forest/32 group-hover:text-forest" aria-hidden="true" />
                 </Link>
@@ -356,7 +356,7 @@ export default async function PortalEmpresaHomePage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block text-xs text-forest">Solicitar reserva</strong>
-                    <span className="mt-1 block text-[11px] text-forest/47">Envie os dados para a equipe Nativos</span>
+                    <span className="mt-1 block text-[11px] text-forest/58">Envie os dados para a equipe Nativos</span>
                   </span>
                   <ArrowRight size={14} className="mt-2 text-forest/32 group-hover:text-forest" aria-hidden="true" />
                 </Link>
@@ -369,7 +369,7 @@ export default async function PortalEmpresaHomePage() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong className="block text-xs text-forest">Acompanhar solicitações</strong>
-                  <span className="mt-1 block text-[11px] text-forest/47">{requests} em andamento</span>
+                  <span className="mt-1 block text-[11px] text-forest/58">{requests} em andamento</span>
                 </span>
                 <ArrowRight size={14} className="mt-2 text-forest/32 group-hover:text-forest" aria-hidden="true" />
               </Link>
@@ -382,7 +382,7 @@ export default async function PortalEmpresaHomePage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block text-xs text-forest">Atualizar equipe</strong>
-                    <span className="mt-1 block text-[11px] text-forest/47">Motoristas e veículos cadastrados</span>
+                    <span className="mt-1 block text-[11px] text-forest/58">Motoristas e veículos cadastrados</span>
                   </span>
                   <ArrowRight size={14} className="mt-2 text-forest/32 group-hover:text-forest" aria-hidden="true" />
                 </Link>

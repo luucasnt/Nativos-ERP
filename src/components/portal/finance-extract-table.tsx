@@ -47,7 +47,7 @@ function amounts(entry: ExtractEntry) {
 export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
   if (entries.length === 0) {
     return (
-      <p className="py-10 text-center text-sm text-forest/46">
+      <p className="py-10 text-center text-sm text-forest/58">
         Nenhum lançamento no momento.
       </p>
     );
@@ -55,7 +55,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
 
   return (
     <>
-      <ul className="divide-y divide-forest/[0.075] md:hidden">
+      <ul className="divide-y divide-forest/[0.075] xl:hidden">
         {entries.map((entry) => {
           const { original, paid, compensated, balance } = amounts(entry);
           const hasSettlement = paid > 0 || compensated > 0;
@@ -67,7 +67,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                   {FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ??
                     entry.category}
                 </p>
-                <p className="mt-1 text-[11px] text-forest/44">
+                <p className="mt-1 text-[11px] text-forest/55">
                   {entry.created_at.toLocaleDateString("pt-BR", {
                     timeZone: "America/Bahia",
                   })}
@@ -79,7 +79,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
               </Badge>
             </div>
             <div className="mt-3 flex items-end justify-between rounded-lg bg-[#faf9f6] px-3 py-2.5">
-              <span className="text-[10px] uppercase tracking-[0.08em] text-forest/42">
+              <span className="text-[11px] uppercase tracking-[0.08em] text-forest/55">
                 {hasSettlement ? "Saldo" : FINANCE_ENTRY_TYPE_LABEL[entry.type] ?? entry.type}
               </span>
               <strong
@@ -92,7 +92,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
               </strong>
             </div>
             {hasSettlement && (
-              <p className="mt-2 text-[10px] text-forest/45">
+              <p className="mt-2 text-[11px] text-forest/58">
                 Original {money.format(original)}
                 {paid > 0 ? ` · pago ${money.format(paid)}` : ""}
                 {compensated > 0 ? ` · compensado ${money.format(compensated)}` : ""}
@@ -103,23 +103,23 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
         })}
       </ul>
 
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto xl:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Data
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Descrição
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Reserva
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Valor
               </th>
-              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-forest/42">
+              <th className="bg-[#faf9f6] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">
                 Status
               </th>
             </tr>
@@ -133,7 +133,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                 key={entry.id}
                 className="border-t border-forest/[0.075] hover:bg-forest/[0.022]"
               >
-                <td className="px-4 py-3.5 text-xs text-forest/48">
+                <td className="px-4 py-3.5 text-xs text-forest/60">
                   {entry.created_at.toLocaleDateString("pt-BR", {
                     timeZone: "America/Bahia",
                   })}
@@ -143,7 +143,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                     {FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ??
                       entry.category}
                   </p>
-                  <p className="mt-1 text-[10px] text-forest/42">
+                  <p className="mt-1 text-[11px] text-forest/55">
                     {FINANCE_ENTRY_TYPE_LABEL[entry.type] ?? entry.type}
                   </p>
                 </td>
@@ -158,7 +158,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                 >
                   {money.format(hasSettlement ? balance : original)}
                   {hasSettlement && (
-                    <span className="mt-1 block text-[10px] font-normal text-forest/42">
+                    <span className="mt-1 block text-[11px] font-normal text-forest/55">
                       Original {money.format(original)}
                       {paid > 0 ? ` · pago ${money.format(paid)}` : ""}
                       {compensated > 0 ? ` · compensado ${money.format(compensated)}` : ""}

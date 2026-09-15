@@ -23,7 +23,7 @@ export function ClauseForm({ action, defaultValues }: ClauseFormProps) {
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="category" className={labelClass}>
             Categoria *
@@ -84,11 +84,11 @@ export function ClauseForm({ action, defaultValues }: ClauseFormProps) {
       </label>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href="/admin/configuracoes/contratos" className={secondaryButtonClass}>
+        <Link href="/admin/configuracoes/contratos" className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

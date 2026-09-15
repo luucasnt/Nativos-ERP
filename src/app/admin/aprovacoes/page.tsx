@@ -34,16 +34,16 @@ export default async function AprovacoesPage() {
           <p className="text-sm text-forest/60">Nenhum motorista pendente.</p>
         ) : (
           <>
-            <ul className="grid gap-3 md:hidden">
+            <ul className="grid gap-3 xl:hidden">
               {drivers.map((driver) => (
                 <li key={driver.id} className="surface-panel p-4">
                   <p className="text-sm font-semibold text-ink">{driver.name}</p>
-                  <p className="mt-1 text-xs text-forest/48">{driver.supplier?.name ?? "Sem fornecedor"}</p>
+                  <p className="mt-1 text-xs text-forest/60">{driver.supplier?.name ?? "Sem fornecedor"}</p>
                   <Link href={`/admin/motoristas/${driver.id}`} className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-forest/15 text-sm font-semibold text-forest">Revisar motorista</Link>
                 </li>
               ))}
             </ul>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden overflow-x-auto xl:block">
               <table className={tableClass}>
             <thead>
               <tr>
@@ -77,17 +77,17 @@ export default async function AprovacoesPage() {
           <p className="text-sm text-forest/60">Nenhum veículo pendente.</p>
         ) : (
           <>
-            <ul className="grid gap-3 md:hidden">
+            <ul className="grid gap-3 xl:hidden">
               {vehicles.map((vehicle) => (
                 <li key={vehicle.id} className="surface-panel p-4">
                   <p className="text-sm font-semibold uppercase tracking-[0.08em] text-forest">{vehicle.plate}</p>
                   <p className="mt-1 text-sm text-ink">{vehicle.model}</p>
-                  <p className="mt-1 text-xs text-forest/48">{vehicle.supplier?.name ?? "Sem fornecedor"}</p>
+                  <p className="mt-1 text-xs text-forest/60">{vehicle.supplier?.name ?? "Sem fornecedor"}</p>
                   <Link href={`/admin/veiculos/${vehicle.id}`} className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-forest/15 text-sm font-semibold text-forest">Revisar veículo</Link>
                 </li>
               ))}
             </ul>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden overflow-x-auto xl:block">
               <table className={tableClass}>
             <thead>
               <tr>

@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { ReservationFormState } from "./actions";
-import { buttonClass, inputClass, labelClass, secondaryButtonClass } from "@/lib/ui";
+import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
 
 const initialState: ReservationFormState = { error: null };
 
@@ -88,7 +88,7 @@ export function ReservationForm({
         </select>
       </div>
 
-      <fieldset className="flex flex-col gap-3 rounded-sm border border-forest/10 p-4">
+      <fieldset className="flex flex-col gap-3 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">Indicação</legend>
         <div className="flex flex-col gap-1">
           <label htmlFor="referrer_type" className={labelClass}>
@@ -126,7 +126,7 @@ export function ReservationForm({
         )}
 
         {referrerType === "pessoa_fisica" && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label htmlFor="referrer_name" className={labelClass}>
                 Nome *
@@ -205,7 +205,7 @@ export function ReservationForm({
       </div>
 
       {requiresNf && (
-        <div className="flex flex-col gap-1 rounded-sm border border-forest/10 p-4">
+        <div className="flex flex-col gap-1 rounded-xl border border-forest/10 p-4">
           <label htmlFor="tax_percent_override" className={labelClass}>
             Alíquota de imposto para esta reserva (%)
           </label>
@@ -217,7 +217,7 @@ export function ReservationForm({
             defaultValue={defaultValues?.tax_percent_snapshot ?? ""}
             className={inputClass}
           />
-          <p className="text-xs text-forest/50">
+          <p className="text-xs text-forest/62">
             Preencher aqui congela a alíquota desta reserva, sobrepondo o
             padrão global de Configurações &gt; Impostos. Deixar em branco
             remove a sobreposição — sem alíquota definida em nenhum dos
@@ -227,11 +227,11 @@ export function ReservationForm({
       )}
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
-      <div className="flex gap-3">
-        <button type="submit" disabled={pending} className={buttonClass}>
+      <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>
+        <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>
           {pending ? "Salvando…" : "Salvar"}
         </button>
-        <Link href={cancelHref} className={secondaryButtonClass}>
+        <Link href={cancelHref} className={`${secondaryButtonClass} w-full sm:w-auto`}>
           Cancelar
         </Link>
       </div>

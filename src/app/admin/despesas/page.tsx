@@ -33,13 +33,13 @@ export default async function DespesasPage() {
         <p className="text-forest/60">Nenhuma despesa pendente.</p>
       ) : (
         <>
-          <ul className="grid gap-3 md:hidden">
+          <ul className="grid gap-3 xl:hidden">
             {expenses.map((expense) => (
               <li key={expense.id} className="surface-panel p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{expense.driver.name}</p>
-                    <p className="mt-1 text-xs text-forest/48">{expense.service?.reservation?.code ? `Reserva ${expense.service.reservation.code}` : `Despesa avulsa · ${expense.vehicle?.plate ?? "veículo"}`}</p>
+                    <p className="mt-1 text-xs text-forest/60">{expense.service?.reservation?.code ? `Reserva ${expense.service.reservation.code}` : `Despesa avulsa · ${expense.vehicle?.plate ?? "veículo"}`}</p>
                   </div>
                   <strong className="shrink-0 text-sm text-forest">
                     {Number(expense.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -59,7 +59,7 @@ export default async function DespesasPage() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto xl:block">
             <table className={tableClass}>
           <thead>
             <tr>

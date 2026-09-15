@@ -12,12 +12,12 @@ export function ApprovalActions({ onApprove, onReject }: ApprovalActionsProps) {
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="flex gap-3">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
       <button
         type="button"
         disabled={isPending}
         onClick={() => startTransition(onApprove)}
-        className={buttonClass}
+        className={`${buttonClass} w-full sm:w-auto`}
       >
         Aprovar
       </button>
@@ -25,7 +25,7 @@ export function ApprovalActions({ onApprove, onReject }: ApprovalActionsProps) {
         type="button"
         disabled={isPending}
         onClick={() => startTransition(onReject)}
-        className={secondaryButtonClass}
+        className={`${secondaryButtonClass} w-full sm:w-auto`}
       >
         Rejeitar
       </button>

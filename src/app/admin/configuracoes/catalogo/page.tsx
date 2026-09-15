@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SectionNavigation } from "@/components/ui/section-navigation";
 import { prisma } from "@/lib/prisma";
 import { tableClass, thClass } from "@/lib/ui";
 import { NewCatalogItemForm } from "./new-item-form";
@@ -33,20 +33,17 @@ export default async function CatalogoPage({
     <div>
       <h1 className="mb-6 font-serif text-3xl text-forest">Catálogo</h1>
 
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-forest/10 pb-3">
-        {TYPES.map((t) => (
-          <Link
-            key={t.value}
-            href={`/admin/configuracoes/catalogo?type=${t.value}`}
-            className={`rounded-sm px-3 py-1 text-sm ${
-              t.value === activeType
-                ? "bg-forest text-cream"
-                : "text-forest/70 hover:bg-forest/5"
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
+      <div className="mb-6">
+        <SectionNavigation
+          activeKey={activeType}
+          ariaLabel="Categorias do catálogo"
+          mobileLabel="Categoria do catálogo"
+          items={TYPES.map((type) => ({
+            key: type.value,
+            label: type.label,
+            href: `/admin/configuracoes/catalogo?type=${type.value}`,
+          }))}
+        />
       </div>
 
       <NewCatalogItemForm type={activeType} />
@@ -54,6 +51,7 @@ export default async function CatalogoPage({
       {items.length === 0 ? (
         <p className="text-forest/60">Nenhum item cadastrado nesta categoria.</p>
       ) : (
+        <div className="max-w-full overflow-x-auto rounded-xl border border-forest/10">
         <table className={tableClass}>
           <thead>
             <tr>
@@ -77,6 +75,7 @@ export default async function CatalogoPage({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

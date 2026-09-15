@@ -60,7 +60,7 @@ export function LoginForm({ next, portal }: { next?: string; portal: "admin" | "
             type="button"
             onClick={() => setShowPassword((visible) => !visible)}
             aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-            className="focus-ring absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-forest/40 transition hover:bg-forest/5 hover:text-forest"
+            className="focus-ring absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-forest/55 transition hover:bg-forest/5 hover:text-forest"
           >
             {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
           </button>

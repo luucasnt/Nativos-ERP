@@ -20,7 +20,7 @@ const money = new Intl.NumberFormat("pt-BR", {
 export function FinanceCashflowChart({ data }: { data: CashflowPoint[] }) {
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-forest/45">
+      <div className="flex h-64 items-center justify-center text-sm text-forest/58">
         Nenhum lançamento no período selecionado.
       </div>
     );
@@ -48,7 +48,7 @@ export function FinanceCashflowChart({ data }: { data: CashflowPoint[] }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-forest/55" aria-hidden="true">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-forest/55" aria-hidden="true">
         <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-[#355f52]" />Receitas</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-[#d9a2a0]" />Despesas</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-3 bg-[#b99a66]" />Resultado</span>
@@ -56,7 +56,7 @@ export function FinanceCashflowChart({ data }: { data: CashflowPoint[] }) {
       <svg
         role="img"
         aria-label="Gráfico de receitas, despesas e resultado do período"
-        className="mt-3 h-44 w-full overflow-visible sm:h-60"
+        className="mt-3 h-44 w-full overflow-hidden sm:h-60"
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
       >

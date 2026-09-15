@@ -13,7 +13,7 @@ export function VehicleRegistrationForm({ categories }: { categories: CategoryOp
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="plate" className={labelClass}>
             Placa *
@@ -27,7 +27,7 @@ export function VehicleRegistrationForm({ categories }: { categories: CategoryOp
           <input id="model" name="model" required className={inputClass} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label htmlFor="category_id" className={labelClass}>
             Categoria
@@ -52,7 +52,7 @@ export function VehicleRegistrationForm({ categories }: { categories: CategoryOp
       <button type="submit" disabled={pending} className={buttonClass}>
         {pending ? "Enviando…" : "Cadastrar veículo"}
       </button>
-      <p className="text-xs text-forest/50">
+      <p className="text-xs text-forest/62">
         O cadastro fica pendente até a aprovação da equipe Nativos.
       </p>
     </form>

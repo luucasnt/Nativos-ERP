@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireFinancialUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
 import { CompensationForm } from "./compensation-form";
@@ -26,7 +25,6 @@ export default async function SupplierCompensationsPage() {
 
   return <div className="mx-auto max-w-[1180px] space-y-6">
     <header><p className="eyebrow">Liquidação financeira</p><h1 className="page-heading mt-1">Compensar fornecedor</h1><p className="page-description">Encontre uma conta a pagar e uma conta a receber do mesmo fornecedor para liquidar apenas a diferença.</p></header>
-    <section className="surface-panel p-5"><h2 className="section-heading">Nova compensação</h2><p className="mb-4 mt-1 text-xs leading-5 text-forest/46">Exemplo: Nativos deve R$ 200 e o fornecedor deve R$ 300. Compense R$ 200 e o saldo a receber será R$ 100.</p><CompensationForm payables={payables} receivables={receivables} /></section>
-    <Link href="/admin/financeiro" className="text-sm font-semibold text-forest underline">Voltar ao financeiro</Link>
+    <section className="surface-panel p-5"><h2 className="section-heading">Nova compensação</h2><p className="mb-4 mt-1 text-xs leading-5 text-forest/58">Exemplo: Nativos deve R$ 200 e o fornecedor deve R$ 300. Compense R$ 200 e o saldo a receber será R$ 100.</p><CompensationForm payables={payables} receivables={receivables} /></section>
   </div>;
 }

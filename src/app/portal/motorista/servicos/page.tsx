@@ -92,7 +92,7 @@ export default async function PortalMotoristaServicosPage() {
           <p className="mt-3 text-sm font-medium text-forest">
             Nenhum serviço ativo
           </p>
-          <p className="mt-1 text-xs text-forest/46">
+          <p className="mt-1 text-xs text-forest/58">
             Novos serviços aparecerão automaticamente aqui.
           </p>
         </section>
@@ -114,7 +114,7 @@ export default async function PortalMotoristaServicosPage() {
                         month: "short",
                       }) ?? "A definir"}
                     </strong>
-                    <span className="mt-0.5 block text-[10px] text-forest/43">
+                    <span className="mt-0.5 block text-[11px] text-forest/55">
                       {service.scheduled_time ?? "—"}
                     </span>
                   </span>
@@ -122,7 +122,7 @@ export default async function PortalMotoristaServicosPage() {
                     <h2 className="text-sm font-semibold text-forest">
                       {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                     </h2>
-                    <p className="mt-1 text-[11px] text-forest/45">
+                    <p className="mt-1 text-[11px] text-forest/58">
                       {service.reservation.code}
                     </p>
                   </div>
@@ -146,7 +146,7 @@ export default async function PortalMotoristaServicosPage() {
                     {service.reservation.client.name}
                   </p>
                   {service.reservation.client.phone && (
-                    <p className="mt-1 text-xs text-forest/52">
+                    <p className="mt-1 text-xs text-forest/62">
                       {service.reservation.client.phone}
                     </p>
                   )}
@@ -171,7 +171,7 @@ export default async function PortalMotoristaServicosPage() {
                       </span>
                     </p>
                   </div>
-                  <p className="mt-2 flex items-center gap-2 text-xs text-forest/48">
+                  <p className="mt-2 flex items-center gap-2 text-xs text-forest/60">
                     <Route size={14} className="text-gold" aria-hidden="true" />
                     {service.passenger_count ?? "—"} passageiros ·{" "}
                     {service.vehicle
@@ -179,7 +179,7 @@ export default async function PortalMotoristaServicosPage() {
                       : "Veículo a definir"}
                   </p>
                   {service.flight_number && (
-                    <p className="mt-2 text-xs text-forest/48">
+                    <p className="mt-2 text-xs text-forest/60">
                       Voo: {service.flight_number}
                     </p>
                   )}
@@ -252,7 +252,7 @@ export default async function PortalMotoristaServicosPage() {
         <section className="surface-panel overflow-hidden">
           <div className="border-b border-forest/10 px-5 py-4">
             <h2 className="section-heading">Recebimentos diretos pendentes</h2>
-            <p className="mt-1 text-xs text-forest/46">
+            <p className="mt-1 text-xs text-forest/58">
               Confirme se o pagamento do passageiro foi recebido.
             </p>
           </div>
@@ -266,7 +266,7 @@ export default async function PortalMotoristaServicosPage() {
                   <strong className="block text-xs text-ink">
                     {service.reservation.client.name}
                   </strong>
-                  <span className="mt-1 block text-[11px] text-forest/46">
+                  <span className="mt-1 block text-[11px] text-forest/58">
                     {service.reservation.code} ·{" "}
                     {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                   </span>
