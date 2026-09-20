@@ -483,6 +483,7 @@ model User {
   reversed_direct_collections DirectCollection[]   @relation("DirectCollectionReversedBy")
   reversed_compensations      Compensation[]       @relation("CompensationReversedBy")
 
+  @@index([linked_company_id])
   @@map("users")
 }
 
@@ -505,6 +506,7 @@ model Client {
   reservations   Reservation[]
   client_credits ClientCredit[]
 
+  @@index([origin_partner_id])
   @@map("clients")
 }
 
@@ -537,6 +539,8 @@ model Driver {
   services           Service[]
   service_expenses   ServiceExpense[]
 
+  @@index([supplier_id])
+  @@index([reviewed_by_id])
   @@map("drivers")
 }
 
@@ -561,10 +565,13 @@ model Vehicle {
   reviewed_by User?        @relation("VehicleReviewedBy", fields: [reviewed_by_id], references: [id])
   category    CatalogItem? @relation("VehicleCategory", fields: [category_id], references: [id])
 
-  services Service[]
-  expense_policy VehicleExpensePolicy?
+  services         Service[]
+  expense_policy   VehicleExpensePolicy?
   service_expenses ServiceExpense[]
 
+  @@index([category_id])
+  @@index([supplier_id])
+  @@index([reviewed_by_id])
   @@map("vehicles")
 }
 
@@ -611,6 +618,8 @@ model Company {
   billing_cycles          BillingCycle[]
   change_requests         ChangeRequest[] @relation("ChangeRequestCompany")
 
+  @@index([owner_driver_id])
+  @@index([category_id])
   @@map("companies")
 }
 
@@ -788,12 +797,12 @@ model Service {
   reception_sign_enabled   Boolean @default(false)
   reception_passenger_name String?
 
-  started_at   DateTime?
-  completed_at DateTime?
+  started_at           DateTime?
+  completed_at         DateTime?
   // Checklists operacionais preenchidos pelo motorista/fornecedor.
-  preflight_checklist   Json?
-  completion_checklist  Json?
-  incident_notes        String?
+  preflight_checklist  Json?
+  completion_checklist Json?
+  incident_notes       String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -813,6 +822,7 @@ model Service {
   @@index([supplier_id, acceptance_status, execution_status])
   @@index([driver_id, execution_status, scheduled_date])
   @@index([vehicle_id, execution_status, scheduled_date])
+  @@index([pacote_disposicao_id])
   @@map("services")
 }
 
@@ -866,6 +876,9 @@ model FinanceEntry {
   @@index([party_type, party_id, created_at(sort: Desc)])
   @@index([service_id, status])
   @@index([reservation_id])
+  @@index([compensacao_id])
+  @@index([estorno_of_id])
+  @@index([reversed_by_id])
   @@map("finance_entries")
 }
 
@@ -896,6 +909,10 @@ model Payment {
   reconciled_by User?        @relation("PaymentReconciledBy", fields: [reconciled_by_id], references: [id])
 
   @@index([finance_entry_id, reversed_at, created_at(sort: Desc)])
+  @@index([bank_account_id])
+  @@index([estorno_of_id])
+  @@index([reconciled_by_id])
+  @@index([reversed_by_id])
   @@map("payments")
 }
 
@@ -921,6 +938,9 @@ model DirectCollection {
   not_received_reason CatalogItem? @relation("DirectCollectionNotReceivedReason", fields: [not_received_reason_id], references: [id])
   reversed_by         User?        @relation("DirectCollectionReversedBy", fields: [reversed_by_id], references: [id])
 
+  @@index([service_id])
+  @@index([not_received_reason_id])
+  @@index([reversed_by_id])
   @@map("direct_collections")
 }
 
@@ -942,6 +962,7 @@ model Compensation {
   reversed_by     User?          @relation("CompensationReversedBy", fields: [reversed_by_id], references: [id])
   finance_entries FinanceEntry[]
 
+  @@index([reversed_by_id])
   @@map("compensations")
 }
 
@@ -975,6 +996,7 @@ model BillingCycleReservation {
   reservation   Reservation  @relation(fields: [reservation_id], references: [id])
 
   @@unique([billing_cycle_id, reservation_id])
+  @@index([reservation_id])
   @@map("billing_cycle_reservations")
 }
 
@@ -1002,6 +1024,9 @@ model CashClosing {
   performed_by User        @relation("CashClosingPerformedBy", fields: [performed_by_id], references: [id])
   reopened_by  User?       @relation("CashClosingReopenedBy", fields: [reopened_by_id], references: [id])
 
+  @@index([bank_account_id])
+  @@index([performed_by_id])
+  @@index([reopened_by_id])
   @@map("cash_closings")
 }
 
@@ -1017,6 +1042,7 @@ model ClientCredit {
 
   client Client @relation(fields: [client_id], references: [id])
 
+  @@index([client_id])
   @@map("client_credits")
 }
 
@@ -1066,6 +1092,7 @@ model ChangeRequest {
   @@index([requester_type, requester_id, status])
   @@index([company_id])
   @@index([reservation_id])
+  @@index([reviewed_by_id])
   @@map("change_requests")
 }
 
@@ -1087,6 +1114,7 @@ model Alert {
   archived_by User? @relation("AlertArchivedBy", fields: [archived_by_id], references: [id])
 
   @@index([archived, severity, created_at(sort: Desc)])
+  @@index([archived_by_id])
   @@map("alerts")
 }
 
@@ -1122,33 +1150,34 @@ model AuditLog {
 
   actor User? @relation("AuditLogActor", fields: [actor_id], references: [id])
 
+  @@index([actor_id])
   @@map("audit_logs")
 }
 
 model ServiceExpense {
-  id               String               @id @default(uuid()) @db.Uuid
-  dedupe_key       String?              @unique
-  service_id       String?              @db.Uuid
-  driver_id        String               @db.Uuid
-  category_id      String               @db.Uuid // CatalogItem (categoria_despesa)
-  amount           Decimal              @db.Decimal(12, 2)
-  receipt_url      String?
-  vehicle_id       String?              @db.Uuid
-  expense_date     DateTime             @default(now())
-  odometer_km      Int?
-  quantity         Decimal?             @db.Decimal(10, 3)
-  unit_price       Decimal?             @db.Decimal(10, 3)
-  calculated_km_per_liter Decimal?       @db.Decimal(8, 3)
-  fuel_type        String?
-  invoice_number   String?
-  notes            String?
-  status           ServiceExpenseStatus @default(pendente)
-  reviewed_by_id   String?              @db.Uuid
-  reviewed_at      DateTime?
-  rejection_reason String?
-  finance_entry_id String?              @unique @db.Uuid
-  created_at       DateTime             @default(now())
-  updated_at       DateTime             @updatedAt
+  id                      String               @id @default(uuid()) @db.Uuid
+  dedupe_key              String?              @unique
+  service_id              String?              @db.Uuid
+  driver_id               String               @db.Uuid
+  category_id             String               @db.Uuid // CatalogItem (categoria_despesa)
+  amount                  Decimal              @db.Decimal(12, 2)
+  receipt_url             String?
+  vehicle_id              String?              @db.Uuid
+  expense_date            DateTime             @default(now())
+  odometer_km             Int?
+  quantity                Decimal?             @db.Decimal(10, 3)
+  unit_price              Decimal?             @db.Decimal(10, 3)
+  calculated_km_per_liter Decimal?             @db.Decimal(8, 3)
+  fuel_type               String?
+  invoice_number          String?
+  notes                   String?
+  status                  ServiceExpenseStatus @default(pendente)
+  reviewed_by_id          String?              @db.Uuid
+  reviewed_at             DateTime?
+  rejection_reason        String?
+  finance_entry_id        String?              @unique @db.Uuid
+  created_at              DateTime             @default(now())
+  updated_at              DateTime             @updatedAt
 
   service     Service?    @relation(fields: [service_id], references: [id])
   vehicle     Vehicle?    @relation(fields: [vehicle_id], references: [id])
@@ -1161,21 +1190,23 @@ model ServiceExpense {
   @@index([service_id])
   @@index([vehicle_id, expense_date])
   @@index([vehicle_id, odometer_km])
+  @@index([category_id])
+  @@index([reviewed_by_id])
   @@map("service_expenses")
 }
 
 model VehicleExpensePolicy {
-  id                    String   @id @default(uuid()) @db.Uuid
-  vehicle_id             String   @unique @db.Uuid
-  expected_km_per_liter  Decimal  @db.Decimal(6, 2)
+  id                       String   @id @default(uuid()) @db.Uuid
+  vehicle_id               String   @unique @db.Uuid
+  expected_km_per_liter    Decimal  @db.Decimal(6, 2)
   alert_below_km_per_liter Decimal? @db.Decimal(6, 2)
   alert_above_km_per_liter Decimal? @db.Decimal(6, 2)
-  tank_capacity_liters   Decimal? @db.Decimal(8, 2)
-  require_receipt        Boolean  @default(true)
-  require_odometer       Boolean  @default(true)
-  active                 Boolean  @default(true)
-  created_at             DateTime @default(now())
-  updated_at             DateTime @updatedAt
+  tank_capacity_liters     Decimal? @db.Decimal(8, 2)
+  require_receipt          Boolean  @default(true)
+  require_odometer         Boolean  @default(true)
+  active                   Boolean  @default(true)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
 
   vehicle Vehicle @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
 
@@ -1204,6 +1235,7 @@ model Communication {
   template EmailTemplate? @relation(fields: [template_key], references: [key])
 
   @@index([status, attempts, created_at])
+  @@index([template_key])
   @@map("communications")
 }
 
