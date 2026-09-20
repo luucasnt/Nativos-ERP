@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { DriverFormState } from "./actions";
 import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
@@ -8,12 +8,10 @@ import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondary
 const initialState: DriverFormState = { error: null };
 
 type SupplierOption = { id: string; name: string };
-type CommissionDefaultOption = { category_key: string; commission_percent: string };
 
 type DriverFormProps = {
   action: (prevState: DriverFormState, formData: FormData) => Promise<DriverFormState>;
   suppliers: SupplierOption[];
-  commissionDefaults: CommissionDefaultOption[];
   defaultValues?: {
     name: string;
     document: string | null;
@@ -33,22 +31,14 @@ type DriverFormProps = {
 export function DriverForm({
   action,
   suppliers,
-  commissionDefaults,
   defaultValues,
 }: DriverFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [ownerType, setOwnerType] = useState(defaultValues?.owner_type ?? "proprio");
   const [paymentType, setPaymentType] = useState(defaultValues?.payment_type ?? "diaria");
-  const commissionInputRef = useRef<HTMLInputElement>(null);
 
   function handleOwnerTypeChange(value: string) {
     setOwnerType(value);
-    if (value === "terceirizado" && commissionInputRef.current && !commissionInputRef.current.value) {
-      const match = commissionDefaults.find((d) => d.category_key === "terceirizado");
-      if (match) {
-        commissionInputRef.current.value = match.commission_percent;
-      }
-    }
   }
 
   return (
@@ -189,7 +179,6 @@ export function DriverForm({
           <input
             id="commission"
             name="commission"
-            ref={commissionInputRef}
             inputMode="decimal"
             defaultValue={defaultValues?.commission ?? ""}
             className={inputClass}

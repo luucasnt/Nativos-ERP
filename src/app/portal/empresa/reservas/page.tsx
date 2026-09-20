@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { Prisma } from "@prisma/client";
 import { ArrowRight, CalendarDays, FileText, Plus, Route } from "lucide-react";
 import { ClientRegistrationForm } from "@/components/portal/client-registration-form";
 import { NovaReservaRequestForm } from "@/components/portal/nova-reserva-request-form";
@@ -29,12 +30,20 @@ export default async function PortalEmpresaReservasPage() {
     redirect("/portal/empresa");
   }
 
+  const partnerReservationWhere = {
+    OR: [
+      { origin_partner_id: company.id },
+      { referrer_type: "company", referrer_id: company.id },
+    ],
+  } satisfies Prisma.ReservationWhereInput;
+
   const reservations = await prisma.reservation.findMany({
-    where: { origin_partner_id: company.id },
+    where: partnerReservationWhere,
     select: {
       id: true,
       code: true,
       status: true,
+      origin_partner_id: true,
       created_at: true,
       client: { select: { name: true } },
       _count: { select: { services: true } },
@@ -117,7 +126,7 @@ export default async function PortalEmpresaReservasPage() {
                         </dd>
                       </div>
                     </dl>
-                    <a
+                    {reservation.origin_partner_id === company.id ? <a
                       href={`/api/documentos/voucher/${reservation.id}`}
                       target="_blank"
                       rel="noreferrer"
@@ -125,13 +134,13 @@ export default async function PortalEmpresaReservasPage() {
                     >
                       <FileText size={15} aria-hidden="true" />
                       Abrir voucher
-                    </a>
+                    </a> : <div className="mt-4 rounded-lg bg-forest/[0.045] px-3 py-2 text-center text-xs font-medium text-forest/60">Indicação · atendimento Nativos</div>}
                   </article>
                 </li>
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto xl:block">
+            <div className="hidden overflow-x-auto scrollbar-clean xl:block">
               <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr>
@@ -158,7 +167,7 @@ export default async function PortalEmpresaReservasPage() {
                       </Badge>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <a
+                      {reservation.origin_partner_id === company.id ? <a
                         href={"/api/documentos/voucher/" + reservation.id}
                         target="_blank"
                         rel="noreferrer"
@@ -166,7 +175,7 @@ export default async function PortalEmpresaReservasPage() {
                       >
                         <FileText size={13} aria-hidden="true" />
                         Voucher
-                      </a>
+                      </a> : <span className="text-xs font-medium text-forest/55">Atendimento Nativos</span>}
                     </td>
                   </tr>
                 ))}
@@ -211,7 +220,7 @@ export default async function PortalEmpresaReservasPage() {
             <p className="mb-4 mt-1 text-xs leading-5 text-forest/60">Solicite ajustes em uma reserva já criada.</p>
             <ReservationRequestForm
               dedupeKey={crypto.randomUUID()}
-              reservations={reservations}
+              reservations={reservations.filter((reservation) => reservation.origin_partner_id === company.id)}
               action={submitAlteracaoRequest}
               reasonFieldName="descricao"
               reasonLabel="O que precisa mudar?"
@@ -224,7 +233,7 @@ export default async function PortalEmpresaReservasPage() {
             <p className="mb-4 mt-1 text-xs leading-5 text-forest/60">Envie o motivo para análise da equipe.</p>
             <ReservationRequestForm
               dedupeKey={crypto.randomUUID()}
-              reservations={reservations}
+              reservations={reservations.filter((reservation) => reservation.origin_partner_id === company.id)}
               action={submitCancelamentoRequest}
               reasonFieldName="motivo"
               reasonLabel="Motivo do cancelamento"

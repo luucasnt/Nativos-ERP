@@ -9,13 +9,15 @@ export default async function EmailTemplatesPage() {
     <div>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Templates de e-mail</h1>
-        <Link href="/admin/configuracoes/emails/novo" className={buttonClass}>
-          Novo template
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/configuracoes/emails/preview" className={linkClass}>Ver prévias</Link>
+          <Link href="/admin/configuracoes/emails/enviar" className={buttonClass}>Enviar manualmente</Link>
+          <Link href="/admin/configuracoes/emails/novo" className={buttonClass}>Novo template</Link>
+        </div>
       </div>
 
       <div className="grid gap-3 md:hidden">{templates.map((template) => <article key={template.key} className="surface-panel p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-forest">{template.name}</p><p className="mt-1 truncate text-xs text-forest/60">{template.key}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${template.auto_send ? "bg-info-light text-info" : "bg-forest/[0.06] text-forest/65"}`}>{template.auto_send ? "Automático" : "Manual"}</span></div><div className="mt-4 flex items-center justify-between"><span className="text-xs text-forest/60">{template.category}</span><Link href={`/admin/configuracoes/emails/${template.key}`} className={linkClass}>Editar template</Link></div></article>)}</div>
-      <div className="hidden max-w-full overflow-x-auto rounded-xl border border-forest/10 md:block">
+      <div className="hidden max-w-full overflow-x-auto scrollbar-clean rounded-xl border border-forest/10 md:block">
       <table className={tableClass}>
         <thead>
           <tr>

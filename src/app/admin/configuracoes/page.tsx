@@ -46,22 +46,16 @@ const sections = [
     description: "Textos reutilizáveis na geração de contratos, por categoria e ordem.",
   },
   {
-    href: "/admin/configuracoes/documentos",
-    group: "Cadastros e documentos",
-    title: "Padrões de documentos",
-    description: "Padrão de exibição de valor em voucher e ordem de serviço.",
-  },
-  {
     href: "/admin/configuracoes/impostos",
     group: "Empresa e operação",
     title: "Impostos",
     description: "Alíquota padrão de imposto/NF — sem valor de fábrica, só o que você definir aqui.",
   },
   {
-    href: "/admin/configuracoes/comissoes",
+    href: "/admin/configuracoes/acessos",
     group: "Regras e acesso",
-    title: "Comissões padrão",
-    description: "Percentual de comissão sugerido ao cadastrar uma nova empresa ou motorista, por categoria.",
+    title: "Central de acessos",
+    description: "Administre logins de parceiros, fornecedores, motoristas e equipe em uma única tela.",
   },
   {
     href: "/admin/configuracoes/usuarios",

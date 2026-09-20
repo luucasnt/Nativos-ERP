@@ -74,7 +74,7 @@ export default async function MotoristaProducaoPage() {
               </li>
             ))}
           </ul>
-          <div className="hidden overflow-x-auto xl:block"><table className="w-full min-w-[620px] text-sm"><thead><tr>
+          <div className="hidden overflow-x-auto scrollbar-clean xl:block"><table className="w-full min-w-[620px] text-sm"><thead><tr>
             {['Data', 'Reserva', 'Serviço', 'Valor do serviço'].map((label) => <th key={label} className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">{label}</th>)}
           </tr></thead><tbody>{services.map((service) => <tr key={service.id} className="border-t border-forest/[0.075]">
             <td className="px-5 py-3.5 text-xs text-forest/55">{(service.completed_at ?? service.scheduled_date)?.toLocaleDateString('pt-BR', { timeZone: 'America/Bahia' }) ?? '—'}</td>

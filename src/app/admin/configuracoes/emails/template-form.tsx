@@ -98,10 +98,9 @@ export function TemplateForm({ action, defaultValues }: TemplateFormProps) {
           className={inputClass}
         />
       </div>
-      <label className="flex items-center gap-2 text-sm text-forest/80">
-        <input type="checkbox" name="auto_send" defaultChecked={defaultValues?.auto_send} />
-        Disparo automático por evento
-      </label>
+      <div className="rounded-lg border border-gold/25 bg-gold/10 p-3 text-sm leading-5 text-forest/75">
+        Este modelo ficará disponível para <strong className="text-forest">envio manual</strong>. O Nativos ERP não dispara e-mails automaticamente por evento.
+      </div>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
       <div className="flex flex-col gap-2 sm:flex-row">

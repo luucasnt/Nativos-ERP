@@ -23,7 +23,7 @@ import {
   FINANCE_PARTY_TYPE_LABEL,
 } from "@/lib/finance/labels";
 import { prisma } from "@/lib/prisma";
-import { inputClass, secondaryButtonClass } from "@/lib/ui";
+import { buttonClass, inputClass, secondaryButtonClass } from "@/lib/ui";
 import { registerPayment } from "./actions";
 import { requireFinancialUser } from "@/lib/auth/get-current-user";
 
@@ -422,7 +422,7 @@ export default async function FinanceiroPage({
         </div>
       </header>
 
-      <SectionNavigation
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><SectionNavigation
         activeKey={view}
         ariaLabel="Áreas do financeiro"
         mobileLabel="Área financeira"
@@ -431,7 +431,7 @@ export default async function FinanceiroPage({
           label: item.label,
           href: "/admin/financeiro?view=" + item.key + "&period=" + period,
         }))}
-      />
+      /><div className="flex flex-col gap-2 sm:flex-row"><Link href="/admin/financeiro/novo" className={`${buttonClass} w-full sm:w-auto`}>Novo lançamento</Link><Link href="/admin/financeiro/fechamento" className={`${secondaryButtonClass} w-full sm:w-auto`}>Fechamento diário</Link></div></div>
 
       <section aria-label="Resumo financeiro" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -519,7 +519,7 @@ export default async function FinanceiroPage({
                 ))}
               </ul>
 
-              <div className="hidden overflow-x-auto xl:block">
+              <div className="hidden overflow-x-auto scrollbar-clean xl:block">
                 <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr>
@@ -669,7 +669,7 @@ export default async function FinanceiroPage({
                   </article>;
                 })}
               </div>
-              <div className="hidden overflow-x-auto xl:block">
+              <div className="hidden overflow-x-auto scrollbar-clean xl:block">
                 <table className="w-full min-w-[1050px] text-sm">
                   <thead>
                     <tr>

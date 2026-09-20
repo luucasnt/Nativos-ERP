@@ -23,7 +23,7 @@ export default async function UsuariosInternosPage() {
 
       <NewInternalUserForm actorIsOwner />
 
-      <div className="max-w-full overflow-x-auto rounded-xl border border-forest/10">
+      <div className="max-w-full overflow-x-auto scrollbar-clean rounded-xl border border-forest/10">
       <table className={tableClass}>
         <thead>
           <tr>

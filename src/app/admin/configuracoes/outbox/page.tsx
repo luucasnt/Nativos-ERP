@@ -43,7 +43,7 @@ export default async function OutboxPage() {
       ) : (
         <>
         <div className="grid gap-3 md:hidden">{communications.map((communication) => <article key={communication.id} className="surface-panel p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-forest">{communication.template_key}</p><p className="mt-1 truncate text-xs text-forest/60">{communication.recipient_email}</p></div><span className="rounded-full bg-forest/[0.06] px-2.5 py-1 text-xs font-semibold text-forest">{STATUS_LABEL[communication.status]}</span></div><dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-forest/60">Tentativas</dt><dd className="mt-1 font-semibold text-forest">{communication.attempts}</dd></div><div><dt className="text-forest/60">Criado em</dt><dd className="mt-1 font-semibold text-forest">{communication.created_at.toLocaleString("pt-BR")}</dd></div></dl>{communication.last_error && <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs leading-5 text-danger">{communication.last_error}</p>}</article>)}</div>
-        <div className="hidden max-w-full overflow-x-auto rounded-xl border border-forest/10 md:block">
+        <div className="hidden max-w-full overflow-x-auto scrollbar-clean rounded-xl border border-forest/10 md:block">
         <table className={tableClass}>
           <thead>
             <tr>

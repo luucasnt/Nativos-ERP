@@ -36,6 +36,7 @@ type SidebarProps = {
 
 const ICONS: Record<NavIconName, LucideIcon> = {
   home: Gauge,
+  control: Gauge,
   calendar: CalendarDays,
   users: Users,
   driver: UserRoundCheck,
@@ -149,7 +150,7 @@ export function Sidebar({ nav, badges = {} }: SidebarProps) {
 
       <nav
         aria-label="Navegação principal"
-        className="mt-7 min-h-0 flex-1 overflow-y-auto pr-1"
+        className="scrollbar-clean mt-7 min-h-0 flex-1 overflow-y-auto pr-1"
       >
         <NavigationList nav={nav} badges={badges} />
       </nav>
@@ -255,7 +256,7 @@ function MobileMenu({
 
               <nav
                 aria-label="Navegação principal"
-                className="mt-4 min-h-0 flex-1 overflow-y-auto"
+                className="scrollbar-clean mt-4 min-h-0 flex-1 overflow-y-auto"
               >
                 <NavigationList
                   nav={nav}

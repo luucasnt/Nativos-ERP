@@ -16,6 +16,7 @@ const TYPES: { value: string; label: string }[] = [
   { value: "tipo_concierge", label: "Tipo de concierge" },
 ];
 
+
 export default async function CatalogoPage({
   searchParams,
 }: {
@@ -43,6 +44,7 @@ export default async function CatalogoPage({
             label: type.label,
             href: `/admin/configuracoes/catalogo?type=${type.value}`,
           }))}
+          wrap
         />
       </div>
 
@@ -51,7 +53,7 @@ export default async function CatalogoPage({
       {items.length === 0 ? (
         <p className="text-forest/60">Nenhum item cadastrado nesta categoria.</p>
       ) : (
-        <div className="max-w-full overflow-x-auto rounded-xl border border-forest/10">
+        <div className="max-w-full overflow-x-auto scrollbar-clean rounded-xl border border-forest/10">
         <table className={tableClass}>
           <thead>
             <tr>
@@ -71,6 +73,7 @@ export default async function CatalogoPage({
                 label={item.label}
                 order={item.order}
                 active={item.active}
+                type={activeType}
               />
             ))}
           </tbody>

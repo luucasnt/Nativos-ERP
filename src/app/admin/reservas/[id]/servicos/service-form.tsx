@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { ServiceFormState } from "./actions";
 import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
+import { SearchableEntitySelect } from "@/components/ui/searchable-entity-select";
 
 const initialState: ServiceFormState = { error: null };
 
@@ -120,19 +121,7 @@ export function ServiceForm({
           <label htmlFor="supplier_id" className={labelClass}>
             Fornecedor *
           </label>
-          <select
-            id="supplier_id"
-            name="supplier_id"
-            defaultValue={defaultValues?.supplier_id ?? ""}
-            className={inputClass}
-          >
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <SearchableEntitySelect name="supplier_id" label="Fornecedor" entity="company" value={defaultValues?.supplier_id ?? ""} initialOptions={suppliers} required />
         </div>
       )}
 
@@ -141,37 +130,13 @@ export function ServiceForm({
           <label htmlFor="driver_id" className={labelClass}>
             Motorista
           </label>
-          <select
-            id="driver_id"
-            name="driver_id"
-            defaultValue={defaultValues?.driver_id ?? ""}
-            className={inputClass}
-          >
-            <option value="">—</option>
-            {drivers.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          <SearchableEntitySelect name="driver_id" label="Motorista" entity="driver" value={defaultValues?.driver_id ?? ""} initialOptions={drivers} />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="vehicle_id" className={labelClass}>
             Veículo
           </label>
-          <select
-            id="vehicle_id"
-            name="vehicle_id"
-            defaultValue={defaultValues?.vehicle_id ?? ""}
-            className={inputClass}
-          >
-            <option value="">—</option>
-            {vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
+          <SearchableEntitySelect name="vehicle_id" label="Veículo" entity="vehicle" value={defaultValues?.vehicle_id ?? ""} initialOptions={vehicles} />
         </div>
       </div>
 

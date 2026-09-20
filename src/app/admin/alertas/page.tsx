@@ -50,7 +50,7 @@ export default async function AlertasPage() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto xl:block">
+          <div className="hidden overflow-x-auto scrollbar-clean xl:block">
             <table className={tableClass}>
           <thead>
             <tr>

@@ -11,16 +11,12 @@ export default async function EditarEmpresaPage({
 }) {
   const { id } = await params;
 
-  const [company, categories, commissionDefaults, existingUser] = await Promise.all([
+  const [company, categories, existingUser] = await Promise.all([
     prisma.company.findUnique({ where: { id } }),
     prisma.catalogItem.findMany({
       where: { type: "categoria_fornecedor_parceiro", active: true },
       orderBy: { order: "asc" },
       select: { id: true, key: true, label: true },
-    }),
-    prisma.commissionDefault.findMany({
-      where: { target: "company", active: true },
-      select: { category_key: true, commission_percent: true },
     }),
     prisma.user.findFirst({ where: { linked_company_id: id } }),
   ]);
@@ -37,10 +33,6 @@ export default async function EditarEmpresaPage({
       <CompanyForm
         action={updateCompany.bind(null, id)}
         categories={categories}
-        commissionDefaults={commissionDefaults.map((d) => ({
-          category_key: d.category_key,
-          commission_percent: d.commission_percent.toString(),
-        }))}
         defaultValues={{
           name: company.name,
           document: company.document,

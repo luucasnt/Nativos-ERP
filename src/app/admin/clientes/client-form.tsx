@@ -75,7 +75,7 @@ export function ClientForm({ action, partners, defaultValues }: ClientFormProps)
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="origin" className={labelClass}>
-          Origem *
+          Vínculo do passageiro *
         </label>
         <select
           id="origin"
@@ -83,9 +83,10 @@ export function ClientForm({ action, partners, defaultValues }: ClientFormProps)
           defaultValue={defaultValues?.origin ?? "proprio"}
           className={inputClass}
         >
-          <option value="proprio">Próprio</option>
-          <option value="parceiro">Parceiro</option>
+          <option value="proprio">Cadastro direto da Nativos</option>
+          <option value="parceiro">Cadastrado por parceiro</option>
         </select>
+        <p className="text-xs leading-5 text-forest/55">Este vínculo registra a origem do cadastro. Quem atende e recebe as comunicações é definido individualmente em cada reserva.</p>
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="origin_partner_id" className={labelClass}>

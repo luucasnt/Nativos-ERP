@@ -12,6 +12,7 @@ type SectionNavigationProps = {
   ariaLabel: string;
   mobileLabel?: string;
   items: SectionNavigationItem[];
+  wrap?: boolean;
 };
 
 export function SectionNavigation({
@@ -19,12 +20,13 @@ export function SectionNavigation({
   ariaLabel,
   mobileLabel = "Navegação da seção",
   items,
+  wrap = false,
 }: SectionNavigationProps) {
   return (
     <nav aria-label={ariaLabel} className="min-w-0">
       <span className="sr-only">{mobileLabel}</span>
-      <div className="-mx-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-        <div className="flex w-max min-w-full gap-1 border-b border-forest/10">
+      <div className={`${wrap ? "w-full" : "-mx-3 overflow-x-auto scrollbar-clean px-3 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"} pb-1`}>
+        <div className={`${wrap ? "w-full flex-wrap" : "w-max min-w-full"} flex gap-1 border-b border-forest/10`}>
         {items.map((item) => {
           const active = activeKey === item.key;
 

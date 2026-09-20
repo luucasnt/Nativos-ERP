@@ -102,8 +102,8 @@ export default async function PortalEmpresaFinanceiroPage() {
 
       {isPartner && !isBilledPartner && (
         <section className="surface-panel border-l-4 border-l-gold p-5">
-          <h2 className="section-heading">Modelo comissionado</h2>
-          <p className="mt-1 text-sm leading-6 text-forest/65">Este parceiro não possui faturamento mensal. As comissões e os recebimentos diretos aplicáveis aparecem no extrato, sem gerar faturas.</p>
+          <h2 className="section-heading">Liquidação por reserva</h2>
+          <p className="mt-1 text-sm leading-6 text-forest/65">Esta conta não possui faturamento mensal. Comissões, pagamentos e repasses aplicáveis aparecem individualmente no extrato, sempre vinculados à reserva correspondente.</p>
         </section>
       )}
 
@@ -165,7 +165,7 @@ export default async function PortalEmpresaFinanceiroPage() {
                 ))}
               </ul>
 
-              <div className="hidden overflow-x-auto xl:block">
+              <div className="hidden overflow-x-auto scrollbar-clean xl:block">
                 <table className="w-full min-w-[650px] text-sm">
               <thead>
                 <tr>

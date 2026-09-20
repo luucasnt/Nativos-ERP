@@ -3,17 +3,11 @@ import { createCompany } from "../actions";
 import { CompanyForm } from "../company-form";
 
 export default async function NovaEmpresaPage() {
-  const [categories, commissionDefaults] = await Promise.all([
-    prisma.catalogItem.findMany({
+  const categories = await prisma.catalogItem.findMany({
       where: { type: "categoria_fornecedor_parceiro", active: true },
       orderBy: { order: "asc" },
       select: { id: true, key: true, label: true },
-    }),
-    prisma.commissionDefault.findMany({
-      where: { target: "company", active: true },
-      select: { category_key: true, commission_percent: true },
-    }),
-  ]);
+  });
 
   return (
     <div>
@@ -21,10 +15,6 @@ export default async function NovaEmpresaPage() {
       <CompanyForm
         action={createCompany}
         categories={categories}
-        commissionDefaults={commissionDefaults.map((d) => ({
-          category_key: d.category_key,
-          commission_percent: d.commission_percent.toString(),
-        }))}
       />
     </div>
   );

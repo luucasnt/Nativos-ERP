@@ -14,7 +14,6 @@
 // para esses ainda.
 import type { EntityRefType, PortalNotificationType, RecipientType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { enqueueCommunication } from "@/lib/communication/outbox";
 
 async function enqueueMatchingEmail(params: {
   userId: string;
@@ -23,6 +22,12 @@ async function enqueueMatchingEmail(params: {
   entityRefId?: string;
   emailVariables?: Record<string, string>;
 }) {
+  // E-mails são sempre disparados manualmente pela equipe interna. As
+  // notificações do portal continuam funcionando, mas nenhum evento envia
+  // mensagem por conta própria.
+  void params;
+  return;
+  /*
   const template = await prisma.emailTemplate.findUnique({ where: { key: params.type } });
   if (!template || !template.active || !template.auto_send) {
     return;
@@ -40,6 +45,7 @@ async function enqueueMatchingEmail(params: {
     variables: params.emailVariables ?? {},
     idempotencyKey: `notif:${params.type}:${params.entityRefId ?? "none"}:${params.userId}`,
   });
+  */
 }
 
 export async function notifyPortalUser(params: {

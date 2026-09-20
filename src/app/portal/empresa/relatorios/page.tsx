@@ -1,4 +1,5 @@
 import { BarChart3, CalendarDays, CheckCircle2, Route, WalletCards } from "lucide-react";
+import type { Prisma } from "@prisma/client";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Badge } from "@/components/ui/badge";
 import { requireCompanyPortalUser } from "@/lib/auth/get-current-user";
@@ -8,14 +9,20 @@ export default async function PartnerReportsPage() {
   const user = await requireCompanyPortalUser();
   const company = user.linked_company;
   if (!company.roles.includes("parceiro")) return null;
-  const where = { origin_partner_id: company.id };
+  const where = {
+    OR: [
+      { origin_partner_id: company.id },
+      { referrer_type: "company", referrer_id: company.id },
+    ],
+  } satisfies Prisma.ReservationWhereInput;
+  const managedWhere = { origin_partner_id: company.id } satisfies Prisma.ReservationWhereInput;
   const [total, confirmed, open, cancelled, services, upcoming] = await Promise.all([
     prisma.reservation.count({ where }),
     prisma.reservation.count({ where: { ...where, status: { in: ["confirmado", "em_andamento", "concluido"] } } }),
     prisma.reservation.count({ where: { ...where, status: { in: ["rascunho", "pendente"] } } }),
     prisma.reservation.count({ where: { ...where, status: { in: ["cancelado", "rejeitado"] } } }),
     prisma.service.count({ where: { reservation: where } }),
-    prisma.service.findMany({ where: { reservation: where, execution_status: { in: ["agendado", "em_andamento"] } }, include: { reservation: { select: { code: true, status: true, client: { select: { name: true } } } } }, orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }], take: 12 }),
+    prisma.service.findMany({ where: { reservation: managedWhere, execution_status: { in: ["agendado", "em_andamento"] } }, include: { reservation: { select: { code: true, status: true, client: { select: { name: true } } } } }, orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }], take: 12 }),
   ]);
   return <div className="mx-auto max-w-[1280px] space-y-6">
     <header><p className="eyebrow">Visão gerencial</p><h1 className="page-heading mt-1">Relatórios</h1><p className="page-description">Acompanhe o volume da sua operação e os próximos atendimentos.</p></header>

@@ -55,13 +55,19 @@ export async function changePassword(
 
   await syncAppMetadata(user.id);
 
-  if (user.account_type === "internal") {
-    redirect("/admin");
-  }
-
-  if (user.linked_driver_id && !user.linked_company_id) {
-    redirect("/portal/motorista");
-  }
-
-  redirect("/portal/empresa");
+  // A senha temporária deixa de ser válida para o fluxo atual. Encerrar a
+  // sessão garante que o JWT antigo (com must_change_password=true) não faça
+  // o middleware devolver o usuário para esta mesma tela.
+  const linkedCompany = user.linked_company_id
+    ? await prisma.company.findUnique({ where: { id: user.linked_company_id }, select: { roles: true } })
+    : null;
+  const loginPath = user.account_type === "internal"
+    ? "/login/admin"
+    : user.linked_driver_id && !user.linked_company_id
+      ? "/login/motorista"
+      : linkedCompany?.roles.includes("fornecedor")
+        ? "/login/fornecedor"
+        : "/login/parceiro";
+  await supabase.auth.signOut();
+  redirect(loginPath);
 }

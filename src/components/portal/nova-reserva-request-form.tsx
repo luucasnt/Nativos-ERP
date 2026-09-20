@@ -35,6 +35,14 @@ export function NovaReservaRequestForm({
         </div>
       )}
       <div className="flex flex-col gap-1">
+        <label htmlFor="relacionamento" className={labelClass}>Como será o atendimento? *</label>
+        <select id="relacionamento" name="relacionamento" required defaultValue="intermediado" className={inputClass}>
+          <option value="intermediado">Meu parceiro atende o passageiro</option>
+          <option value="indicacao">A Nativos atende o passageiro</option>
+        </select>
+        <p className="text-xs leading-5 text-forest/55">Isso define quem receberá voucher e comunicações. O passageiro não recebe mensagens financeiras.</p>
+      </div>
+      <div className="flex flex-col gap-1">
         <label htmlFor="descricao" className={labelClass}>
           O que você precisa? *
         </label>

@@ -30,6 +30,7 @@ async function regenerateAcceptedServiceEntries(reservationId: string) {
 }
 
 const reservationSchema = z.object({
+  relationship_mode: z.enum(["direto", "indicacao", "intermediado"]),
   client_id: z.string().uuid("Selecione o cliente."),
   origin_partner_id: z.string().uuid().optional().or(z.literal("")),
   referrer_type: z.enum(["company", "driver", "client", "pessoa_fisica"]).optional().or(z.literal("")),
@@ -56,6 +57,7 @@ export type ReservationFormState = { error: string | null };
 
 function parse(formData: FormData) {
   const parsed = reservationSchema.safeParse({
+    relationship_mode: formData.get("relationship_mode"),
     client_id: formData.get("client_id"),
     origin_partner_id: formData.get("origin_partner_id") || undefined,
     referrer_type: formData.get("referrer_type") || undefined,
@@ -76,29 +78,38 @@ function parse(formData: FormData) {
 
   const d = parsed.data;
 
-  if (d.referrer_type === "pessoa_fisica" && !d.referrer_name) {
+  if (d.relationship_mode === "indicacao" && d.referrer_type === "pessoa_fisica" && !d.referrer_name) {
     return { ok: false as const, error: "Informe o nome do indicador (pessoa física)." };
   }
 
-  if (d.referrer_type && d.referrer_type !== "pessoa_fisica" && !d.referrer_id) {
+  if (d.relationship_mode === "indicacao" && d.referrer_type && d.referrer_type !== "pessoa_fisica" && !d.referrer_id) {
     return { ok: false as const, error: "Selecione o indicador." };
   }
-  if (d.collection_mode === "faturado" && !d.origin_partner_id) {
-    return { ok: false as const, error: "Selecione o parceiro responsável pelo faturamento." };
+  if (d.relationship_mode === "indicacao" && !d.referrer_type) {
+    return { ok: false as const, error: "Selecione quem indicou esta reserva." };
+  }
+  if (d.relationship_mode === "intermediado" && !d.origin_partner_id) {
+    return { ok: false as const, error: "Selecione o parceiro responsável pelo atendimento." };
+  }
+  if (d.relationship_mode === "intermediado" && d.collection_mode !== "faturado") {
+    return { ok: false as const, error: "Reservas intermediadas devem ser cobradas do parceiro responsável." };
+  }
+  if (d.relationship_mode !== "intermediado" && d.collection_mode === "faturado") {
+    return { ok: false as const, error: "A cobrança ao parceiro só pode ser usada em uma reserva intermediada." };
   }
 
   return {
     ok: true as const,
     data: {
       client_id: d.client_id,
-      origin_partner_id: d.origin_partner_id || null,
-      referrer_type: d.referrer_type || null,
-      referrer_id: d.referrer_type && d.referrer_type !== "pessoa_fisica" ? d.referrer_id || null : null,
-      referrer_name: d.referrer_type === "pessoa_fisica" ? d.referrer_name || null : null,
-      referrer_document: d.referrer_type === "pessoa_fisica" ? d.referrer_document || null : null,
-      commission_percent: d.commission_percent || null,
+      origin_partner_id: d.relationship_mode === "intermediado" ? d.origin_partner_id || null : null,
+      referrer_type: d.relationship_mode === "indicacao" ? d.referrer_type || null : null,
+      referrer_id: d.relationship_mode === "indicacao" && d.referrer_type && d.referrer_type !== "pessoa_fisica" ? d.referrer_id || null : null,
+      referrer_name: d.relationship_mode === "indicacao" && d.referrer_type === "pessoa_fisica" ? d.referrer_name || null : null,
+      referrer_document: d.relationship_mode === "indicacao" && d.referrer_type === "pessoa_fisica" ? d.referrer_document || null : null,
+      commission_percent: d.relationship_mode === "indicacao" ? d.commission_percent || null : null,
       is_cortesia: d.is_cortesia === "on",
-      is_net_fare: d.is_net_fare === "on",
+      is_net_fare: d.relationship_mode === "intermediado" && d.is_net_fare === "on",
       requires_nf: d.requires_nf === "on",
       collection_mode: d.collection_mode,
       // Edição manual e direta: preencher congela imediatamente a
@@ -108,6 +119,43 @@ function parse(formData: FormData) {
       tax_percent_snapshot: d.tax_percent_override === "" ? null : d.tax_percent_override,
     },
   };
+}
+
+type ParsedReservationData = Extract<ReturnType<typeof parse>, { ok: true }>["data"];
+
+async function validateRelationshipEntities(data: ParsedReservationData): Promise<string | null> {
+  const client = await prisma.client.findUnique({
+    where: { id: data.client_id },
+    select: { origin_partner_id: true },
+  });
+  if (!client) return "Cliente não encontrado.";
+
+  if (data.origin_partner_id) {
+    const partner = await prisma.company.findUnique({
+      where: { id: data.origin_partner_id },
+      select: { roles: true },
+    });
+    if (!partner?.roles.includes("parceiro")) return "A empresa selecionada não está cadastrada como parceiro.";
+    if (client.origin_partner_id && client.origin_partner_id !== data.origin_partner_id) {
+      return "O passageiro está vinculado a outro parceiro. Revise o cadastro antes de salvar a reserva.";
+    }
+  }
+
+  if (!data.referrer_type || data.referrer_type === "pessoa_fisica") return null;
+  if (!data.referrer_id) return "Selecione o indicador.";
+
+  if (data.referrer_type === "company") {
+    const company = await prisma.company.findUnique({ where: { id: data.referrer_id }, select: { roles: true } });
+    if (!company?.roles.includes("parceiro")) return "A empresa indicadora não está cadastrada como parceiro.";
+  } else if (data.referrer_type === "driver") {
+    const driver = await prisma.driver.findUnique({ where: { id: data.referrer_id }, select: { id: true } });
+    if (!driver) return "Motorista indicador não encontrado.";
+  } else {
+    const indicator = await prisma.client.findUnique({ where: { id: data.referrer_id }, select: { id: true } });
+    if (!indicator) return "Cliente indicador não encontrado.";
+  }
+
+  return null;
 }
 
 export async function createReservation(
@@ -120,6 +168,8 @@ export async function createReservation(
   if (!result.ok) {
     return { error: result.error };
   }
+  const relationshipError = await validateRelationshipEntities(result.data);
+  if (relationshipError) return { error: relationshipError };
 
   let reservation: Awaited<ReturnType<typeof prisma.reservation.create>> | null = null;
   for (let attempt = 0; attempt < 4 && !reservation; attempt += 1) {
@@ -157,6 +207,8 @@ export async function updateReservation(
   if (!result.ok) {
     return { error: result.error };
   }
+  const relationshipError = await validateRelationshipEntities(result.data);
+  if (relationshipError) return { error: relationshipError };
 
   const [current, lockedEntry] = await Promise.all([
     prisma.reservation.findUniqueOrThrow({ where: { id } }),

@@ -1,5 +1,6 @@
 export type NavIconName =
   | "home"
+  | "control"
   | "calendar"
   | "users"
   | "driver"
@@ -28,6 +29,7 @@ export type AdminNavItem = {
 export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin", label: "Início", icon: "home", section: "Visão geral", mobilePrimary: true },
   { href: "/admin/reservas", label: "Reservas", icon: "calendar", section: "Operação", mobilePrimary: true },
+  { href: "/admin/controle", label: "Torre de controle", icon: "control", section: "Operação", mobilePrimary: true },
   { href: "/admin/solicitacoes", label: "Solicitações", icon: "requests", section: "Operação", badgeKey: "solicitacoes", mobilePrimary: true },
   { href: "/admin/aprovacoes", label: "Aprovações", icon: "approvals", section: "Operação" },
   { href: "/admin/alertas", label: "Alertas", icon: "alerts", section: "Operação", badgeKey: "alertas" },

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { buttonClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
+import { buttonClass, inputClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
 
-export default async function MotoristasPage() {
+export default async function MotoristasPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const query = (await searchParams).q?.trim() ?? "";
   const drivers = await prisma.driver.findMany({
+    where: query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { phone: { contains: query, mode: "insensitive" } }, { email: { contains: query, mode: "insensitive" } }, { document: { contains: query, mode: "insensitive" } }] } : undefined,
     orderBy: { created_at: "desc" },
     select: {
       id: true,
@@ -21,9 +23,7 @@ export default async function MotoristasPage() {
     <div>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Motoristas</h1>
-        <Link href="/admin/motoristas/novo" className={buttonClass}>
-          Novo motorista
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><form className="flex gap-2"><input name="q" defaultValue={query} placeholder="Pesquisar motorista…" className={`${inputClass} sm:w-64`} /><button className={buttonClass}>Buscar</button></form><Link href="/admin/motoristas/novo" className={buttonClass}>Novo motorista</Link></div>
       </div>
 
       {drivers.length === 0 ? (
@@ -52,7 +52,7 @@ export default async function MotoristasPage() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto xl:block">
+          <div className="hidden overflow-x-auto scrollbar-clean xl:block">
             <table className={tableClass}>
             <thead>
               <tr>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { deleteCatalogItem, toggleCatalogItemActive } from "./actions";
-import { secondaryButtonClass, tdClass } from "@/lib/ui";
+import { useActionState, useState, useTransition } from "react";
+import { deleteCatalogItem, toggleCatalogItemActive, updateCatalogItem, type CatalogItemFormState } from "./actions";
+import { inputClass, secondaryButtonClass, tdClass } from "@/lib/ui";
 
 type ItemRowProps = {
   id: string;
@@ -10,20 +10,25 @@ type ItemRowProps = {
   label: string;
   order: number;
   active: boolean;
+  type: string;
 };
 
-export function ItemRow({ id, keyName, label, order, active }: ItemRowProps) {
+export function ItemRow({ id, keyName, label, order, active, type }: ItemRowProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [state, formAction, savePending] = useActionState<CatalogItemFormState, FormData>(updateCatalogItem.bind(null, id), { error: null });
 
   return (
     <tr>
-      <td className={tdClass}>{keyName}</td>
-      <td className={tdClass}>{label}</td>
-      <td className={tdClass}>{order}</td>
+      <td className={tdClass}>{editing ? <input name="key" defaultValue={keyName} required className={`${inputClass} min-w-32`} form={`edit-catalog-${id}`} /> : keyName}</td>
+      <td className={tdClass}>{editing ? <input name="label" defaultValue={label} required className={`${inputClass} min-w-40`} form={`edit-catalog-${id}`} /> : label}</td>
+      <td className={tdClass}>{editing ? <input name="order" type="number" defaultValue={order} className={`${inputClass} w-20`} form={`edit-catalog-${id}`} /> : order}</td>
       <td className={tdClass}>{active ? "Ativo" : "Inativo"}</td>
       <td className={tdClass}>
-        <div className="flex items-center gap-3">
+        {editing && <form id={`edit-catalog-${id}`} action={formAction}><input type="hidden" name="type" value={type} /></form>}
+        <div className="flex flex-wrap items-center gap-3">
+          {editing ? <><button type="submit" form={`edit-catalog-${id}`} disabled={savePending} className="text-sm font-semibold text-forest underline decoration-gold">{savePending ? "Salvando…" : "Salvar"}</button><button type="button" onClick={() => setEditing(false)} className="text-sm text-forest/65 underline">Cancelar</button></> : <button type="button" onClick={() => setEditing(true)} className="text-sm font-semibold text-forest underline decoration-gold">Editar</button>}
           <button
             type="button"
             disabled={isPending}
@@ -45,7 +50,7 @@ export function ItemRow({ id, keyName, label, order, active }: ItemRowProps) {
           >
             Excluir
           </button>
-          {error && <span className="text-xs text-red-700">{error}</span>}
+          {(error || state.error) && <span className="text-xs text-red-700">{error || state.error}</span>}
         </div>
       </td>
     </tr>

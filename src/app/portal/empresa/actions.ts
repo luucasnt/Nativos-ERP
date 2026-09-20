@@ -222,6 +222,7 @@ const novaReservaSchema = z.object({
   dedupe_key: z.string().min(1),
   cliente_nome: z.string().min(1, "Informe o nome do cliente."),
   client_id: z.string().uuid().optional().or(z.literal("")),
+  relacionamento: z.enum(["indicacao", "intermediado"]),
   descricao: z.string().min(1, "Descreva a reserva desejada."),
 });
 
@@ -242,6 +243,7 @@ export async function submitNovaReservaRequest(
     dedupe_key: formData.get("dedupe_key"),
     cliente_nome: formData.get("cliente_nome"),
     client_id: formData.get("client_id") || undefined,
+    relacionamento: formData.get("relacionamento"),
     descricao: formData.get("descricao"),
   });
   if (!parsed.success) {
@@ -264,6 +266,9 @@ export async function submitNovaReservaRequest(
     allocationDetails: {
       cliente_nome: parsed.data.cliente_nome,
       client_id: parsed.data.client_id || null,
+      relacionamento: parsed.data.relacionamento === "indicacao"
+        ? "Indicação — atendimento conduzido pela Nativos"
+        : "Intermediação — atendimento conduzido pelo parceiro",
       descricao: parsed.data.descricao,
     },
     dedupeKey: parsed.data.dedupe_key,

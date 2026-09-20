@@ -17,7 +17,7 @@ export default async function ContratosPage() {
       </div>
 
       <div className="grid gap-3 md:hidden">{clauses.map((clause) => <article key={clause.id} className="surface-panel p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#806538]">{clause.category}</p><h2 className="mt-1 text-sm font-semibold text-forest">{clause.title}</h2></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${clause.active ? "bg-success-light text-success" : "bg-forest/[0.06] text-forest/65"}`}>{clause.active ? "Ativa" : "Inativa"}</span></div><div className="mt-4 flex items-center justify-between"><span className="text-xs text-forest/60">Ordem {clause.order}</span><Link href={`/admin/configuracoes/contratos/${clause.id}`} className={linkClass}>Editar cláusula</Link></div></article>)}</div>
-      <div className="hidden max-w-full overflow-x-auto rounded-xl border border-forest/10 md:block">
+      <div className="hidden max-w-full overflow-x-auto scrollbar-clean rounded-xl border border-forest/10 md:block">
       <table className={tableClass}>
         <thead>
           <tr>

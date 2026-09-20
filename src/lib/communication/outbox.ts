@@ -109,6 +109,11 @@ async function sendOne(communicationId: string) {
   }
 }
 
+export async function processCommunicationNow(communicationId: string) {
+  await sendOne(communicationId);
+  return prisma.communication.findUnique({ where: { id: communicationId } });
+}
+
 // Idempotente/seguro de chamar repetidamente: processa um lote de
 // pendentes + falhas que ainda não esgotaram as tentativas. Quem dispara
 // isso em intervalos (cron) decide o espaçamento do retry — esta função

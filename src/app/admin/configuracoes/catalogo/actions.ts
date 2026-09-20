@@ -66,6 +66,33 @@ export async function createCatalogItem(
   return { error: null };
 }
 
+export async function updateCatalogItem(
+  id: string,
+  _prevState: CatalogItemFormState,
+  formData: FormData,
+): Promise<CatalogItemFormState> {
+  const user = await requireInternalUser();
+  const parsed = itemSchema.safeParse({
+    type: formData.get("type"),
+    key: formData.get("key"),
+    label: formData.get("label"),
+    order: formData.get("order") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+
+  try {
+    const item = await prisma.catalogItem.update({
+      where: { id },
+      data: { key: parsed.data.key, label: parsed.data.label, order: parsed.data.order },
+    });
+    await logAudit({ actorId: user.id, action: "catalogo_item_atualizado", entityType: "other", entityId: item.id, metadata: { key: item.key } });
+  } catch {
+    return { error: "Já existe um item com essa chave para este tipo." };
+  }
+  revalidatePath(PATH);
+  return { error: null };
+}
+
 export async function toggleCatalogItemActive(id: string, active: boolean) {
   const user = await requireInternalUser();
 

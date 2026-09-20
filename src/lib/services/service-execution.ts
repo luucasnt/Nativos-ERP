@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
 import { markReservationCommissionsEligible } from "@/lib/finance/commissions";
+import { z } from "zod";
 
 // Requisito adicional pós-Fase 1 (item 6): o dono/responsável de uma
 // empresa fornecedora pode, pelo portal dele, iniciar e finalizar os
@@ -37,6 +38,35 @@ async function assertCanOperateService(serviceId: string) {
 
 export type ServiceExecutionState = { error: string | null };
 
+const checklistSchema = z.object({
+  vehicle_clean: z.boolean().optional(),
+  fuel_checked: z.boolean().optional(),
+  tires_checked: z.boolean().optional(),
+  documents_ready: z.boolean().optional(),
+  passenger_items_ready: z.boolean().optional(),
+  passenger_embarked: z.boolean().optional(),
+  service_delivered: z.boolean().optional(),
+  payment_checked: z.boolean().optional(),
+  incident_reported: z.boolean().optional(),
+  notes: z.string().max(800).optional(),
+});
+
+export async function saveServiceChecklist(serviceId: string, phase: "preflight" | "completion", input: unknown): Promise<ServiceExecutionState> {
+  try {
+    const { user, service } = await assertCanOperateService(serviceId);
+    const checklist = checklistSchema.parse(input);
+    if (phase === "preflight" && service.execution_status !== "agendado") return { error: "O checklist inicial só pode ser alterado antes do início." };
+    if (phase === "completion" && service.execution_status !== "em_andamento") return { error: "O checklist de finalização só pode ser alterado durante o serviço." };
+    await prisma.service.update({ where: { id: serviceId }, data: phase === "preflight" ? { preflight_checklist: checklist } : { completion_checklist: checklist, incident_notes: checklist.notes ?? null } });
+    await logAudit({ actorId: user.id, action: phase === "preflight" ? "checklist_inicial_salvo" : "checklist_final_salvo", entityType: "service", entityId: serviceId, metadata: checklist });
+    revalidatePath("/portal/motorista/servicos");
+    revalidatePath("/portal/empresa/operacao");
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível salvar o checklist." };
+  }
+}
+
 export async function startService(
   serviceId: string,
 ): Promise<ServiceExecutionState> {
@@ -49,6 +79,11 @@ export async function startService(
 
     if (service.execution_status !== "agendado") {
       return { error: "Este serviço não está aguardando início." };
+    }
+
+    const preflight = checklistSchema.safeParse(service.preflight_checklist);
+    if (!preflight.success || !["vehicle_clean", "fuel_checked", "tires_checked", "documents_ready", "passenger_items_ready"].every((key) => preflight.data[key as keyof typeof preflight.data] === true)) {
+      return { error: "Conclua o checklist de saída antes de iniciar o serviço." };
     }
 
     await prisma.service.update({
@@ -81,6 +116,11 @@ export async function completeService(
 
     if (service.execution_status !== "em_andamento") {
       return { error: "Este serviço precisa estar em andamento para ser finalizado." };
+    }
+
+    const completion = checklistSchema.safeParse(service.completion_checklist);
+    if (!completion.success || !["passenger_embarked", "service_delivered", "payment_checked"].every((key) => completion.data[key as keyof typeof completion.data] === true)) {
+      return { error: "Conclua o checklist de finalização antes de encerrar o serviço." };
     }
 
     await prisma.service.update({

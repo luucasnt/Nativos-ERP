@@ -18,6 +18,7 @@ import { submitChangeRequest } from "../src/lib/change-requests/submit";
 import { reviewChangeRequest } from "../src/lib/change-requests/review";
 import { alertPendingExpense } from "../src/lib/alerts/detectors";
 import { enqueueCommunication } from "../src/lib/communication/outbox";
+import { DEFAULT_EMAIL_TEMPLATES } from "../src/lib/communication/default-templates";
 
 const prisma = new PrismaClient();
 
@@ -172,56 +173,25 @@ async function seedCommissionDefaults() {
 }
 
 async function seedEmailTemplates() {
-  const templates = [
-    {
-      key: "reserva_confirmada",
-      name: "Reserva confirmada",
-      subject: "Sua reserva {{codigo_reserva}} foi confirmada",
-      category: "operacional",
-      auto_send: true,
-    },
-    {
-      key: "alteracao_aprovada",
-      name: "Alteração aprovada",
-      subject: "Sua solicitação {{protocolo}} foi aprovada",
-      category: "operacional",
-      auto_send: true,
-    },
-    {
-      key: "cancelamento_aprovado",
-      name: "Cancelamento aprovado",
-      subject: "Cancelamento da reserva {{codigo_reserva}} confirmado",
-      category: "operacional",
-      auto_send: true,
-    },
-    {
-      key: "pagamento_confirmado",
-      name: "Pagamento confirmado",
-      subject: "Recebemos seu pagamento — {{codigo_reserva}}",
-      category: "financeiro",
-      auto_send: true,
-    },
-    {
-      key: "primeiro_acesso",
-      name: "Primeiro acesso ao portal",
-      subject: "Seu acesso ao Nativos ERP",
-      category: "acesso",
-      auto_send: false,
-    },
-  ];
-
-  for (const t of templates) {
+  for (const t of DEFAULT_EMAIL_TEMPLATES) {
     await prisma.emailTemplate.upsert({
       where: { key: t.key },
-      update: {},
+      update: {
+        name: t.name,
+        subject: t.subject,
+        body: t.body,
+        category: t.category,
+        auto_send: false,
+        allowed_variables: t.allowed_variables,
+      },
       create: {
         key: t.key,
         name: t.name,
         subject: t.subject,
-        body: `<p>${t.name}</p>`,
+        body: t.body,
         category: t.category,
-        auto_send: t.auto_send,
-        allowed_variables: ["codigo_reserva", "protocolo", "nome"],
+        auto_send: false,
+        allowed_variables: t.allowed_variables,
       },
     });
   }
@@ -833,11 +803,11 @@ async function seedApprovalWorkflowExamples() {
 // provisionado (o que exigiria um projeto Supabase real).
 async function seedOutboxExample() {
   await enqueueCommunication({
-    templateKey: "reserva_confirmada",
+    templateKey: "voucher_cliente",
     recipientType: "cliente",
     recipientEmail: "cliente-exemplo@nativos-portal.test",
-    variables: { codigo_reserva: "RES-2026-000001" },
-    idempotencyKey: "seed-outbox-reserva-confirmada-r1",
+    variables: { codigo_reserva: "RES-2026-000001", nome: "Cliente exemplo", anexo_nome: "voucher-res-2026-000001.pdf" },
+    idempotencyKey: "seed-outbox-voucher-cliente-r1",
   });
 }
 

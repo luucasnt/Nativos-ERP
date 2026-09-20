@@ -59,20 +59,33 @@ export default async function ReservaDetailPage({ params, searchParams }: { para
   const paidRevenue = reservation.finance_entries.filter((entry) => entry.type === "receita").flatMap((entry) => entry.payments).reduce((sum, payment) => sum + Number(payment.amount), 0);
   const profit = revenue - expense - tax;
   const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+  const relationshipLabel = reservation.origin_partner
+    ? `Atendimento conduzido por ${reservation.origin_partner.name}`
+    : reservation.referrer_type
+      ? "Indicação · atendimento conduzido pela Nativos"
+      : "Cliente direto · atendimento conduzido pela Nativos";
   const bankAccounts = financeAllowed && tab === "financeiro" ? await prisma.bankAccount.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : [];
 
   let clients: Array<{ id: string; name: string }> = [], partners: Array<{ id: string; name: string }> = [], companies: Array<{ id: string; name: string }> = [], drivers: Array<{ id: string; name: string }> = [];
-  if (tab === "dados") [clients, partners, companies, drivers] = await Promise.all([
-    prisma.client.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.company.findMany({ where: { roles: { has: "parceiro" } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.company.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.driver.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-  ]);
+  if (tab === "dados") {
+    clients = [{ id: reservation.client.id, name: reservation.client.name }];
+    if (reservation.origin_partner) partners = [{ id: reservation.origin_partner.id, name: reservation.origin_partner.name }];
+    if (reservation.referrer_id && reservation.referrer_type === "company") {
+      const company = await prisma.company.findUnique({ where: { id: reservation.referrer_id }, select: { id: true, name: true } });
+      if (company) companies = [company];
+    } else if (reservation.referrer_id && reservation.referrer_type === "driver") {
+      const driver = await prisma.driver.findUnique({ where: { id: reservation.referrer_id }, select: { id: true, name: true } });
+      if (driver) drivers = [driver];
+    } else if (reservation.referrer_id && reservation.referrer_type === "client") {
+      const client = await prisma.client.findUnique({ where: { id: reservation.referrer_id }, select: { id: true, name: true } });
+      if (client) clients.push(client);
+    }
+  }
   const history = tab === "historico" ? await prisma.auditLog.findMany({ where: { OR: [{ entity_id: id }, { entity_id: { in: reservation.services.map((service) => service.id) } }] }, include: { actor: { select: { display_name: true, native_name: true, email: true } } }, orderBy: { created_at: "desc" }, take: 50 }) : [];
 
   return <div className="mx-auto max-w-[1380px] space-y-5">
     <header className="operational-strip p-4 sm:p-5">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start"><div><div className="flex flex-wrap items-center gap-2"><h1 className="page-heading">{reservation.code}</h1><Badge tone={reservation.status === "cancelado" || reservation.status === "rejeitado" ? "danger" : reservation.status === "pendente" || reservation.status === "rascunho" ? "warning" : "success"}>{RESERVATION_STATUS_LABEL[reservation.status]}</Badge>{reservation.has_partial_cancellation && <Badge tone="warning">Cancelamento parcial</Badge>}</div><p className="mt-2 text-base font-medium text-ink">{reservation.client.name}</p><p className="mt-1 text-sm text-forest/55">{reservation.origin_partner?.name ?? "Cliente direto"} · {activeServices.length} {activeServices.length === 1 ? "serviço ativo" : "serviços ativos"}</p></div>
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start"><div><div className="flex flex-wrap items-center gap-2"><h1 className="page-heading">{reservation.code}</h1><Badge tone={reservation.status === "cancelado" || reservation.status === "rejeitado" ? "danger" : reservation.status === "pendente" || reservation.status === "rascunho" ? "warning" : "success"}>{RESERVATION_STATUS_LABEL[reservation.status]}</Badge>{reservation.has_partial_cancellation && <Badge tone="warning">Cancelamento parcial</Badge>}</div><p className="mt-2 text-base font-medium text-ink">{reservation.client.name}</p><p className="mt-1 text-sm text-forest/55">{relationshipLabel} · {activeServices.length} {activeServices.length === 1 ? "serviço ativo" : "serviços ativos"}</p></div>
         {!['cancelado','rejeitado'].includes(reservation.status) && <div className="flex flex-col gap-2 sm:flex-row"><CancelReservationButton reservationId={id} />{['rascunho','pendente'].includes(reservation.status) && <RejectReservationButton reservationId={id} />}</div>}
       </div>
       {nextService && <div className="mt-5 grid gap-3 rounded-xl bg-forest/[0.045] p-3 text-sm sm:grid-cols-3"><span className="flex items-center gap-2 text-forest"><CalendarDays size={16} className="text-gold" />{nextService.scheduled_date ? nextService.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Data pendente"}{nextService.scheduled_time ? ` · ${nextService.scheduled_time}` : ""}</span><span className="flex min-w-0 items-center gap-2 text-forest"><MapPin size={16} className="shrink-0 text-gold" /><span className="truncate">{nextService.pickup_location ?? "Origem não informada"} → {nextService.dropoff_location ?? "Destino não informado"}</span></span><span className="flex items-center gap-2 text-forest"><Car size={16} className="text-gold" />{nextService.driver?.name ?? nextService.supplier?.name ?? "Recurso pendente"}</span></div>}

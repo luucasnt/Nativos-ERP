@@ -790,6 +790,10 @@ model Service {
 
   started_at   DateTime?
   completed_at DateTime?
+  // Checklists operacionais preenchidos pelo motorista/fornecedor.
+  preflight_checklist   Json?
+  completion_checklist  Json?
+  incident_notes        String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

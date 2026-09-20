@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import {
   ArrowRight,
   BadgeCheck,
@@ -31,16 +32,23 @@ export default async function PortalEmpresaHomePage() {
   const company = user.linked_company;
   const isSupplier = company.roles.includes("fornecedor");
   const isPartner = company.roles.includes("parceiro");
+  const partnerReservationWhere = {
+    OR: [
+      { origin_partner_id: company.id },
+      { referrer_type: "company", referrer_id: company.id },
+    ],
+  } satisfies Prisma.ReservationWhereInput;
 
   const [reservations, supplierServices, pendingAcceptance, activeServices, drivers, vehicles, requests] =
     await Promise.all([
       isPartner
         ? prisma.reservation.findMany({
-            where: { origin_partner_id: company.id },
+            where: partnerReservationWhere,
             select: {
               id: true,
               code: true,
               status: true,
+              origin_partner_id: true,
               client: { select: { name: true } },
               _count: { select: { services: true } },
             },
@@ -228,21 +236,21 @@ export default async function PortalEmpresaHomePage() {
                           </div>
                           <div className="mt-3 flex items-center justify-between gap-3 text-xs text-forest/62">
                             <span>{reservation._count.services} serviço(s)</span>
-                            <a
+                            {reservation.origin_partner_id === company.id ? <a
                               href={`/api/documentos/voucher/${reservation.id}`}
                               target="_blank"
                               rel="noreferrer"
                               className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-forest/15 bg-white px-4 font-semibold text-forest"
                             >
                               Voucher
-                            </a>
+                            </a> : <span className="rounded-lg bg-forest/[0.045] px-3 py-2 font-medium text-forest/60">Indicação</span>}
                           </div>
                         </article>
                       </li>
                     ))}
                   </ul>
 
-                  <div className="hidden overflow-x-auto xl:block">
+                  <div className="hidden overflow-x-auto scrollbar-clean xl:block">
                     <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr>
@@ -265,14 +273,14 @@ export default async function PortalEmpresaHomePage() {
                             </Badge>
                           </td>
                           <td className="px-5 py-3.5 text-right">
-                            <a
+                            {reservation.origin_partner_id === company.id ? <a
                               href={"/api/documentos/voucher/" + reservation.id}
                               target="_blank"
                               rel="noreferrer"
                               className="focus-ring rounded text-xs font-semibold text-forest hover:text-forest-light"
                             >
                               Voucher
-                            </a>
+                            </a> : <span className="text-xs font-medium text-forest/55">Atendimento Nativos</span>}
                           </td>
                         </tr>
                       ))}

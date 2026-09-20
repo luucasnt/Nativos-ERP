@@ -3,22 +3,24 @@
 import { useActionState } from "react";
 import { createCatalogItem, type CatalogItemFormState } from "./actions";
 import { buttonClass, inputClass } from "@/lib/ui";
+import { CATALOG_PLACEHOLDERS } from "./catalog-constants";
 
 const initialState: CatalogItemFormState = { error: null };
 
 export function NewCatalogItemForm({ type }: { type: string }) {
   const [state, formAction, pending] = useActionState(createCatalogItem, initialState);
+  const placeholder = CATALOG_PLACEHOLDERS[type] ?? { key: "exemplo", label: "Novo item" };
 
   return (
     <form action={formAction} className="mb-6 flex flex-wrap items-end gap-3">
       <input type="hidden" name="type" value={type} />
       <div className="flex flex-col gap-1">
         <label className="text-xs text-forest/60">Chave</label>
-        <input name="key" required placeholder="ex.: sedan_executivo" className={inputClass} />
+        <input name="key" required placeholder={`ex.: ${placeholder.key}`} className={inputClass} />
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-forest/60">Rótulo</label>
-        <input name="label" required placeholder="ex.: Sedan executivo" className={inputClass} />
+        <input name="label" required placeholder={`ex.: ${placeholder.label}`} className={inputClass} />
       </div>
       <div className="flex w-20 flex-col gap-1">
         <label className="text-xs text-forest/60">Ordem</label>

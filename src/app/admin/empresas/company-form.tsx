@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { CompanyFormState } from "./actions";
 import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
@@ -8,12 +8,10 @@ import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondary
 const initialState: CompanyFormState = { error: null };
 
 type CatalogOption = { id: string; key: string; label: string };
-type CommissionDefaultOption = { category_key: string; commission_percent: string };
 
 type CompanyFormProps = {
   action: (prevState: CompanyFormState, formData: FormData) => Promise<CompanyFormState>;
   categories: CatalogOption[];
-  commissionDefaults: CommissionDefaultOption[];
   defaultValues?: {
     name: string;
     document: string | null;
@@ -45,12 +43,10 @@ type CompanyFormProps = {
 export function CompanyForm({
   action,
   categories,
-  commissionDefaults,
   defaultValues,
 }: CompanyFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [roles, setRoles] = useState<string[]>(defaultValues?.roles ?? []);
-  const commissionInputRef = useRef<HTMLInputElement>(null);
 
   const isParceiro = roles.includes("parceiro");
   const isFornecedor = roles.includes("fornecedor");
@@ -59,18 +55,6 @@ export function CompanyForm({
     setRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
-  }
-
-  function handleCategoryChange(categoryId: string) {
-    if (commissionInputRef.current && !commissionInputRef.current.value) {
-      const category = categories.find((c) => c.id === categoryId);
-      const match = category
-        ? commissionDefaults.find((d) => d.category_key === category.key)
-        : undefined;
-      if (match) {
-        commissionInputRef.current.value = match.commission_percent;
-      }
-    }
   }
 
   return (
@@ -198,7 +182,6 @@ export function CompanyForm({
             id="category_id"
             name="category_id"
             defaultValue={defaultValues?.category_id ?? ""}
-            onChange={(e) => handleCategoryChange(e.target.value)}
             className={inputClass}
           >
             <option value="">—</option>
@@ -216,7 +199,7 @@ export function CompanyForm({
           <legend className="font-serif text-lg text-forest">Parceiro</legend>
           <div className="flex flex-col gap-1">
             <label htmlFor="modelo_parceiro" className={labelClass}>
-              Modelo
+              Perfil financeiro
             </label>
             <select
               id="modelo_parceiro"
@@ -225,10 +208,13 @@ export function CompanyForm({
               className={inputClass}
             >
               <option value="">—</option>
-              <option value="comissionado">Comissionado</option>
-              <option value="faturado">Faturado</option>
-              <option value="ambos">Ambos</option>
+              <option value="comissionado">Recebe comissão</option>
+              <option value="faturado">Trabalha com faturamento</option>
+              <option value="ambos">Comissão e faturamento</option>
             </select>
+            <p className="text-xs leading-5 text-forest/60">
+              Este campo define somente o acordo financeiro. Quem atende o passageiro é determinado individualmente em cada reserva.
+            </p>
           </div>
           <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2 text-sm text-forest/80">
@@ -263,7 +249,6 @@ export function CompanyForm({
             <input
               id="commission"
               name="commission"
-              ref={commissionInputRef}
               defaultValue={defaultValues?.commission ?? ""}
               inputMode="decimal"
               className={inputClass}

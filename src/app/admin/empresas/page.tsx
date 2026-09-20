@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { buttonClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
+import { buttonClass, inputClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
 
 const roleLabel: Record<string, string> = {
   parceiro: "Parceiro",
   fornecedor: "Fornecedor",
 };
 
-export default async function EmpresasPage() {
+export default async function EmpresasPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const query = (await searchParams).q?.trim() ?? "";
   const companies = await prisma.company.findMany({
+    where: query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { contact_name: { contains: query, mode: "insensitive" } }, { contact_phone: { contains: query, mode: "insensitive" } }, { contact_email: { contains: query, mode: "insensitive" } }, { document: { contains: query, mode: "insensitive" } }] } : undefined,
     orderBy: { created_at: "desc" },
     select: { id: true, name: true, roles: true, document: true, portal_email: true },
     take: 100,
@@ -18,9 +20,7 @@ export default async function EmpresasPage() {
     <div>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Empresas</h1>
-        <Link href="/admin/empresas/novo" className={buttonClass}>
-          Nova empresa
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><form className="flex gap-2"><input name="q" defaultValue={query} placeholder="Pesquisar empresa…" className={`${inputClass} sm:w-64`} /><button className={buttonClass}>Buscar</button></form><Link href="/admin/empresas/novo" className={buttonClass}>Nova empresa</Link></div>
       </div>
 
       {companies.length === 0 ? (
@@ -45,7 +45,7 @@ export default async function EmpresasPage() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto xl:block">
+          <div className="hidden overflow-x-auto scrollbar-clean xl:block">
             <table className={tableClass}>
             <thead>
               <tr>

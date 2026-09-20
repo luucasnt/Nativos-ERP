@@ -13,16 +13,12 @@ export default async function EditarMotoristaPage({
 }) {
   const { id } = await params;
 
-  const [driver, suppliers, commissionDefaults, existingUser] = await Promise.all([
+  const [driver, suppliers, existingUser] = await Promise.all([
     prisma.driver.findUnique({ where: { id } }),
     prisma.company.findMany({
       where: { roles: { has: "fornecedor" } },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
-    }),
-    prisma.commissionDefault.findMany({
-      where: { target: "driver", active: true },
-      select: { category_key: true, commission_percent: true },
     }),
     prisma.user.findFirst({ where: { linked_driver_id: id } }),
   ]);
@@ -59,10 +55,6 @@ export default async function EditarMotoristaPage({
       <DriverForm
         action={updateDriver.bind(null, id)}
         suppliers={suppliers}
-        commissionDefaults={commissionDefaults.map((d) => ({
-          category_key: d.category_key,
-          commission_percent: d.commission_percent.toString(),
-        }))}
         defaultValues={{
           name: driver.name,
           document: driver.document,

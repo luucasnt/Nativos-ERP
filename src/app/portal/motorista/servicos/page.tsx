@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { DirectCollectionActions } from "@/components/portal/direct-collection-actions";
 import { ServiceExecutionActions } from "@/components/portal/service-execution-actions";
+import { ServiceChecklist } from "@/components/portal/service-checklist";
 import { Badge } from "@/components/ui/badge";
 import { requireDriverPortalUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
@@ -44,6 +45,9 @@ export default async function PortalMotoristaServicosPage() {
         notes: true,
         reception_sign_enabled: true,
         reception_passenger_name: true,
+        preflight_checklist: true,
+        completion_checklist: true,
+        incident_notes: true,
         reservation: { select: { code: true, client: { select: { name: true, phone: true } } } },
         vehicle: { select: { model: true, plate: true } },
       },
@@ -140,7 +144,7 @@ export default async function PortalMotoristaServicosPage() {
                 </Badge>
               </div>
 
-              <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink">
                     {service.reservation.client.name}
@@ -242,6 +246,10 @@ export default async function PortalMotoristaServicosPage() {
                     </a>
                   )}
                 </div>
+              </div>
+              <div className="grid gap-4 border-t border-forest/10 bg-[#faf9f6] p-4 sm:p-5">
+                <ServiceChecklist serviceId={service.id} phase="preflight" initialValue={service.preflight_checklist as Record<string, boolean> | null} />
+                {service.execution_status === "em_andamento" && <ServiceChecklist serviceId={service.id} phase="completion" initialValue={service.completion_checklist as Record<string, boolean> | null} />}
               </div>
             </article>
           ))}

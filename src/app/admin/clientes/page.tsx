@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { buttonClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
+import { buttonClass, inputClass, linkClass, tableClass, tdClass, thClass } from "@/lib/ui";
 
-export default async function ClientesPage() {
+export default async function ClientesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const query = (await searchParams).q?.trim() ?? "";
   const clients = await prisma.client.findMany({
+    where: query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { phone: { contains: query, mode: "insensitive" } }, { email: { contains: query, mode: "insensitive" } }, { document: { contains: query, mode: "insensitive" } }] } : undefined,
     orderBy: { created_at: "desc" },
     select: {
       id: true,
@@ -19,9 +21,7 @@ export default async function ClientesPage() {
     <div>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="font-serif text-3xl text-forest">Clientes</h1>
-        <Link href="/admin/clientes/novo" className={buttonClass}>
-          Novo cliente
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><form className="flex gap-2"><input name="q" defaultValue={query} placeholder="Pesquisar cliente…" className={`${inputClass} sm:w-64`} /><button className={buttonClass}>Buscar</button></form><Link href="/admin/clientes/novo" className={buttonClass}>Novo cliente</Link></div>
       </div>
 
       {clients.length === 0 ? (
@@ -53,7 +53,7 @@ export default async function ClientesPage() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto xl:block">
+          <div className="hidden overflow-x-auto scrollbar-clean xl:block">
             <table className={tableClass}>
             <thead>
               <tr>
