@@ -30,6 +30,8 @@ export async function resetDemoData() {
 
   // Users are removed before companies/drivers because their nullable links are FKs.
   await prisma.user.deleteMany({ where: { id: { not: actor.id } } });
+  await prisma.$executeRawUnsafe(`UPDATE public."companies" SET "owner_driver_id" = NULL`);
+  await prisma.$executeRawUnsafe(`UPDATE public."drivers" SET "supplier_id" = NULL`);
   await prisma.$executeRawUnsafe(`DELETE FROM public."companies"`);
   await prisma.$executeRawUnsafe(`DELETE FROM public."drivers"`);
   await prisma.$executeRawUnsafe(`DELETE FROM public."catalog_items"`);
