@@ -10,9 +10,9 @@ const TEST_DATA_TABLES = [
   "payments", "finance_entries", "service_expenses", "services", "reservations",
   "billing_cycle_reservations", "billing_cycles", "change_requests", "direct_collections",
   "compensations", "client_credits", "portal_notifications", "alerts", "audit_logs",
-  "communications", "cash_closings", "vehicle_expense_policies", "drivers", "vehicles",
-  "clients", "companies", "catalog_items", "bank_accounts", "commission_defaults",
-  "contract_clauses", "email_templates", "settings",
+  "communications", "cash_closings", "vehicle_expense_policies", "clients", "vehicles",
+  "catalog_items", "bank_accounts", "commission_defaults", "contract_clauses", "email_templates",
+  "settings",
 ] as const;
 
 export async function resetDemoData() {
@@ -29,7 +29,10 @@ export async function resetDemoData() {
     await prisma.$executeRawUnsafe(`DELETE FROM public."${table}"`);
   }
 
+  // Users are removed before companies/drivers because their nullable links are FKs.
   await prisma.user.deleteMany({ where: { id: { not: actor.id } } });
+  await prisma.$executeRawUnsafe(`DELETE FROM public."companies"`);
+  await prisma.$executeRawUnsafe(`DELETE FROM public."drivers"`);
 
   // Remove every Supabase Auth test login except the currently authenticated owner.
   const admin = createSupabaseAdminClient();
