@@ -33,3 +33,5 @@ export async function resetPortalAccessPassword(id: string, _prev: AccessActionS
     return { error: error instanceof Error ? error.message : "Não foi possível redefinir a senha.", temporaryPassword: null };
   }
 }
+
+export { resetDemoData } from "./reset-demo-data";
