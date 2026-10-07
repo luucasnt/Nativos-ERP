@@ -32,6 +32,7 @@ export async function resetDemoData() {
   await prisma.user.deleteMany({ where: { id: { not: actor.id } } });
   await prisma.$executeRawUnsafe(`DELETE FROM public."companies"`);
   await prisma.$executeRawUnsafe(`DELETE FROM public."drivers"`);
+  await prisma.$executeRawUnsafe(`DELETE FROM public."catalog_items"`);
 
   // Remove every Supabase Auth test login except the currently authenticated owner.
   const admin = createSupabaseAdminClient();
