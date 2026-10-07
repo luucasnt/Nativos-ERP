@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { resetDemoData } from "./actions";
+import { resetDemoData } from "./reset-demo-data";
 
 export function ResetDemoDataButton() {
   const [busy, setBusy] = useState(false);
