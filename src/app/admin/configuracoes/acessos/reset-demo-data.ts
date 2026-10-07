@@ -11,8 +11,7 @@ const TEST_DATA_TABLES = [
   "billing_cycle_reservations", "billing_cycles", "change_requests", "direct_collections",
   "compensations", "client_credits", "portal_notifications", "alerts", "audit_logs",
   "communications", "cash_closings", "vehicle_expense_policies", "clients", "vehicles",
-  "catalog_items", "bank_accounts", "commission_defaults", "contract_clauses", "email_templates",
-  "settings",
+  "bank_accounts", "commission_defaults", "contract_clauses", "email_templates", "settings",
 ] as const;
 
 export async function resetDemoData() {
