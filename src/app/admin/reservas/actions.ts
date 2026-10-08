@@ -291,3 +291,18 @@ export async function cancelReservationEntirely(reservationId: string, reason: s
   revalidatePath("/admin/reservas");
   revalidatePath(`/admin/reservas/${reservationId}`);
 }
+
+
+export async function deleteReservation(id: string): Promise<{ error?: string | null }> {
+  const user = await requireInternalUser();
+  const reservation = await prisma.reservation.findUnique({
+    where: { id },
+    select: { id: true, code: true, _count: { select: { services: true, finance_entries: true, billing_cycle_reservations: true, change_requests: true } } },
+  });
+  if (!reservation) return { error: "Reserva não encontrada." };
+  if (Object.values(reservation._count).some((count) => count > 0)) return { error: "Esta reserva possui serviços, lançamentos financeiros, ciclos de faturamento ou solicitações vinculadas. Exclua ou regularize os registros relacionados primeiro." };
+  await prisma.reservation.delete({ where: { id } });
+  await logAudit({ actorId: user.id, action: "reserva_excluida", entityType: "reservation", entityId: id, metadata: { code: reservation.code } });
+  revalidatePath("/admin/reservas");
+  redirect("/admin/reservas");
+}
