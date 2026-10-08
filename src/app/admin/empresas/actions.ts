@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 
 const decimalField = z
   .string()
@@ -184,11 +185,11 @@ export async function updateCompany(
 
 export async function deleteCompany(id: string): Promise<{ error?: string | null }> {
   const user = await requireInternalUser();
-  const company = await prisma.company.findUnique({ where: { id }, select: { id: true, name: true, _count: { select: { users: true, clients_originated: true, drivers_as_supplier: true, vehicles_as_supplier: true, reservations_as_partner: true, services_as_supplier: true, billing_cycles: true, change_requests: true, owner_of_companies: true } } } });
-  if (!company) return { error: "Empresa não encontrada." };
-  if (Object.values(company._count).some((count) => count > 0)) return { error: "Esta empresa possui vínculos (acessos, clientes, motoristas, veículos, reservas, serviços ou faturamento). Regularize os vínculos antes de excluir." };
-  try { await prisma.company.delete({ where: { id } }); } catch { return { error: "Não foi possível excluir: existe vínculo com outro registro. Verifique os cadastros relacionados." }; }
-  await logAudit({ actorId: user.id, action: "empresa_excluida", entityType: "company", entityId: id, metadata: { name: company.name } });
+  try {
+    await deleteUnusedRecord("company", id, user.id);
+  } catch (error) {
+    return { error: deletionError(error) };
+  }
   revalidatePath("/admin/empresas");
   return {};
 }

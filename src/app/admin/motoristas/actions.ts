@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 
 const decimalField = z
   .string()
@@ -200,4 +201,14 @@ export async function setDriverStatus(id: string, status: "ativo" | "inativo") {
 
   revalidatePath("/admin/motoristas");
   revalidatePath(`/admin/motoristas/${id}`);
+}
+export async function deleteDriver(id: string): Promise<{ error?: string | null }> {
+  const user = await requireInternalUser();
+  try {
+    await deleteUnusedRecord("driver", id, user.id);
+  } catch (error) {
+    return { error: deletionError(error) };
+  }
+  revalidatePath("/admin/motoristas");
+  return {};
 }

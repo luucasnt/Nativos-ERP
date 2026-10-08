@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 import { generateNextReservationCode } from "@/lib/reservations/code";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
 import { generateServiceFinanceEntries } from "@/lib/finance/settlement";
@@ -227,6 +228,10 @@ export async function updateReservation(
   const changedFinancialRule =
     current.client_id !== result.data.client_id ||
     current.origin_partner_id !== result.data.origin_partner_id ||
+    current.referrer_type !== result.data.referrer_type ||
+    current.referrer_id !== result.data.referrer_id ||
+    current.referrer_name !== result.data.referrer_name ||
+    current.referrer_document !== result.data.referrer_document ||
     current.collection_mode !== result.data.collection_mode ||
     current.is_cortesia !== result.data.is_cortesia ||
     current.is_net_fare !== result.data.is_net_fare ||
@@ -295,14 +300,11 @@ export async function cancelReservationEntirely(reservationId: string, reason: s
 
 export async function deleteReservation(id: string): Promise<{ error?: string | null }> {
   const user = await requireInternalUser();
-  const reservation = await prisma.reservation.findUnique({
-    where: { id },
-    select: { id: true, code: true, _count: { select: { services: true, finance_entries: true, billing_cycle_reservations: true, change_requests: true } } },
-  });
-  if (!reservation) return { error: "Reserva não encontrada." };
-  if (Object.values(reservation._count).some((count) => count > 0)) return { error: "Esta reserva possui serviços, lançamentos financeiros, ciclos de faturamento ou solicitações vinculadas. Exclua ou regularize os registros relacionados primeiro." };
-  await prisma.reservation.delete({ where: { id } });
-  await logAudit({ actorId: user.id, action: "reserva_excluida", entityType: "reservation", entityId: id, metadata: { code: reservation.code } });
+  try {
+    await deleteUnusedRecord("reservation", id, user.id);
+  } catch (error) {
+    return { error: deletionError(error) };
+  }
   revalidatePath("/admin/reservas");
-  redirect("/admin/reservas");
+  return {};
 }

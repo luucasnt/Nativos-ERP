@@ -1,6 +1,7 @@
+import { DeleteRecordButton } from "@/components/admin/delete-record-button";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { approveDriver, rejectDriver, updateDriver } from "../actions";
+import { deleteDriver, approveDriver, rejectDriver, updateDriver } from "../actions";
 import { DriverForm } from "../driver-form";
 import { PortalLoginPanel } from "@/components/admin/portal-login-panel";
 import { ApprovalActions } from "@/components/admin/approval-actions";
@@ -81,6 +82,7 @@ export default async function EditarMotoristaPage({
           existingUserStatus={existingUser?.status ?? null}
         />
       </div>
+      <DeleteRecordButton id={driver.id} label={`o motorista ${driver.name}`} action={deleteDriver} successHref="/admin/motoristas" />
     </div>
   );
 }

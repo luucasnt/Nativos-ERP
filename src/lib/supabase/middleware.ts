@@ -36,6 +36,12 @@ function isPublicPath(pathname: string) {
 // Regras finas (ex.: qual internal_role, quais roles da Company) ficam por
 // conta das páginas/layouts de servidor, que têm acesso ao Prisma.
 export async function updateSession(request: NextRequest) {
+  // The outbox endpoint authenticates its own CRON_SECRET. Vercel Cron
+  // has no browser session and must reach that check without a login redirect.
+  if (request.nextUrl.pathname === "/api/outbox/process") {
+    request.headers.delete(AUTH_USER_ID_HEADER);
+    return NextResponse.next({ request });
+  }
   let supabaseResponse = NextResponse.next({ request });
   const authHeaders = new Headers();
 

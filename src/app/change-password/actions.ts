@@ -4,11 +4,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { assertPasswordNotLeaked } from "@/lib/auth/password-security";
 import { syncAppMetadata } from "@/lib/auth/provision-user";
 
 const schema = z
   .object({
-    password: z.string().min(8, "Use pelo menos 8 caracteres."),
+    password: z.string().min(8, "Use pelo menos 8 caracteres.").max(128, "Use até 128 caracteres."),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -39,6 +40,11 @@ export async function changePassword(
   if (!authUser) {
     redirect("/login");
   }
+
+  const current = await prisma.user.findUnique({ where: { auth_user_id: authUser.id }, select: { status: true } });
+  if (current?.status !== "ativo") return { error: "Este acesso não está ativo." };
+  try { await assertPasswordNotLeaked(parsed.data.password); }
+  catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível verificar a senha." }; }
 
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,

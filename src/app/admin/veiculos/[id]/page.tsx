@@ -1,6 +1,7 @@
+import { DeleteRecordButton } from "@/components/admin/delete-record-button";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { approveVehicle, rejectVehicle, updateVehicle } from "../actions";
+import { deleteVehicle, approveVehicle, rejectVehicle, updateVehicle } from "../actions";
 import { VehicleForm } from "../vehicle-form";
 import { ApprovalActions } from "@/components/admin/approval-actions";
 
@@ -63,6 +64,7 @@ export default async function EditarVeiculoPage({
           initial_odometer_km: vehicle.initial_odometer_km,
         }}
       />
+      <DeleteRecordButton id={vehicle.id} label={`o veículo ${vehicle.plate}`} action={deleteVehicle} successHref="/admin/veiculos" />
     </div>
   );
 }

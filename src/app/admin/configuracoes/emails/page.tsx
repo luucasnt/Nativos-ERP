@@ -16,6 +16,7 @@ export default async function EmailTemplatesPage() {
         </div>
       </div>
 
+      {(!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) && <p role="status" className="mb-5 rounded-lg border border-gold/30 bg-gold/10 p-4 text-sm text-forest">O envio de e-mails ainda não está conectado. Os modelos podem ser preparados, mas o serviço de envio e o remetente precisam ser configurados antes de enviar mensagens.</p>}
       <div className="grid gap-3 md:hidden">{templates.map((template) => <article key={template.key} className="surface-panel p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-forest">{template.name}</p><p className="mt-1 truncate text-xs text-forest/60">{template.key}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${template.auto_send ? "bg-info-light text-info" : "bg-forest/[0.06] text-forest/65"}`}>{template.auto_send ? "Automático" : "Manual"}</span></div><div className="mt-4 flex items-center justify-between"><span className="text-xs text-forest/60">{template.category}</span><Link href={`/admin/configuracoes/emails/${template.key}`} className={linkClass}>Editar template</Link></div></article>)}</div>
       <div className="hidden max-w-full overflow-x-auto scrollbar-clean rounded-xl border border-forest/10 md:block">
       <table className={tableClass}>

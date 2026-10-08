@@ -3,13 +3,14 @@
 // via Vitest — o pacote "server-only" lança erro incondicionalmente fora
 // do runtime de Server Component do Next.js (não faz checagem de
 // `typeof window`), o que inviabilizaria testá-lo diretamente.
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeReservationStatus } from "@/lib/reservations/status-pure";
 
 export { computeReservationStatus } from "@/lib/reservations/status-pure";
 
-export async function recalculateReservationStatus(reservationId: string) {
-  const current = await prisma.reservation.findUniqueOrThrow({
+export async function recalculateReservationStatus(reservationId: string, db: Prisma.TransactionClient = prisma) {
+  const current = await db.reservation.findUniqueOrThrow({
     where: { id: reservationId },
     select: { status: true, has_partial_cancellation: true },
   });
@@ -17,19 +18,19 @@ export async function recalculateReservationStatus(reservationId: string) {
   // "rejeitado" é uma ação manual do admin (Fase 6), fora do algoritmo
   // automático — nunca é produzido nem desfeito por ele. Uma vez rejeitada,
   // editar os serviços da reserva não a "reabre" silenciosamente.
-  if (current.status === "rejeitado") {
+  if (["rejeitado", "cancelado"].includes(current.status)) {
     return { status: current.status, has_partial_cancellation: current.has_partial_cancellation };
   }
 
-  const services = await prisma.service.findMany({
+  const services = await db.service.findMany({
     where: { reservation_id: reservationId },
     select: { acceptance_status: true, execution_status: true },
   });
 
   const result = computeReservationStatus(services);
 
-  await prisma.reservation.update({
-    where: { id: reservationId },
+  await db.reservation.updateMany({
+    where: { id: reservationId, status: { notIn: ["cancelado", "rejeitado"] } },
     data: {
       status: result.status,
       has_partial_cancellation: result.has_partial_cancellation,

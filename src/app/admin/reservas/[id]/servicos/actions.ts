@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
@@ -10,6 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { computeCollectionActor, computeServicePrice } from "@/lib/reservations/pricing";
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
+import { terminateService } from "@/lib/reservations/termination";
 import { acceptService, rejectService } from "@/lib/reservations/acceptance";
 import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
@@ -232,6 +234,8 @@ export async function createService(
     where: { id: reservationId },
   });
 
+  if (["cancelado", "rejeitado"].includes(reservation.status)) return { error: "Esta reserva foi encerrada e não pode receber novos serviços." };
+
   const price = computeServicePrice(
     parsed.data.original_price,
     common.data.discount_type,
@@ -331,6 +335,7 @@ export async function updateService(
       },
     }),
   ]);
+  if (["cancelado", "rejeitado"].includes(reservation.status) || existing.execution_status === "cancelado") return { error: "Este serviço foi encerrado e não pode ser editado." };
   if (existing.reservation_id !== reservationId) {
     return { error: "O serviço informado não pertence a esta reserva." };
   }
@@ -422,40 +427,8 @@ export async function updateService(
 
 export async function cancelService(reservationId: string, serviceId: string) {
   const user = await requireInternalUser();
-
-  await requireServiceInReservation(reservationId, serviceId);
-  const paid = await prisma.financeEntry.findFirst({
-    where: {
-      service_id: serviceId,
-      reversed_at: null,
-      OR: [
-        { status: "pago" },
-        { payments: { some: { reversed_at: null, estorno_of_id: null } } },
-      ],
-    },
-    select: { id: true },
-  });
-  if (paid) {
-    throw new Error("Este serviço possui pagamento registrado. Faça o estorno antes de cancelar.");
-  }
-
-  await prisma.$transaction([
-    prisma.financeEntry.updateMany({
-      where: { service_id: serviceId, reversed_at: null, status: { in: ["programado", "pendente", "vencido"] } },
-      data: { status: "cancelado", payment_eligible: false },
-    }),
-    prisma.service.update({ where: { id: serviceId }, data: { execution_status: "cancelado" } }),
-  ]);
-
+  await terminateService(reservationId, serviceId, user.id);
   await afterServiceMutation(reservationId, serviceId);
-
-  await logAudit({
-    actorId: user.id,
-    action: "servico_cancelado",
-    entityType: "service",
-    entityId: serviceId,
-  });
-
   revalidatePath(`/admin/reservas/${reservationId}`);
 }
 
@@ -496,4 +469,16 @@ export async function rejectServiceInternal(
   });
 
   revalidatePath(`/admin/reservas/${reservationId}`);
+}
+
+export async function deleteService(reservationId: string, serviceId: string): Promise<{ error?: string | null }> {
+  const user = await requireInternalUser();
+  try { await deleteUnusedRecord("service", serviceId, user.id, reservationId); }
+  catch (error) { return { error: deletionError(error) }; }
+  await recalculateReservationStatus(reservationId);
+  await recalculateReservationTax(reservationId);
+  await recalculateReservationCommissions(reservationId);
+  revalidatePath(`/admin/reservas/${reservationId}`);
+  revalidatePath("/admin/reservas");
+  return {};
 }

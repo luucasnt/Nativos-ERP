@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export function DeleteRecordButton({ id, label, action }: { id: string; label: string; action: (id: string) => Promise<{ error?: string | null }> }) {
+export function DeleteRecordButton({ id, label, action, successHref }: { id: string; label: string; action: (id: string) => Promise<{ error?: string | null }>; successHref?: string }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,6 +15,8 @@ export function DeleteRecordButton({ id, label, action }: { id: string; label: s
     try {
       const result = await action(id);
       if (result?.error) setError(result.error);
+      else if (successHref) router.replace(successHref);
+      else router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível excluir este registro.");
     } finally {

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { cancelService, updateService } from "../actions";
+import { cancelService, deleteService, updateService } from "../actions";
+import { DeleteRecordButton } from "@/components/admin/delete-record-button";
 import { ServiceForm } from "../service-form";
 import { InternalAcceptancePanel } from "./internal-acceptance-panel";
 import { DeleteButton } from "@/components/admin/delete-button";
@@ -133,6 +134,7 @@ export default async function EditarServicoPage({
           os_show_price: service.os_show_price,
         }}
       />
+      <DeleteRecordButton id={serviceId} label="este serviço sem histórico" action={deleteService.bind(null, reservationId)} successHref={`/admin/reservas/${reservationId}`} />
     </div>
   );
 }

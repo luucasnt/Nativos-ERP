@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import { requireFinancialUser } from "@/lib/auth/get-current-user";
 import { tableClass, tdClass, thClass } from "@/lib/ui";
 import { ExpenseReviewActions } from "@/components/admin/expense-review-actions";
 
 export default async function DespesasPage() {
+  await requireFinancialUser();
   const expenses = await prisma.serviceExpense.findMany({
     where: { status: "pendente" },
     select: {

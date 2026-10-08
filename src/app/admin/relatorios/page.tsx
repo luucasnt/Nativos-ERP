@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { loadReportReservations, reportFilters, type ReportParams } from "@/lib/reports/management";
 import { Download, FileBarChart } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { requireFinancialUser } from "@/lib/auth/get-current-user";
@@ -10,18 +11,6 @@ const money = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
-const date = (value: string | undefined, fallback: Date) => {
-  const parsed = value ? new Date(`${value}T00:00:00.000Z`) : fallback;
-  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
-};
-
-type ReportParams = {
-  empresa?: string;
-  de?: string;
-  ate?: string;
-  status?: string;
-};
-
 export default async function RelatoriosPage({
   searchParams,
 }: {
@@ -29,22 +18,15 @@ export default async function RelatoriosPage({
 }) {
   await requireFinancialUser();
   const params = await searchParams;
-  const today = new Date();
-  const defaultFrom = new Date(today);
-  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 30);
-  defaultFrom.setUTCHours(0, 0, 0, 0);
-  const from = date(params.de, defaultFrom);
-  const to = date(params.ate, today);
-  to.setUTCHours(23, 59, 59, 999);
-
+  const { from, to, companyId, where } = reportFilters(params);
   const [companies, selectedCompany] = await Promise.all([
     prisma.company.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    params.empresa
+    companyId
       ? prisma.company.findUnique({
-          where: { id: params.empresa },
+          where: { id: companyId },
           select: {
             id: true,
             name: true,
@@ -58,37 +40,7 @@ export default async function RelatoriosPage({
       : null,
   ]);
 
-  const reservations = await prisma.reservation.findMany({
-    where: {
-      created_at: { gte: from, lte: to },
-      ...(params.status ? { status: params.status as never } : {}),
-      ...(selectedCompany
-        ? {
-            OR: [
-              { origin_partner_id: selectedCompany.id },
-              { services: { some: { supplier_id: selectedCompany.id } } },
-            ],
-          }
-        : {}),
-    },
-    include: {
-      client: { select: { name: true } },
-      origin_partner: { select: { name: true } },
-      services: {
-        include: {
-          supplier: { select: { name: true } },
-          driver: { select: { name: true } },
-          vehicle: { select: { plate: true, model: true } },
-          service_expenses: {
-            where: { status: { not: "rejeitado" } },
-            select: { amount: true },
-          },
-        },
-      },
-    },
-    orderBy: { created_at: "desc" },
-    take: 500,
-  });
+  const reservations = await loadReportReservations(where);
 
   const relevantParty = selectedCompany
     ? {
@@ -99,6 +51,7 @@ export default async function RelatoriosPage({
   const entries = await prisma.financeEntry.findMany({
     where: {
       created_at: { gte: from, lte: to },
+      status: { not: "cancelado" }, reversed_at: null, estorno_of_id: null,
       ...(relevantParty ?? {}),
     },
     include: {
@@ -116,9 +69,9 @@ export default async function RelatoriosPage({
     reservation.services
       .filter(
         (service) =>
-          !selectedCompany ||
-          service.supplier_id === selectedCompany.id ||
-          reservation.origin_partner_id === selectedCompany.id,
+          !companyId ||
+          service.supplier_id === companyId ||
+          reservation.origin_partner_id === companyId,
       )
       .map((service) => {
         const expense = service.service_expenses.reduce(
@@ -176,7 +129,7 @@ export default async function RelatoriosPage({
           </p>
         </div>
         <Link
-          href="/api/admin/relatorios/export"
+          href={`/api/admin/relatorios/export?${new URLSearchParams(Object.entries(params).filter((item): item is [string, string] => typeof item[1] === "string")).toString()}`}
           className={`${secondaryButtonClass} w-full sm:w-auto`}
         >
           <Download size={15} /> Exportar CSV

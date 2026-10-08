@@ -657,10 +657,10 @@ export default async function FinanceiroPage({
                 {entries.map((entry) => {
                   const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + activeCompensationAmount(entry);
                   const remaining = Math.max(0, Number(entry.amount) - paid);
-                  const isOverdue = entry.status !== "pago" && entry.due_date && entry.due_date < now;
+                  const isOverdue = ["programado", "pendente", "vencido"].includes(entry.status) && entry.due_date && entry.due_date < now;
                   return <article key={entry.id} className="space-y-4 p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}</p><p className="mt-1 text-xs text-forest/62">{entry.reservation?.code ?? "Sem reserva"} · {partyName(entry)}</p></div>
+                      <div className="min-w-0"><Link href={`/admin/financeiro/${entry.id}`} className="focus-ring block truncate rounded text-sm font-semibold text-ink underline decoration-gold">{entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}</Link><p className="mt-1 text-xs text-forest/62">{entry.reservation?.code ?? "Sem reserva"} · {partyName(entry)}</p></div>
                       <Badge tone={isOverdue ? "danger" : statusTone(entry.status)}>{isOverdue ? "Vencido" : FINANCE_ENTRY_STATUS_LABEL[entry.status]}</Badge>
                     </div>
                     <div className="flex items-end justify-between gap-3"><div><span className="block text-xs text-forest/60">{entry.type === "receita" ? "A receber" : "A pagar"}</span><strong className={`mt-1 block text-lg ${entry.type === "receita" ? "text-success" : "text-danger"}`}>{money.format(Number(entry.amount))}</strong>{paid > 0 && remaining > 0 && <span className="mt-1 block text-xs text-forest/55">Pago {money.format(paid)} · saldo {money.format(remaining)}</span>}</div><span className="text-xs text-forest/60">{entry.due_date ? `Vence ${entry.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}</span></div>
@@ -689,9 +689,9 @@ export default async function FinanceiroPage({
                           {entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}
                         </td>
                         <td className="max-w-[280px] px-4 py-3.5">
-                          <p className="truncate text-xs font-medium text-ink">
+                          <Link href={`/admin/financeiro/${entry.id}`} className="focus-ring block truncate rounded text-xs font-medium text-ink underline decoration-gold">
                             {entry.description ?? FINANCE_ENTRY_CATEGORY_LABEL[entry.category] ?? entry.category}
-                          </p>
+                          </Link>
                           <p className="mt-1 text-[11px] text-forest/55">{FINANCE_ENTRY_CATEGORY_LABEL[entry.category]}</p>
                         </td>
                         <td className="px-4 py-3.5">
