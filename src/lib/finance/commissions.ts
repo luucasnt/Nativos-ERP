@@ -93,8 +93,12 @@ export async function recalculateReservationCommissions(reservationId: string) {
   }
 
   const referrerKey = "comissao_indicacao";
+  const referrerDriver = reservation.referrer_type === "driver" && reservation.referrer_id
+    ? await prisma.driver.findUnique({ where: { id: reservation.referrer_id }, select: { owner_type: true } })
+    : null;
+  const referrerAllowed = reservation.referrer_type !== "driver" || referrerDriver?.owner_type === "proprio";
   if (
-    commissionsApply &&
+    commissionsApply && referrerAllowed &&
     reservation.referrer_type &&
     reservation.commission_percent &&
     base.gt(0)

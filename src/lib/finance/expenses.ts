@@ -10,11 +10,14 @@ import { generateServiceFinanceEntries } from "@/lib/finance/settlement";
 export async function approveServiceExpense(expenseId: string, reviewerId: string) {
   const expense = await prisma.serviceExpense.findUniqueOrThrow({
     where: { id: expenseId },
-    include: { service: { select: { reservation_id: true } } },
+    include: { service: { select: { reservation_id: true } }, driver: { select: { owner_type: true } } },
   });
 
   if (expense.status !== "pendente") {
     return expense;
+  }
+  if (expense.driver.owner_type !== "proprio") {
+    throw new Error("Reembolso de despesas é permitido somente para motoristas próprios.");
   }
 
   const entry = await createFinanceEntry({

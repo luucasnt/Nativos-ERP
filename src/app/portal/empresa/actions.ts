@@ -100,7 +100,7 @@ export type DriverRegistrationState = { error: string | null };
 // terceirizados, vinculados à empresa que está logada, e pendentes de
 // aprovação do admin (created_from_portal=true). payment_type/comissão/
 // diária/salário não aparecem aqui: são termos financeiros que só fazem
-// sentido para frota própria (Nativos) ou para o dono-motorista — a
+// sentido para motoristas próprios (Nativos) — a
 // relação financeira de um terceirizado comum é com a empresa, não com
 // ele individualmente (spec seção 6).
 export async function registerDriverPortal(
@@ -135,7 +135,7 @@ export async function registerDriverPortal(
       owner_type: "terceirizado",
       supplier_id: user.linked_company_id,
       is_company_owner_driver: d.is_company_owner_driver === "on",
-      payment_type: "diaria",
+      payment_type: null,
       created_from_portal: true,
     },
   });

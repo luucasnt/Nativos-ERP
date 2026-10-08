@@ -519,7 +519,7 @@ model Driver {
   owner_type              OwnerType
   supplier_id             String?           @db.Uuid
   is_company_owner_driver Boolean           @default(false)
-  payment_type            DriverPaymentType
+  payment_type            DriverPaymentType?
   commission              Decimal?          @db.Decimal(5, 2)
   daily_rate              Decimal?          @db.Decimal(12, 2)
   salario_mensal          Decimal?          @db.Decimal(12, 2)

@@ -43,6 +43,9 @@ export async function submitServiceExpense(
   formData: FormData,
 ): Promise<ExpenseFormState> {
   const user = await assertActiveDriverPortalUser();
+  if (user.linked_driver.owner_type !== "proprio") {
+    return { error: "Registro de despesas é permitido somente para motoristas próprios." };
+  }
 
   const parsed = expenseSchema.safeParse({
     dedupe_key: formData.get("dedupe_key"),
@@ -185,6 +188,9 @@ export async function submitRepasseRequestMotorista(
   formData: FormData,
 ): Promise<ChangeRequestFormState> {
   const user = await assertActiveDriverPortalUser();
+  if (user.linked_driver.owner_type !== "proprio") {
+    return { error: "Solicitação de repasse é permitida somente para motoristas próprios." };
+  }
 
   const parsed = repasseSchema.safeParse({
     dedupe_key: formData.get("dedupe_key"),
