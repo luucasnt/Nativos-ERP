@@ -150,6 +150,7 @@ export async function sendEmailManually(
   formData: FormData,
 ): Promise<EmailTemplateFormState> {
   const user = await requireInternalUser();
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) return { error: "O serviço de envio de e-mails e o remetente ainda não estão configurados." };
   const parsed = z.object({
     templateKey: z.string().min(1),
     recipientEmail: z.string().trim().optional(),

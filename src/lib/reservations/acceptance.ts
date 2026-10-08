@@ -1,48 +1,31 @@
-// Sem "server-only" — mesma razão de status.ts/tax.ts: precisa ser
-// importável em testes de integração via Vitest.
 import { prisma } from "@/lib/prisma";
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 import { alertSupplierRejected } from "@/lib/alerts/detectors";
 
-// Fluxo de aceite do fornecedor (spec seção 5): aguardando_aceite ->
-// aceito/recusado (com aceite_motivo). Mutação pura, sem checagem de
-// autorização — cada chamador (Server Action do admin ou do portal)
-// decide quem pode chamar isto e faz sua própria checagem antes.
-export async function acceptService(serviceId: string) {
-  const service = await prisma.service.update({
-    where: { id: serviceId },
-    data: { acceptance_status: "aceito", acceptance_reason: null },
+async function respond(serviceId: string, accepted: boolean, reason?: string) {
+  return prisma.$transaction(async (tx) => {
+    const relation = await tx.service.findUniqueOrThrow({ where: { id: serviceId }, select: { reservation_id: true } });
+    await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${relation.reservation_id}::uuid FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM services WHERE id = ${serviceId}::uuid FOR UPDATE`;
+    const current = await tx.service.findUniqueOrThrow({ where: { id: serviceId }, include: { reservation: true, supplier: true } });
+    if (["cancelado", "rejeitado"].includes(current.reservation.status) || current.execution_status !== "agendado") throw new Error("Este serviço não pode mais receber aceite ou recusa.");
+    const target = accepted ? "aceito" : "recusado";
+    if (current.acceptance_status !== target && current.acceptance_status !== "aguardando_aceite") throw new Error("O serviço já foi respondido. Solicite a reatribuição antes de mudar a resposta.");
+    if (current.acceptance_status === target) return { service: current, changed: false };
+    const service = await tx.service.update({ where: { id: serviceId }, data: { acceptance_status: target, acceptance_reason: accepted ? null : reason }, include: { supplier: true } });
+    if (accepted) await generateServiceFinanceEntries(serviceId, tx);
+    else await cancelServiceFinanceEntries(serviceId, tx);
+    await recalculateReservationStatus(service.reservation_id, tx);
+    return { service, changed: true };
   });
-
-  // O compromisso passa a existir de fato só agora — é aqui que os
-  // lançamentos "programado" do serviço nascem (spec seção 6).
-  await generateServiceFinanceEntries(serviceId);
-  await recalculateReservationStatus(service.reservation_id);
-
-  return service;
 }
-
+export async function acceptService(serviceId: string) {
+  return (await respond(serviceId, true)).service;
+}
 export async function rejectService(serviceId: string, reason: string) {
-  const service = await prisma.service.update({
-    where: { id: serviceId },
-    data: { acceptance_status: "recusado", acceptance_reason: reason },
-    include: { supplier: true },
-  });
-
-  // Defensivo: se este serviço já tinha sido aceito antes (reatribuição
-  // que voltou a ser recusada), cancela os lançamentos que não fazem mais
-  // sentido — nunca os apaga.
-  await cancelServiceFinanceEntries(serviceId);
-  await recalculateReservationStatus(service.reservation_id);
-
-  if (service.supplier) {
-    await alertSupplierRejected({
-      serviceId: service.id,
-      supplierName: service.supplier.name,
-      reason,
-    });
-  }
-
+  if (!reason.trim() || reason.trim().length > 1000) throw new Error("Informe um motivo de recusa de até 1000 caracteres.");
+  const { service, changed } = await respond(serviceId, false, reason.trim());
+  if (changed && service.supplier) await alertSupplierRejected({ serviceId: service.id, supplierName: service.supplier.name, reason: reason.trim() });
   return service;
 }

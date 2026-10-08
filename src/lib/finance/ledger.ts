@@ -22,8 +22,10 @@ import type {
   FinancialResponsibleType,
   PaymentMethod,
   PaymentType,
+  FinanceEntry,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { businessDay } from "@/lib/finance/cash-closing";
 
 type CreateFinanceEntryInput = {
   type: "receita" | "despesa";
@@ -48,14 +50,14 @@ type CreateFinanceEntryInput = {
 
 // Idempotente: chamar de novo com o mesmo auto_key devolve o lançamento já
 // existente em vez de criar um duplicado ou lançar erro de constraint.
-export async function createFinanceEntry(input: CreateFinanceEntryInput) {
-  const existing = await prisma.financeEntry.findUnique({ where: { auto_key: input.auto_key } });
+export async function createFinanceEntry(input: CreateFinanceEntryInput, db: Prisma.TransactionClient = prisma) {
+  const existing = await db.financeEntry.findUnique({ where: { auto_key: input.auto_key } });
   if (existing) {
     return existing;
   }
 
   try {
-    return await prisma.financeEntry.create({
+    return await db.financeEntry.create({
       data: {
         type: input.type,
         category: input.category,
@@ -75,7 +77,7 @@ export async function createFinanceEntry(input: CreateFinanceEntryInput) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const concurrent = await prisma.financeEntry.findUnique({ where: { auto_key: input.auto_key } });
+      const concurrent = await db.financeEntry.findUnique({ where: { auto_key: input.auto_key } });
       if (concurrent) return concurrent;
     }
     throw error;
@@ -100,22 +102,14 @@ export async function markFinanceEntryEligible(entryId: string) {
 // um UPDATE de status (permitido), não uma reversão formal, porque nada
 // foi de fato liquidado ainda. Uma vez que existir um Payment "pago", usar
 // reverseFinanceEntry em vez desta função.
-export async function cancelUnpaidFinanceEntry(entryId: string) {
-  const entry = await prisma.financeEntry.findUniqueOrThrow({
-    where: { id: entryId },
-    include: { payments: true },
-  });
-
-  if (entry.status === "pago" || entry.payments.some((p) => !p.reversed_at)) {
-    throw new Error(
-      "Este lançamento já tem pagamento registrado — reverta o pagamento em vez de cancelar diretamente.",
-    );
+export async function cancelUnpaidFinanceEntry(entryId: string, db?: Prisma.TransactionClient): Promise<FinanceEntry> {
+  if (!db) return prisma.$transaction((tx) => cancelUnpaidFinanceEntry(entryId, tx));
+  await db.$queryRaw`SELECT id FROM finance_entries WHERE id = ${entryId}::uuid FOR UPDATE`;
+  const entry = await db.financeEntry.findUniqueOrThrow({ where: { id: entryId }, include: { payments: { where: { reversed_at: null, estorno_of_id: null } }, compensacao: true } });
+  if (entry.status === "pago" || entry.payments.length || (entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at)) {
+    throw new Error("Este lançamento já tem pagamento ou compensação registrado. Reverta a liquidação antes de cancelar.");
   }
-
-  return prisma.financeEntry.update({
-    where: { id: entryId },
-    data: { status: "cancelado", payment_eligible: false },
-  });
+  return db.financeEntry.update({ where: { id: entryId }, data: { status: "cancelado", payment_eligible: false } });
 }
 
 // Reversão formal (estorno) de um lançamento já elegível/pago — cria um
@@ -196,6 +190,8 @@ export async function createPayment(input: CreatePaymentInput) {
 
   try {
     return await prisma.$transaction(async (tx) => {
+      const relation = await tx.financeEntry.findUniqueOrThrow({ where: { id: input.finance_entry_id }, select: { reservation_id: true } });
+      if (relation.reservation_id) await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${relation.reservation_id}::uuid FOR UPDATE`;
       // Serializa liquidações do mesmo título. Sem este lock, dois cliques
       // simultâneos podem ler o mesmo saldo e registrar pagamento acima do valor.
       await tx.$queryRaw`SELECT id FROM finance_entries WHERE id = ${input.finance_entry_id}::uuid FOR UPDATE`;
@@ -214,8 +210,11 @@ export async function createPayment(input: CreatePaymentInput) {
         throw new Error("O sentido do pagamento não corresponde ao lançamento.");
       }
       if (input.bank_account_id) {
+        await tx.$queryRaw`SELECT id FROM bank_accounts WHERE id = ${input.bank_account_id}::uuid FOR UPDATE`;
         const account = await tx.bankAccount.findUnique({ where: { id: input.bank_account_id }, select: { active: true } });
         if (!account?.active) throw new Error("Selecione uma conta bancária ativa.");
+        const { start, end } = businessDay();
+        if (await tx.cashClosing.findFirst({ where: { bank_account_id: input.bank_account_id, closing_date: { gte: start, lt: end }, reopened_at: null } })) throw new Error("O caixa de hoje está fechado. Reabra o fechamento antes de registrar movimentações.");
       }
 
       const amount = new Prisma.Decimal(input.amount);
@@ -289,16 +288,19 @@ export async function reversePayment(
         throw new Error("Pagamento já estornado sem contrapartida localizada.");
       }
 
+      const relation = await tx.financeEntry.findUniqueOrThrow({ where: { id: original.finance_entry_id }, select: { reservation_id: true } });
+      if (relation.reservation_id) await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${relation.reservation_id}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM finance_entries WHERE id = ${original.finance_entry_id}::uuid FOR UPDATE`;
       if (original.reconciled) throw new Error("Este pagamento já foi conciliado. Revise a conciliação antes de estornar.");
       if (original.bank_account_id) {
+        await tx.$queryRaw`SELECT id FROM bank_accounts WHERE id = ${original.bank_account_id}::uuid FOR UPDATE`;
         const closing = await tx.cashClosing.findFirst({ where: {
           bank_account_id: original.bank_account_id, reopened_at: null,
-          closing_date: { gte: new Date(original.created_at.getTime() - 24 * 60 * 60 * 1000) },
+          closing_date: { gte: businessDay(original.created_at).start },
         }, select: { id: true } });
         if (closing) throw new Error("Este pagamento pertence a um caixa fechado. Revise o fechamento antes de estornar.");
       }
 
-      await tx.$queryRaw`SELECT id FROM finance_entries WHERE id = ${original.finance_entry_id}::uuid FOR UPDATE`;
       const duplicate = await tx.payment.findUnique({ where: { dedupe_key: params.dedupeKey } });
       if (duplicate) return duplicate;
 
@@ -446,6 +448,9 @@ export async function createCompensation(input: CreateCompensationInput) {
         throw new Error("O valor da compensação deve ser maior que zero.");
       }
 
+      const relations = await tx.financeEntry.findMany({ where: { id: { in: entryIds } }, select: { reservation_id: true } });
+      const reservationIds = [...new Set(relations.map((entry) => entry.reservation_id).filter((id): id is string => Boolean(id)))].sort();
+      for (const id of reservationIds) await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${id}::uuid FOR UPDATE`;
       // Serializa compensações e pagamentos concorrentes dos mesmos títulos.
       await tx.$queryRaw`
         SELECT id

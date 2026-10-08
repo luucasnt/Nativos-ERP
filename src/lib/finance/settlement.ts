@@ -184,11 +184,11 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
   return entries;
 }
 
-async function loadSettlementInput(serviceId: string): Promise<{
+async function loadSettlementInput(serviceId: string, db: Prisma.TransactionClient = prisma): Promise<{
   reservationId: string;
   input: ServiceSettlementInput;
 }> {
-  const service = await prisma.service.findUniqueOrThrow({
+  const service = await db.service.findUniqueOrThrow({
     where: { id: serviceId },
     include: {
       reservation: true,
@@ -197,7 +197,7 @@ async function loadSettlementInput(serviceId: string): Promise<{
     },
   });
 
-  const expenseTotal = await prisma.serviceExpense.aggregate({
+  const expenseTotal = await db.serviceExpense.aggregate({
     where: { service_id: serviceId, status: { not: "rejeitado" } },
     _sum: { amount: true },
   });
@@ -223,9 +223,10 @@ async function loadSettlementInput(serviceId: string): Promise<{
   };
 }
 
-async function upsertProgrammedEntry(serviceId: string, reservationId: string, spec: EntrySpec) {
+async function upsertProgrammedEntry(serviceId: string, reservationId: string, spec: EntrySpec, db: Prisma.TransactionClient) {
   const autoKey = `svc:${serviceId}:${spec.key}`;
-  const existing = await prisma.financeEntry.findUnique({
+  await db.$queryRaw`SELECT id FROM finance_entries WHERE auto_key = ${autoKey} FOR UPDATE`;
+  const existing = await db.financeEntry.findUnique({
     where: { auto_key: autoKey },
     include: { payments: { where: { reversed_at: null, estorno_of_id: null }, select: { id: true } } },
   });
@@ -243,7 +244,7 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
       origin_id: serviceId,
       auto_key: autoKey,
       status: spec.finalized ? "pago" : "programado",
-    });
+    }, db);
   }
 
   // Um registro de rastreio "finalized" (ex.: cortesia, amount=0) já nasce
@@ -256,7 +257,7 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
   // ser ajustado in-place — uma vez elegível/pago, mudar de valor exige
   // uma reversão formal, não uma edição silenciosa.
   if (existing.status === "programado" && existing.payments.length === 0 && !existing.compensacao_id && !existing.reversed_at) {
-    return prisma.financeEntry.update({
+    return db.financeEntry.update({
       where: { id: existing.id },
       data: { type: spec.type, category: spec.category, amount: spec.amount, party_type: spec.party_type, party_id: spec.party_id },
     });
@@ -270,22 +271,28 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
 // zero o conjunto de lançamentos "programado" que ele deveria ter,
 // criando/ajustando os que ainda fazem sentido e cancelando (nunca
 // apagando) os que deixaram de se aplicar.
-export async function generateServiceFinanceEntries(serviceId: string) {
-  const { reservationId, input } = await loadSettlementInput(serviceId);
+export async function generateServiceFinanceEntries(serviceId: string, db?: Prisma.TransactionClient): Promise<void> {
+  if (!db) return prisma.$transaction((tx) => generateServiceFinanceEntries(serviceId, tx));
+  const relation = await db.service.findUniqueOrThrow({ where: { id: serviceId }, select: { reservation_id: true } });
+  await db.$queryRaw`SELECT id FROM reservations WHERE id = ${relation.reservation_id}::uuid FOR UPDATE`;
+  await db.$queryRaw`SELECT id FROM services WHERE id = ${serviceId}::uuid FOR UPDATE`;
+  const current = await db.service.findUniqueOrThrow({ where: { id: serviceId }, include: { reservation: true } });
+  if (current.execution_status === "cancelado" || ["cancelado", "rejeitado"].includes(current.reservation.status)) return;
+  const { reservationId, input } = await loadSettlementInput(serviceId, db);
   const desired = computeServiceSettlementEntries(input);
   const desiredKeys = new Set(desired.map((d) => `svc:${serviceId}:${d.key}`));
 
   for (const spec of desired) {
-    await upsertProgrammedEntry(serviceId, reservationId, spec);
+    await upsertProgrammedEntry(serviceId, reservationId, spec, db);
   }
 
-  const existingEntries = await prisma.financeEntry.findMany({
+  const existingEntries = await db.financeEntry.findMany({
     where: { service_id: serviceId, status: "programado", reversed_at: null },
   });
 
   for (const entry of existingEntries) {
     if (entry.auto_key && !desiredKeys.has(entry.auto_key)) {
-      await cancelUnpaidFinanceEntry(entry.id);
+      await cancelUnpaidFinanceEntry(entry.id, db);
     }
   }
 }
@@ -437,12 +444,13 @@ async function compensateGrossRepassPairIfPresent(serviceId: string) {
 
 // Cancela (nunca apaga) os lançamentos ainda não pagos de um serviço
 // cancelado.
-export async function cancelServiceFinanceEntries(serviceId: string) {
-  const entries = await prisma.financeEntry.findMany({
-    where: { service_id: serviceId, reversed_at: null, status: { in: ["programado", "pendente"] } },
+export async function cancelServiceFinanceEntries(serviceId: string, db?: Prisma.TransactionClient): Promise<void> {
+  if (!db) return prisma.$transaction((tx) => cancelServiceFinanceEntries(serviceId, tx));
+  const entries = await db.financeEntry.findMany({
+    where: { service_id: serviceId, reversed_at: null, status: { in: ["programado", "pendente", "vencido"] } },
   });
 
   for (const entry of entries) {
-    await cancelUnpaidFinanceEntry(entry.id);
+    await cancelUnpaidFinanceEntry(entry.id, db);
   }
 }
