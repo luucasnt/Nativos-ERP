@@ -72,7 +72,7 @@ export default async function EditarEmpresaPage({
           existingUserStatus={existingUser?.status ?? null}
         />
       </div>
-      <DeleteRecordButton id={company.id} label={`a empresa ${company.name}`} action={deleteCompany} />
+      <DeleteRecordButton id={company.id} label={`a empresa ${company.name}`} action={deleteCompany} successHref="/admin/empresas" />
     </div>
   );
 }

@@ -41,7 +41,7 @@ export default async function EditarClientePage({
           origin_partner_id: client.origin_partner_id,
         }}
       />
-      <DeleteRecordButton id={client.id} label={`o cliente ${client.name}`} action={deleteClient} />
+      <DeleteRecordButton id={client.id} label={`o cliente ${client.name}`} action={deleteClient} successHref="/admin/clientes" />
     </div>
   );
 }

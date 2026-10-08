@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireInternalUser } from "@/lib/auth/get-current-user";
+import { requireFinancialUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
 import { approveServiceExpense, rejectServiceExpense } from "@/lib/finance/expenses";
 import { notifyDriverPortalUser } from "@/lib/notifications";
 
 export async function approveExpense(expenseId: string) {
-  const user = await requireInternalUser();
+  const user = await requireFinancialUser();
   const expense = await approveServiceExpense(expenseId, user.id);
 
   await logAudit({
@@ -21,7 +21,7 @@ export async function approveExpense(expenseId: string) {
 }
 
 export async function rejectExpense(expenseId: string, reason: string) {
-  const user = await requireInternalUser();
+  const user = await requireFinancialUser();
   const expense = await rejectServiceExpense(expenseId, user.id, reason);
 
   if (expense.service_id) {

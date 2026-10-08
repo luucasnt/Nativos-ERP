@@ -21,7 +21,7 @@ export function ItemRow({ id, keyName, label, order, active, type }: ItemRowProp
 
   return (
     <tr>
-      <td className={tdClass}>{editing ? <input name="key" defaultValue={keyName} required className={`${inputClass} min-w-32`} form={`edit-catalog-${id}`} /> : keyName}</td>
+      <td className={tdClass}>{editing ? <input name="key" defaultValue={keyName} required readOnly className={`${inputClass} min-w-32`} form={`edit-catalog-${id}`} /> : keyName}</td>
       <td className={tdClass}>{editing ? <input name="label" defaultValue={label} required className={`${inputClass} min-w-40`} form={`edit-catalog-${id}`} /> : label}</td>
       <td className={tdClass}>{editing ? <input name="order" type="number" defaultValue={order} className={`${inputClass} w-20`} form={`edit-catalog-${id}`} /> : order}</td>
       <td className={tdClass}>{active ? "Ativo" : "Inativo"}</td>
@@ -42,6 +42,7 @@ export function ItemRow({ id, keyName, label, order, active, type }: ItemRowProp
             disabled={isPending}
             onClick={() =>
               startTransition(async () => {
+                if (!window.confirm("Excluir este item sem vínculos?")) return;
                 const result = await deleteCatalogItem(id);
                 setError(result.error);
               })

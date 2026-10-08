@@ -59,7 +59,8 @@ export async function createEmailTemplate(
     return { error: "Já existe um template com essa chave." };
   }
 
-  await prisma.emailTemplate.create({
+  await prisma.$transaction(async (tx) => {
+  await tx.emailTemplate.create({
     data: {
       key: parsed.data.key,
       name: parsed.data.name,
@@ -71,11 +72,7 @@ export async function createEmailTemplate(
     },
   });
 
-  await logAudit({
-    actorId: user.id,
-    action: "template_email_criado",
-    entityType: "other",
-    entityId: parsed.data.key,
+  await tx.auditLog.create({ data: { actor_id: user.id, action: "template_email_criado", entity_type: "other", metadata: { template_key: parsed.data.key } } });
   });
 
   revalidatePath(PATH);
@@ -103,7 +100,8 @@ export async function updateEmailTemplate(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  await prisma.emailTemplate.update({
+  await prisma.$transaction(async (tx) => {
+  await tx.emailTemplate.update({
     where: { key },
     data: {
       name: parsed.data.name,
@@ -115,11 +113,7 @@ export async function updateEmailTemplate(
     },
   });
 
-  await logAudit({
-    actorId: user.id,
-    action: "template_email_atualizado",
-    entityType: "other",
-    entityId: key,
+  await tx.auditLog.create({ data: { actor_id: user.id, action: "template_email_atualizado", entity_type: "other", metadata: { template_key: key } } });
   });
 
   revalidatePath(PATH);
@@ -129,13 +123,11 @@ export async function updateEmailTemplate(
 export async function deleteEmailTemplate(key: string) {
   const user = await requireInternalUser();
 
-  await prisma.emailTemplate.delete({ where: { key } });
-
-  await logAudit({
-    actorId: user.id,
-    action: "template_email_excluido",
-    entityType: "other",
-    entityId: key,
+  await prisma.$transaction(async (tx) => {
+    const template = await tx.emailTemplate.findUniqueOrThrow({ where: { key }, include: { _count: { select: { communications: true } } } });
+    if (template._count.communications) throw new Error("Este modelo possui comunicações no histórico e não pode ser excluído.");
+    await tx.emailTemplate.delete({ where: { key } });
+    await tx.auditLog.create({ data: { actor_id: user.id, action: "template_email_excluido", entity_type: "other", metadata: { template_key: key } } });
   });
 
   revalidatePath(PATH);

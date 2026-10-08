@@ -255,10 +255,10 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
   // Só um lançamento ainda em rascunho (programado, nunca revertido) pode
   // ser ajustado in-place — uma vez elegível/pago, mudar de valor exige
   // uma reversão formal, não uma edição silenciosa.
-  if ((existing.status === "programado" || (existing.status === "pendente" && existing.payments.length === 0)) && !existing.reversed_at) {
+  if (existing.status === "programado" && existing.payments.length === 0 && !existing.compensacao_id && !existing.reversed_at) {
     return prisma.financeEntry.update({
       where: { id: existing.id },
-      data: { amount: spec.amount, party_type: spec.party_type, party_id: spec.party_id },
+      data: { type: spec.type, category: spec.category, amount: spec.amount, party_type: spec.party_type, party_id: spec.party_id },
     });
   }
 

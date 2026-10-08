@@ -1,0 +1,27 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("@/lib/auth/get-current-user", () => ({ requireFinancialUser: vi.fn(), requireInternalUser: vi.fn() }));
+import { requireFinancialUser, requireInternalUser } from "@/lib/auth/get-current-user";
+import { deleteClient } from "@/app/admin/clientes/actions";
+import { deleteCompany } from "@/app/admin/empresas/actions";
+import { deleteDriver } from "@/app/admin/motoristas/actions";
+import { deleteVehicle } from "@/app/admin/veiculos/actions";
+import { cancelManualEntry, registerPayment, reverseRegisteredPayment, updateManualEntry } from "@/app/admin/financeiro/actions";
+import { createManualFinanceEntry } from "@/app/admin/financeiro/novo/actions";
+import { approveExpense, rejectExpense } from "@/app/admin/despesas/actions";
+import { deleteBankAccount, updateBankAccount } from "@/app/admin/configuracoes/bancos/actions";
+beforeEach(() => { vi.mocked(requireFinancialUser).mockRejectedValue(new Error("Financeiro restrito")); vi.mocked(requireInternalUser).mockRejectedValue(new Error("Equipe restrita")); });
+describe("ações exigem permissão no servidor antes de ler ou alterar registros", () => {
+  it.each([deleteClient, deleteCompany, deleteDriver, deleteVehicle])("exclusão de cadastro exige equipe", async (action) => { await expect(action(crypto.randomUUID())).rejects.toThrow("Equipe restrita"); });
+  it("edição financeira exige financeiro", async () => { await expect(updateManualEntry(crypto.randomUUID(), { error: null }, new FormData())).rejects.toThrow("Financeiro restrito"); });
+  it("criação financeira exige financeiro", async () => { await expect(createManualFinanceEntry({ error: null }, new FormData())).rejects.toThrow("Financeiro restrito"); });
+  it("exclusão financeira exige financeiro", async () => { await expect(cancelManualEntry(crypto.randomUUID(), "teste")).rejects.toThrow("Financeiro restrito"); });
+  it("estorno exige financeiro", async () => { await expect(reverseRegisteredPayment(crypto.randomUUID(), "teste")).rejects.toThrow("Financeiro restrito"); });
+  it("pagamento exige financeiro", async () => { await expect(registerPayment({ entryId: crypto.randomUUID(), paymentMethod: "pix", amount: "100", dedupeKey: crypto.randomUUID() })).rejects.toThrow("Financeiro restrito"); });
+  it("aprovação de despesa exige financeiro", async () => { await expect(approveExpense(crypto.randomUUID())).rejects.toThrow("Financeiro restrito"); });
+  it("rejeição de despesa exige financeiro", async () => { await expect(rejectExpense(crypto.randomUUID(), "teste")).rejects.toThrow("Financeiro restrito"); });
+  it("exclusão de conta exige financeiro", async () => { await expect(deleteBankAccount(crypto.randomUUID())).rejects.toThrow("Financeiro restrito"); });
+  it("edição de conta exige financeiro", async () => { await expect(updateBankAccount(crypto.randomUUID(), { error: null, saved: false }, new FormData())).rejects.toThrow("Financeiro restrito"); });
+});

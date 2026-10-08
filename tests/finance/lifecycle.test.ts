@@ -195,7 +195,9 @@ describe("regras não-negociáveis (spec seção 6) via motor, não só via SQL 
       const [entry] = await prisma.financeEntry.findMany({ where: { service_id: service.id } });
 
       await expect(prisma.financeEntry.delete({ where: { id: entry.id } })).rejects.toThrow();
-
+      // Reconnect after the database rejects the mutation. This also proves
+      // that the original survives outside the failed session/transaction.
+      await prisma.$disconnect();
       const stillThere = await prisma.financeEntry.findUnique({ where: { id: entry.id } });
       expect(stillThere).not.toBeNull();
     } finally {

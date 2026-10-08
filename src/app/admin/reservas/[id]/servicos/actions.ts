@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
@@ -496,4 +497,16 @@ export async function rejectServiceInternal(
   });
 
   revalidatePath(`/admin/reservas/${reservationId}`);
+}
+
+export async function deleteService(reservationId: string, serviceId: string): Promise<{ error?: string | null }> {
+  const user = await requireInternalUser();
+  try { await deleteUnusedRecord("service", serviceId, user.id, reservationId); }
+  catch (error) { return { error: deletionError(error) }; }
+  await recalculateReservationStatus(reservationId);
+  await recalculateReservationTax(reservationId);
+  await recalculateReservationCommissions(reservationId);
+  revalidatePath(`/admin/reservas/${reservationId}`);
+  revalidatePath("/admin/reservas");
+  return {};
 }

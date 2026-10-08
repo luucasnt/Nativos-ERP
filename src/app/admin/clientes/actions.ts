@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 
 const clientSchema = z.object({
   name: z.string().min(1, "Informe o nome."),
@@ -113,11 +114,11 @@ export async function updateClient(
 
 export async function deleteClient(id: string): Promise<{ error?: string | null }> {
   const user = await requireInternalUser();
-  const client = await prisma.client.findUnique({ where: { id }, select: { id: true, name: true, _count: { select: { reservations: true, client_credits: true } } } });
-  if (!client) return { error: "Cliente não encontrado." };
-  if (client._count.reservations || client._count.client_credits) return { error: "Este cliente possui reservas ou créditos vinculados. Regularize esses vínculos antes de excluir." };
-  await prisma.client.delete({ where: { id } });
-  await logAudit({ actorId: user.id, action: "cliente_excluido", entityType: "client", entityId: id, metadata: { name: client.name } });
+  try {
+    await deleteUnusedRecord("client", id, user.id);
+  } catch (error) {
+    return { error: deletionError(error) };
+  }
   revalidatePath("/admin/clientes");
   return {};
 }

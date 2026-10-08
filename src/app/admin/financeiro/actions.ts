@@ -6,7 +6,8 @@ import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireFinancialUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
-import { createPayment } from "@/lib/finance/ledger";
+import { createPayment, reversePayment } from "@/lib/finance/ledger";
+import { cancelStandaloneManualEntry, isStandaloneManualEntry, manualEntrySchema, moneyInput, updateStandaloneManualEntry } from "@/lib/finance/manual-entry";
 import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
 
 const paymentMethodSchema = z.enum(["pix", "cartao", "dinheiro", "transferencia", "boleto", "outro"]);
@@ -24,7 +25,9 @@ export async function registerPayment(input: {
 }) {
   const user = await requireFinancialUser();
   const paymentMethod = paymentMethodSchema.parse(input.paymentMethod);
-  const amount = z.coerce.number().positive("Informe um valor maior que zero.").parse(input.amount);
+  const amount = moneyInput.parse(input.amount);
+  z.string().uuid().parse(input.entryId);
+  z.string().uuid().parse(input.dedupeKey);
   const bankAccountId = input.bankAccountId ? z.string().uuid().parse(input.bankAccountId) : null;
   const receiptUrl = input.receiptUrl?.trim() ? z.string().url("Informe uma URL válida para o comprovante.").parse(input.receiptUrl.trim()) : null;
 
@@ -33,7 +36,7 @@ export async function registerPayment(input: {
   if (requiresProof && !receiptUrl) {
     throw new Error("O comprovante é obrigatório para pagamentos de fornecedor, parceiro ou cliente.");
   }
-  if (requiresProof && !entry.reservation_id) {
+  if (requiresProof && !entry.reservation_id && !isStandaloneManualEntry(entry)) {
     throw new Error("Este lançamento não está vinculado a uma reserva e não pode ser liquidado automaticamente.");
   }
 
@@ -84,5 +87,41 @@ export async function registerPayment(input: {
   await Promise.allSettled(sideEffects);
 
   revalidatePath("/admin/financeiro");
+  if (entry.reservation_id) revalidatePath(`/admin/reservas/${entry.reservation_id}`);
+}
+
+export async function updateManualEntry(id: string, _prev: { error: string | null }, formData: FormData) {
+  const user = await requireFinancialUser();
+  const parsed = manualEntrySchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  try {
+    await updateStandaloneManualEntry(id, parsed.data, user.id, String(formData.get("updated_at")));
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível atualizar." };
+  }
+  revalidatePath("/admin/financeiro");
+  revalidatePath(`/admin/financeiro/${id}`);
+  return { error: null };
+}
+
+export async function cancelManualEntry(id: string, reason: string) {
+  const user = await requireFinancialUser();
+  await cancelStandaloneManualEntry(id, reason, user.id);
+  revalidatePath("/admin/financeiro");
+  revalidatePath(`/admin/financeiro/${id}`);
+}
+
+export async function reverseRegisteredPayment(paymentId: string, reason: string) {
+  const user = await requireFinancialUser();
+  z.string().uuid().parse(paymentId);
+  const note = z.string().trim().min(3, "Informe o motivo do estorno.").max(1000).parse(reason);
+  const reversal = await reversePayment(paymentId, {
+    actorId: user.id, reason: note, dedupeKey: `admin:estorno:${paymentId}`, audit: true,
+  });
+  const entry = await prisma.financeEntry.findUniqueOrThrow({ where: { id: reversal.finance_entry_id } });
+  revalidatePath("/admin/financeiro");
+  revalidatePath(`/admin/financeiro/${entry.id}`);
+  revalidatePath("/portal/empresa", "layout");
+  revalidatePath("/portal/motorista", "layout");
   if (entry.reservation_id) revalidatePath(`/admin/reservas/${entry.reservation_id}`);
 }

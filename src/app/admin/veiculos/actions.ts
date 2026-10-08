@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
+import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 
 const vehicleSchema = z.object({
   plate: z.string().min(1, "Informe a placa."),
@@ -159,4 +160,14 @@ export async function rejectVehicle(id: string) {
   revalidatePath("/admin/veiculos");
   revalidatePath("/admin/aprovacoes");
   revalidatePath(`/admin/veiculos/${id}`);
+}
+export async function deleteVehicle(id: string): Promise<{ error?: string | null }> {
+  const user = await requireInternalUser();
+  try {
+    await deleteUnusedRecord("vehicle", id, user.id);
+  } catch (error) {
+    return { error: deletionError(error) };
+  }
+  revalidatePath("/admin/veiculos");
+  return {};
 }

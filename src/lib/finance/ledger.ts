@@ -87,16 +87,13 @@ export async function createFinanceEntry(input: CreateFinanceEntryInput) {
 // atingido — nunca antes. Esta função é o único lugar que liga
 // payment_eligible=true, e só é chamada quando esse marco é confirmado.
 export async function markFinanceEntryEligible(entryId: string) {
-  const entry = await prisma.financeEntry.findUniqueOrThrow({ where: { id: entryId } });
-
-  if (entry.status === "cancelado" || entry.reversed_at) {
-    return entry;
-  }
-
-  return prisma.financeEntry.update({
-    where: { id: entryId },
+  // An atomic predicate prevents a concurrent settlement from being
+  // overwritten by a retry of the operational completion event.
+  await prisma.financeEntry.updateMany({
+    where: { id: entryId, status: "programado", reversed_at: null },
     data: { status: "pendente", payment_eligible: true },
   });
+  return prisma.financeEntry.findUniqueOrThrow({ where: { id: entryId } });
 }
 
 // Cancela um lançamento que ainda não gerou nenhum pagamento real — isto é
@@ -213,6 +210,13 @@ export async function createPayment(input: CreatePaymentInput) {
       if (!entry.payment_eligible || entry.reversed_at || entry.status === "cancelado") {
         throw new Error("Este lançamento não está elegível para pagamento.");
       }
+      if (input.type !== (entry.type === "receita" ? "recebimento" : "pagamento")) {
+        throw new Error("O sentido do pagamento não corresponde ao lançamento.");
+      }
+      if (input.bank_account_id) {
+        const account = await tx.bankAccount.findUnique({ where: { id: input.bank_account_id }, select: { active: true } });
+        if (!account?.active) throw new Error("Selecione uma conta bancária ativa.");
+      }
 
       const amount = new Prisma.Decimal(input.amount);
       if (!amount.isPositive()) throw new Error("O valor do pagamento deve ser maior que zero.");
@@ -265,7 +269,7 @@ export async function createPayment(input: CreatePaymentInput) {
 
 export async function reversePayment(
   paymentId: string,
-  params: { actorId: string; reason: string; dedupeKey: string },
+  params: { actorId: string; reason: string; dedupeKey: string; audit?: boolean },
 ) {
   if (!params.reason.trim()) throw new Error("Informe o motivo do estorno.");
 
@@ -283,6 +287,15 @@ export async function reversePayment(
         const reversal = await tx.payment.findFirst({ where: { estorno_of_id: paymentId } });
         if (reversal) return reversal;
         throw new Error("Pagamento já estornado sem contrapartida localizada.");
+      }
+
+      if (original.reconciled) throw new Error("Este pagamento já foi conciliado. Revise a conciliação antes de estornar.");
+      if (original.bank_account_id) {
+        const closing = await tx.cashClosing.findFirst({ where: {
+          bank_account_id: original.bank_account_id, reopened_at: null,
+          closing_date: { gte: new Date(original.created_at.getTime() - 24 * 60 * 60 * 1000) },
+        }, select: { id: true } });
+        if (closing) throw new Error("Este pagamento pertence a um caixa fechado. Revise o fechamento antes de estornar.");
       }
 
       await tx.$queryRaw`SELECT id FROM finance_entries WHERE id = ${original.finance_entry_id}::uuid FOR UPDATE`;
@@ -340,6 +353,10 @@ export async function reversePayment(
         },
       });
 
+      if (params.audit) await tx.auditLog.create({ data: {
+        actor_id: params.actorId, action: "pagamento_estornado", entity_type: "payment", entity_id: paymentId,
+        metadata: { reason: params.reason.trim(), reversal_id: reversal.id, amount: original.amount.toString() },
+      } });
       return reversal;
     });
   } catch (error) {
