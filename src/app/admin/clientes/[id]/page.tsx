@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { updateClient } from "../actions";
+import { deleteClient, updateClient } from "../actions";
+import { DeleteRecordButton } from "@/components/admin/delete-record-button";
 import { ClientForm } from "../client-form";
 
 export default async function EditarClientePage({
@@ -40,6 +41,7 @@ export default async function EditarClientePage({
           origin_partner_id: client.origin_partner_id,
         }}
       />
+      <DeleteRecordButton id={client.id} label={`o cliente ${client.name}`} action={deleteClient} />
     </div>
   );
 }
