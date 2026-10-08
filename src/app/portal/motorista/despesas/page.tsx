@@ -183,6 +183,7 @@ export default async function PortalMotoristaDespesasPage() {
         </section>
 
         <aside className="surface-panel p-5">
+          {driver.owner_type === "proprio" ? <>
           <div className="flex items-center gap-2">
             <Plus size={17} className="text-gold" aria-hidden="true" />
             <h2 className="section-heading">Registrar despesa</h2>
@@ -202,6 +203,7 @@ export default async function PortalMotoristaDespesasPage() {
             categories={categories}
             vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, label: `${vehicle.plate} — ${vehicle.model}` }))}
           />
+          </> : <p className="text-sm text-forest/70">Motoristas terceirizados possuem cadastro operacional, sem reembolso ou remuneração pela Nativos.</p>}
         </aside>
       </div>
     </div>

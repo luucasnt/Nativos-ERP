@@ -20,7 +20,7 @@ type DriverFormProps = {
     owner_type: string;
     supplier_id: string | null;
     is_company_owner_driver: boolean;
-    payment_type: string;
+    payment_type: string | null;
     commission: string | null;
     daily_rate: string | null;
     salario_mensal: string | null;
@@ -153,6 +153,7 @@ export function DriverForm({
         </div>
       )}
 
+      {ownerType === "proprio" ? <>
       <div className="flex flex-col gap-1">
         <label htmlFor="payment_type" className={labelClass}>
           Forma de pagamento *
@@ -213,6 +214,8 @@ export function DriverForm({
           />
         </div>
       )}
+
+      </> : <p className="rounded-lg bg-forest/5 p-4 text-sm text-forest/75">Cadastro operacional, sem diária, comissão ou salário pago pela Nativos.</p>}
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
       <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>

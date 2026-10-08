@@ -101,7 +101,7 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
           party_id: input.supplier_id,
         });
       }
-    } else if (collectionActor === "motorista_proprio" && input.driver_id) {
+    } else if (collectionActor === "motorista_proprio" && input.driver_id && input.driver_owner_type === "proprio") {
       // INFERIDO: sem um campo de "modo de liquidação" próprio para
       // motorista próprio (só Company tem direct_collection_settlement_mode),
       // aplicamos por analogia o mesmo padrão de "retém a própria
