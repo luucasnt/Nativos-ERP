@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { updateCompany } from "../actions";
+import { deleteCompany, updateCompany } from "../actions";
+import { DeleteRecordButton } from "@/components/admin/delete-record-button";
 import { CompanyForm } from "../company-form";
 import { PortalLoginPanel } from "@/components/admin/portal-login-panel";
 
@@ -71,6 +72,7 @@ export default async function EditarEmpresaPage({
           existingUserStatus={existingUser?.status ?? null}
         />
       </div>
+      <DeleteRecordButton id={company.id} label={`a empresa ${company.name}`} action={deleteCompany} />
     </div>
   );
 }
