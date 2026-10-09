@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { assertResourceRelinkAllowed, assertSupplier } from "@/lib/services/resource-validation";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
@@ -77,6 +78,11 @@ export async function createVehicle(
     return { error: result.error };
   }
 
+  if (result.data.owner_type === "terceirizado") {
+    try { await assertSupplier(result.data.supplier_id); }
+    catch (error) { return { error: error instanceof Error ? error.message : "Fornecedor inválido." }; }
+  }
+
   const vehicle = await prisma.vehicle.create({
     data: {
       ...result.data,
@@ -109,7 +115,12 @@ export async function updateVehicle(
     return { error: result.error };
   }
 
-  await prisma.vehicle.update({ where: { id }, data: result.data });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await assertResourceRelinkAllowed("vehicle", id, result.data, tx);
+      await tx.vehicle.update({ where: { id }, data: result.data });
+    });
+  } catch (error) { return { error: error instanceof Error ? error.message : "Vínculo de fornecedor inválido." }; }
 
   await logAudit({
     actorId: user.id,

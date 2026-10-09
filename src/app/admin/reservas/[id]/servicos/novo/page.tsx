@@ -20,12 +20,12 @@ export default async function NovoServicoPage({
     prisma.driver.findMany({
       where: { status: "ativo", approval_status: "aprovado" },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, owner_type: true, supplier_id: true },
     }),
     prisma.vehicle.findMany({
       where: { status: "ativo", approval_status: "aprovado" },
       orderBy: { model: "asc" },
-      select: { id: true, model: true, plate: true },
+      select: { id: true, model: true, plate: true, owner_type: true, supplier_id: true },
     }),
     prisma.catalogItem.findMany({
       where: { type: "pacote_disposicao", active: true },
@@ -47,7 +47,7 @@ export default async function NovoServicoPage({
         action={createService.bind(null, reservationId)}
         suppliers={suppliers}
         drivers={drivers}
-        vehicles={vehicles.map((v) => ({ id: v.id, name: `${v.model} (${v.plate})` }))}
+        vehicles={vehicles.map((v) => ({ id: v.id, name: `${v.model} (${v.plate})`, owner_type: v.owner_type, supplier_id: v.supplier_id }))}
         disposicaoPackages={disposicaoPackages}
         cancelHref={`/admin/reservas/${reservationId}`}
       />

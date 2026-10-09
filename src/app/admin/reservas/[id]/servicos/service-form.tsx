@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ServiceFormState } from "./actions";
 import { buttonClass, inputClass, labelClass, mobileStickyActionClass, secondaryButtonClass } from "@/lib/ui";
 import { SearchableEntitySelect } from "@/components/ui/searchable-entity-select";
+import { resourceMatchesScope, type ExecutionType, type ResourceOwnership } from "@/lib/services/resource-scope";
 
 const initialState: ServiceFormState = { error: null };
 
@@ -14,8 +15,8 @@ type CatalogOption = { id: string; label: string };
 type ServiceFormProps = {
   action: (prevState: ServiceFormState, formData: FormData) => Promise<ServiceFormState>;
   suppliers: Option[];
-  drivers: Option[];
-  vehicles: Option[];
+  drivers: (Option & ResourceOwnership)[];
+  vehicles: (Option & ResourceOwnership)[];
   disposicaoPackages: CatalogOption[];
   cancelHref: string;
   isEditing?: boolean;
@@ -66,7 +67,9 @@ export function ServiceForm({
 }: ServiceFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [type, setType] = useState(defaultValues?.type ?? "transfer_chegada");
-  const [executionType, setExecutionType] = useState(defaultValues?.execution_type ?? "propria");
+  const [executionType, setExecutionType] = useState<ExecutionType>((defaultValues?.execution_type as ExecutionType) ?? "propria");
+  const [supplierId, setSupplierId] = useState(defaultValues?.supplier_id ?? "");
+  const [resourcesChanged, setResourcesChanged] = useState(false);
   const [discountType, setDiscountType] = useState(defaultValues?.discount_type ?? "nenhum");
 
   const osShowPriceDefault =
@@ -107,7 +110,11 @@ export function ServiceForm({
             id="execution_type"
             name="execution_type"
             value={executionType}
-            onChange={(e) => setExecutionType(e.target.value)}
+            onChange={(e) => {
+              setExecutionType(e.target.value as ExecutionType);
+              setSupplierId("");
+              setResourcesChanged(true);
+            }}
             className={inputClass}
           >
             <option value="propria">Frota própria</option>
@@ -118,16 +125,19 @@ export function ServiceForm({
 
       {executionType === "fornecedor" && (
         <div className="flex flex-col gap-1">
-          <SearchableEntitySelect name="supplier_id" label="Fornecedor" entity="company" value={defaultValues?.supplier_id ?? ""} initialOptions={suppliers} required />
+          <SearchableEntitySelect name="supplier_id" label="Fornecedor" entity="supplier" value={supplierId} initialOptions={suppliers} required onValueChange={(id) => {
+            if (id !== supplierId) setResourcesChanged(true);
+            setSupplierId(id);
+          }} />
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <SearchableEntitySelect name="driver_id" label="Motorista" entity="driver" value={defaultValues?.driver_id ?? ""} initialOptions={drivers} />
+          <SearchableEntitySelect key={`driver-${executionType}-${supplierId}`} name="driver_id" label="Motorista" entity="driver" value={resourcesChanged ? "" : defaultValues?.driver_id ?? ""} initialOptions={drivers.filter((driver) => resourceMatchesScope(driver, executionType, supplierId || null))} executionType={executionType} supplierId={supplierId} disabled={executionType === "fornecedor" && !supplierId} />
         </div>
         <div className="flex flex-col gap-1">
-          <SearchableEntitySelect name="vehicle_id" label="Veículo" entity="vehicle" value={defaultValues?.vehicle_id ?? ""} initialOptions={vehicles} />
+          <SearchableEntitySelect key={`vehicle-${executionType}-${supplierId}`} name="vehicle_id" label="Veículo" entity="vehicle" value={resourcesChanged ? "" : defaultValues?.vehicle_id ?? ""} initialOptions={vehicles.filter((vehicle) => resourceMatchesScope(vehicle, executionType, supplierId || null))} executionType={executionType} supplierId={supplierId} disabled={executionType === "fornecedor" && !supplierId} />
         </div>
       </div>
 

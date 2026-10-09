@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { parseDriverForm } from "@/lib/drivers/form";
+import { assertResourceRelinkAllowed, assertSupplier } from "@/lib/services/resource-validation";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
@@ -23,6 +24,11 @@ export async function createDriver(
 
   // Cadastrado pela equipe interna: já nasce aprovado (o fluxo de
   // aprovação existe para cadastros vindos do portal do fornecedor).
+  if (result.data.owner_type === "terceirizado") {
+    try { await assertSupplier(result.data.supplier_id); }
+    catch (error) { return { error: error instanceof Error ? error.message : "Fornecedor inválido." }; }
+  }
+
   const driver = await prisma.driver.create({
     data: {
       ...result.data,
@@ -55,7 +61,12 @@ export async function updateDriver(
     return { error: result.error };
   }
 
-  await prisma.driver.update({ where: { id }, data: result.data });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await assertResourceRelinkAllowed("driver", id, result.data, tx);
+      await tx.driver.update({ where: { id }, data: result.data });
+    });
+  } catch (error) { return { error: error instanceof Error ? error.message : "Vínculo de fornecedor inválido." }; }
 
   await logAudit({
     actorId: user.id,

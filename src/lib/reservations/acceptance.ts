@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 import { alertSupplierRejected } from "@/lib/alerts/detectors";
+import { assertServiceResources } from "@/lib/services/resource-validation";
 
 async function respond(serviceId: string, accepted: boolean, reason?: string) {
   return prisma.$transaction(async (tx) => {
@@ -13,6 +14,7 @@ async function respond(serviceId: string, accepted: boolean, reason?: string) {
     const target = accepted ? "aceito" : "recusado";
     if (current.acceptance_status !== target && current.acceptance_status !== "aguardando_aceite") throw new Error("O serviço já foi respondido. Solicite a reatribuição antes de mudar a resposta.");
     if (current.acceptance_status === target) return { service: current, changed: false };
+    if (accepted && (current.driver_id || current.vehicle_id)) await assertServiceResources(current, current, tx);
     const service = await tx.service.update({ where: { id: serviceId }, data: { acceptance_status: target, acceptance_reason: accepted ? null : reason }, include: { supplier: true } });
     if (accepted) await generateServiceFinanceEntries(serviceId, tx);
     else await cancelServiceFinanceEntries(serviceId, tx);
