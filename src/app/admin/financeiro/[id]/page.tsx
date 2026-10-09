@@ -55,7 +55,7 @@ export default async function FinanceEntryPage({ params }: { params: Promise<{ i
         {payment.receipt_url && <a href={`/api/admin/comprovantes/${payment.id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir comprovante</a>}
         {payment.reversal_reason && <p className="text-sm text-forest/60">Motivo: {payment.reversal_reason}</p>}
         {!payment.reversed_at && !payment.estorno_of_id && <>
-          <a href={`/api/documentos/recibo/${payment.id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir recibo</a>
+          <a href={`/api/documentos/recibo/${payment.id}`} download className={secondaryButtonClass}>Abrir recibo</a>
           <FinanceReasonAction label="Estornar pagamento" explanation="O valor será retirado da liquidação e o saldo será recalculado. O pagamento original e o estorno permanecerão no histórico." onConfirm={reverseRegisteredPayment.bind(null, payment.id)} />
         </>}
       </li>)}</ul>

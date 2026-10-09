@@ -83,10 +83,10 @@ describe("documentos operacionais completos", () => {
     if (many) {
       expect(many.pages).toBeGreaterThan(1);
       if (many.text) {
-        for (const page of many.text.split("\f").filter(page => page.trim())) {
-          expect(page).toContain("22.891.018/0001-63");
-          expect(page).toContain("Página");
-        }
+        const pages = many.text.split("\f").filter(page => page.trim());
+        for (const page of pages) expect(page).toContain("Página");
+        for (const page of pages.slice(0, -1)) expect(page).not.toContain("22.891.018/0001-63");
+        expect(pages.at(-1)).toContain("22.891.018/0001-63");
       }
     }
   });

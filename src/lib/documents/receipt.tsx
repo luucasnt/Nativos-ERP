@@ -52,7 +52,7 @@ export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof load
   return (
     <DocumentShell company={data.company}
       title="Recibo"
-      documentCode={"REC-" + payment.id.slice(0, 8).toUpperCase()}
+      documentCode={[entry.reservation?.code, "REC-" + payment.id.slice(0, 8).toUpperCase()].filter(Boolean).join(" · ")}
       issuedAt={payment.created_at}
     >
       <DocumentHero

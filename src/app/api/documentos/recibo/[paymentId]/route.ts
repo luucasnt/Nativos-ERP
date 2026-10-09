@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pay
     await requireInternalUser();
     const data = await loadReceiptData(paymentId);
     const buffer = await renderToBuffer(ReceiptDocument({ data }));
-    return pdfResponse(buffer, `recibo-${data.payment.id.slice(0, 8)}.pdf`);
+    return pdfResponse(buffer, `Recibo-${data.payment.finance_entry.reservation?.code ?? "avulso"}-${data.payment.id.slice(0, 8)}.pdf`);
   } catch (error) {
     return errorResponse(error);
   }

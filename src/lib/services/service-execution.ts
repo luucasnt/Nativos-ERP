@@ -75,12 +75,13 @@ export async function startService(
     const { user, service } = await assertCanOperateService(serviceId);
 
     if (service.acceptance_status !== "aceito") {
-      return { error: "Este serviço ainda não foi aceito pelo fornecedor." };
+      return { error: "Este serviço ainda aguarda confirmação." };
     }
 
     if (service.execution_status !== "agendado") {
       return { error: "Este serviço não está aguardando início." };
     }
+    if (service.execution_type === "propria" && (!service.driver_id || !service.vehicle_id)) return { error: "Defina o motorista e o veículo antes de iniciar a operação própria." };
     if (service.driver_id || service.vehicle_id) await assertServiceResources(service);
 
     const preflight = checklistSchema.safeParse(service.preflight_checklist);

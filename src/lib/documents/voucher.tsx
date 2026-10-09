@@ -44,17 +44,19 @@ export function VoucherDocument({
   const departure = reservation.services.some(service => service.type === "transfer_saida");
   const instructions = [
     ...(arrival ? [reservation.services.some(service => service.type === "transfer_chegada" && service.flight_number)
-      ? "Nossa equipe acompanha o voo de chegada em tempo real para organizar sua recepção. Avise imediatamente se houver mudança de voo, conexão perdida ou alteração do itinerário."
+      ? "Nossa equipe acompanha o voo de chegada em tempo real. Informe imediatamente mudanças de voo, conexões perdidas ou alterações no itinerário."
       : "Informe o número do voo à equipe para o acompanhamento em tempo real e a organização da recepção no desembarque."] : []),
-    ...(departure ? ["Na saída para o aeroporto, esteja pronto com as bagagens 10 minutos antes do horário do transfer. O horário indicado é o embarque na hospedagem, não a decolagem do voo."] : []),
+    ...(departure ? ["Na saída ao aeroporto, confirme a antecedência para seu voo. Avise a equipe se mudar a hospedagem ou o local de embarque."] : []),
     ...(!arrival && !departure ? ["Esteja no local de encontro combinado 10 minutos antes do horário do serviço."] : []),
-    "Em qualquer imprevisto, atraso ou dificuldade para encontrar o motorista, avise nossa equipe imediatamente pelos contatos abaixo. Mantenha o telefone e o WhatsApp disponíveis.",
-    "Confira datas, horários, origem, destino, passageiros, bagagens e assentos infantis. Solicite alterações com antecedência para confirmarmos a disponibilidade.",
+    "Em caso de imprevisto, atraso ou dificuldade no encontro, avise a equipe imediatamente. Mantenha o telefone e o WhatsApp disponíveis.",
+    "Confira datas, horários, locais, passageiros, bagagens e assentos infantis. Alterações devem ser confirmadas pela equipe com antecedência.",
+    "Tenha o voucher e um documento de identificação no embarque. Informe com antecedência necessidades de acessibilidade ou assistência.",
+    "Confira seus pertences ao desembarcar. Em caso de objeto esquecido, informe à equipe o código da reserva e o serviço realizado.",
   ];
 
   return (
     <DocumentShell company={data.company} title="Voucher de reserva" documentCode={reservation.code}>
-      <Text style={{ fontSize: 9, marginBottom: 8 }}>Este é seu voucher de confirmação da reserva {reservation.code}. Obrigado por escolher a Nativos Experiences. Confira os serviços e as orientações para uma experiência tranquila.</Text>
+      <Text style={{ fontSize: 9, marginBottom: 8 }}>Este é seu voucher de confirmação da reserva {reservation.code}. Obrigado por escolher a Nativos Experiences. Reunimos abaixo os detalhes dos serviços contratados e as orientações para sua viagem. Guarde este documento para consultar e apresentar no embarque.</Text>
       <DetailGrid
         compact
         columns={3}

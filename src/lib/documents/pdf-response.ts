@@ -3,7 +3,7 @@ export function pdfResponse(buffer: Buffer, filename: string) {
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
+      "Content-Disposition": `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
       "Content-Length": String(buffer.length),
       "Cache-Control": "private, no-store, max-age=0",
     },

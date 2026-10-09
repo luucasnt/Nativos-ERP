@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ser
     await assertCanAccessServiceDocument(serviceId);
     const data = await loadReceptionSignData(serviceId);
     const buffer = await renderToBuffer(ReceptionSignDocument({ data }));
-    return pdfResponse(buffer, "plaquinha.pdf");
+    return pdfResponse(buffer, `Plaquinha-${data.reservationCode}-${serviceId.slice(0, 8)}.pdf`);
   } catch (error) {
     return errorResponse(error);
   }

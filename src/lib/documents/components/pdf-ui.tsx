@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   instructionRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 5,
+    marginBottom: 3,
   },
   instructionNumber: {
     width: 15,

@@ -153,8 +153,7 @@ export default async function PortalEmpresaFinanceiroPage() {
                       </dl>
                       <a
                         href={`/api/documentos/fatura/${cycle.id}`}
-                        target="_blank"
-                        rel="noreferrer"
+                        download
                         className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-forest/15 bg-white text-xs font-semibold text-forest active:bg-forest/5"
                       >
                         <FileText size={15} aria-hidden="true" />
@@ -190,8 +189,7 @@ export default async function PortalEmpresaFinanceiroPage() {
                     <td className="px-5 py-3.5 text-right">
                       <a
                         href={"/api/documentos/fatura/" + cycle.id}
-                        target="_blank"
-                        rel="noreferrer"
+                        download
                         className="focus-ring rounded text-xs font-semibold text-forest hover:text-forest-light"
                       >
                         Fatura PDF

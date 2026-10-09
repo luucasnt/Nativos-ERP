@@ -246,8 +246,7 @@ export default async function PortalMotoristaHomePage() {
                 )}
                 <a
                   href={"/api/documentos/os/" + nextService.id}
-                  target="_blank"
-                  rel="noreferrer"
+                  download
                   className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest transition hover:bg-forest/[0.035] sm:text-sm"
                 >
                   <FileText size={15} aria-hidden="true" />
@@ -256,8 +255,7 @@ export default async function PortalMotoristaHomePage() {
                 {nextService.reception_sign_enabled && nextService.reception_passenger_name && (
                   <a
                     href={`/api/documentos/plaquinha/${nextService.id}`}
-                    target="_blank"
-                    rel="noreferrer"
+                    download
                     className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest transition hover:bg-forest/[0.035] sm:text-sm"
                   >
                     <Users size={15} aria-hidden="true" />
