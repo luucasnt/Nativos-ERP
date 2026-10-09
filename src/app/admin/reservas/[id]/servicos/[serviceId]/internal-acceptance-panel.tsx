@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { acceptServiceInternal, rejectServiceInternal } from "../actions";
+import { respondToServiceInternal } from "../actions";
 import { buttonClass, inputClass, secondaryButtonClass } from "@/lib/ui";
 
 export function InternalAcceptancePanel({
@@ -12,8 +12,17 @@ export function InternalAcceptancePanel({
   serviceId: string;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [showReject, setShowReject] = useState(false);
+
+  function respond(accepted: boolean) {
+    setError(null);
+    startTransition(async () => {
+      const result = await respondToServiceInternal(reservationId, serviceId, accepted, reason);
+      setError(result.error);
+    });
+  }
 
   return (
     <div className="mb-6 flex flex-col gap-3 rounded-sm bg-gold/10 p-4">
@@ -26,7 +35,7 @@ export function InternalAcceptancePanel({
         <button
           type="button"
           disabled={isPending}
-          onClick={() => startTransition(() => acceptServiceInternal(reservationId, serviceId))}
+          onClick={() => respond(true)}
           className={buttonClass}
         >
           Registrar aceite
@@ -40,6 +49,7 @@ export function InternalAcceptancePanel({
           Registrar recusa
         </button>
       </div>
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       {showReject && (
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -51,9 +61,7 @@ export function InternalAcceptancePanel({
           <button
             type="button"
             disabled={isPending || !reason}
-            onClick={() =>
-              startTransition(() => rejectServiceInternal(reservationId, serviceId, reason))
-            }
+            onClick={() => respond(false)}
             className={secondaryButtonClass}
           >
             Confirmar recusa

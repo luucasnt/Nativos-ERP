@@ -2,7 +2,6 @@ import type { DocumentCompany } from "@/lib/documents/company";
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { registerBrandFonts } from "@/lib/documents/register-fonts";
 import { BRAND_COLORS, BRAND_FONTS } from "@/lib/documents/brand";
-import { formatDate } from "@/lib/documents/format";
 
 registerBrandFonts();
 
@@ -11,7 +10,7 @@ registerBrandFonts();
 const styles = StyleSheet.create({
   page: {
     paddingTop: 84,
-    paddingBottom: 90,
+    paddingBottom: 86,
     paddingHorizontal: 38,
     fontFamily: BRAND_FONTS.sans,
     fontSize: 9.5,
@@ -53,19 +52,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 7.5,
     color: BRAND_COLORS.muted,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 16,
-    height: 66,
-    left: 38,
-    right: 38,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: BRAND_COLORS.line,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
   },
   footerText: {
     fontSize: 7,
@@ -112,16 +98,18 @@ export function DocumentShell({
             <Text style={styles.headerTitle}>{title}</Text>
             <Text style={styles.headerMeta}>
               {documentCode ? documentCode + " · " : ""}
-              Emitido em {formatDate(issuedAt)}
+              Emitido em {issuedAt.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}
             </Text>
           </View>
         </View>
 
         {children}
 
-        <View style={styles.footer} fixed wrap={false}>
-          <Text style={[styles.footerText, { width: 440 }]}>{footerLines}</Text>
-        </View>
+        <Text
+          fixed
+          style={[styles.footerText, { position: "absolute", bottom: 25, left: 38, width: 440, height: 55 }]}
+          render={({ pageNumber, totalPages }) => !totalPages || pageNumber === totalPages ? footerLines : ""}
+        />
           <Text
             fixed
             style={[styles.pageNumber, { position: "absolute", bottom: 16, right: 38, width: 70, textAlign: "right" }]}

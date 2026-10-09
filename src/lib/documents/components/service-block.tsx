@@ -189,12 +189,12 @@ export function ServiceBlock({
       {(luggageTotal > 0 || seatsTotal > 0) && (
         <Text style={[styles.extra, compact ? { marginBottom: 0 } : {}]}>
           {[
-            service.luggage_10kg ? `${service.luggage_10kg} bagagem(ns) até 10 kg` : "",
-            service.luggage_23kg ? `${service.luggage_23kg} bagagem(ns) até 23 kg` : "",
-            service.luggage_32kg ? `${service.luggage_32kg} bagagem(ns) até 32 kg` : "",
-            service.bebe_conforto ? `${service.bebe_conforto} bebê conforto` : "",
-            service.cadeirinha ? `${service.cadeirinha} cadeirinha` : "",
-            service.booster ? `${service.booster} assento de elevação` : "",
+            service.luggage_10kg ? `${service.luggage_10kg} ${service.luggage_10kg === 1 ? "bagagem" : "bagagens"} até 10 kg` : "",
+            service.luggage_23kg ? `${service.luggage_23kg} ${service.luggage_23kg === 1 ? "bagagem" : "bagagens"} até 23 kg` : "",
+            service.luggage_32kg ? `${service.luggage_32kg} ${service.luggage_32kg === 1 ? "bagagem" : "bagagens"} até 32 kg` : "",
+            service.bebe_conforto ? `${service.bebe_conforto} ${service.bebe_conforto === 1 ? "bebê-conforto" : "bebês-conforto"}` : "",
+            service.cadeirinha ? `${service.cadeirinha} ${service.cadeirinha === 1 ? "cadeirinha" : "cadeirinhas"}` : "",
+            service.booster ? `${service.booster} ${service.booster === 1 ? "assento" : "assentos"} de elevação` : "",
           ].filter(Boolean).join(" | ")}
         </Text>
       )}

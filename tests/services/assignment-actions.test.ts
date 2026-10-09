@@ -2,10 +2,10 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const auth = vi.hoisted(() => ({ id: "" }));
 vi.mock("@/lib/auth/get-current-user", () => ({ requireInternalUser: async () => ({ id: auth.id }) }));
-vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("REDIRECT"); } }));
+vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("REDIRECT"); }, unstable_rethrow: () => {} }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { prisma } from "@/lib/prisma";
-import { createService, updateService } from "@/app/admin/reservas/[id]/servicos/actions";
+import { createService, updateService, respondToServiceInternal } from "@/app/admin/reservas/[id]/servicos/actions";
 import { updateDriver } from "@/app/admin/motoristas/actions";
 import { updateVehicle } from "@/app/admin/veiculos/actions";
 let a: string, b: string, da: string, db: string, va: string, reservationId: string;
@@ -25,6 +25,22 @@ function form(supplier: string, driver: string, vehicle: string) {
   return f;
 }
 describe("atribuição validada nas ações reais de cadastro e edição", () => {
+  it("confirma serviço próprio sem exigir aceite da própria equipe, mantendo alocação pendente", async () => {
+    const client = await prisma.client.create({ data: { name: "Operação própria" } });
+    const reservation = await prisma.reservation.create({ data: { client_id: client.id, code: crypto.randomUUID() } });
+    const f = form("", "", ""); f.set("execution_type", "propria"); f.set("supplier_cost", "");
+    await expect(createService(reservation.id, { error: null }, f)).rejects.toThrow("REDIRECT");
+    const own = await prisma.service.findFirstOrThrow({ where: { reservation_id: reservation.id, execution_type: "propria" } });
+    expect(own.acceptance_status).toBe("aceito");
+    expect(own.driver_id).toBeNull(); expect(own.vehicle_id).toBeNull();
+
+  });
+  it("devolve motivo legível sem aceitar serviço de outra reserva", async () => {
+    const other = await prisma.service.findFirstOrThrow({ where: { reservation_id: { not: reservationId } } });
+    const result = await respondToServiceInternal(reservationId, other.id, false, "");
+    expect(result.error).toBe("O serviço informado não pertence a esta reserva.");
+    expect(result.error).not.toContain("Prisma");
+  });
   it("não grava serviço ou financeiro com motorista de outro fornecedor", async () => {
     const result = await createService(reservationId, { error: null }, form(a, db, va));
     expect(result.error).toContain("ao fornecedor selecionado");

@@ -2,7 +2,7 @@
 
 import { resolveServiceCategories } from "@/lib/reservations/categories";
 
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
@@ -277,7 +277,7 @@ export async function createService(
           price,
           collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
           acceptance_status:
-            common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
+            common.data.execution_type === "propria"
               ? "aceito"
               : "aguardando_aceite",
         },
@@ -410,10 +410,10 @@ export async function updateService(
           collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
           // Troca de fornecedor/modalidade reabre o fluxo de aceite; serviço
           // próprio não precisa de aceite de terceiro.
-          ...(executionOrSupplierChanged || ownResourcesChanged
+          ...(executionOrSupplierChanged || ownResourcesChanged || (common.data.execution_type === "propria" && existing.acceptance_status === "aguardando_aceite")
             ? {
                 acceptance_status:
-                  common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
+                  common.data.execution_type === "propria"
                     ? "aceito"
                     : "aguardando_aceite",
                 acceptance_reason: null,
@@ -514,4 +514,18 @@ export async function deleteService(reservationId: string, serviceId: string): P
   revalidatePath(`/admin/reservas/${reservationId}`);
   revalidatePath("/admin/reservas");
   return {};
+}
+
+// Mensagens de regra de negócio precisam sobreviver à serialização em produção.
+export async function respondToServiceInternal(reservationId: string, serviceId: string, accepted: boolean, reason?: string): Promise<{ error: string | null }> {
+  try {
+    if (accepted) await acceptServiceInternal(reservationId, serviceId);
+    else await rejectServiceInternal(reservationId, serviceId, reason ?? "");
+    return { error: null };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof Error && error.name === "Error") return { error: error.message };
+    console.error("Falha ao registrar confirmação de serviço", error);
+    return { error: "Não foi possível registrar a resposta. Atualize a página e tente novamente." };
+  }
 }

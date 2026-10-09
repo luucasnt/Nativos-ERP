@@ -9,6 +9,7 @@ registerBrandFonts();
 export async function loadReceptionSignData(serviceId: string) {
   const service = await prisma.service.findUniqueOrThrow({
     where: { id: serviceId },
+    include: { reservation: { select: { code: true } } },
   });
 
   if (!service.reception_sign_enabled) {
@@ -18,7 +19,7 @@ export async function loadReceptionSignData(serviceId: string) {
     throw new Error("Informe o nome do passageiro para gerar a plaquinha.");
   }
 
-  return { passengerName: service.reception_passenger_name };
+  return { passengerName: service.reception_passenger_name, reservationCode: service.reservation.code };
 }
 const styles = StyleSheet.create({
   page: {
@@ -78,7 +79,7 @@ const styles = StyleSheet.create({
 export function ReceptionSignDocument({
   data,
 }: {
-  data: Awaited<ReturnType<typeof loadReceptionSignData>>;
+  data: Pick<Awaited<ReturnType<typeof loadReceptionSignData>>, "passengerName">;
 }) {
   const normalizedLength = Math.max(1, data.passengerName.trim().length);
   const nameSize = Math.max(24, Math.min(76, 1900 / normalizedLength));

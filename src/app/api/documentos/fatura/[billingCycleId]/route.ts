@@ -13,7 +13,7 @@ export async function GET(
     await assertCanAccessBillingCycleDocument(billingCycleId);
     const data = await loadInvoiceData(billingCycleId);
     const buffer = await renderToBuffer(InvoiceDocument({ data }));
-    return pdfResponse(buffer, "fatura-" + data.billingCycle.period + ".pdf");
+    return pdfResponse(buffer, `Fatura-${data.billingCycle.period}-${data.billingCycle.reservations.length === 1 ? data.billingCycle.reservations[0].reservation.code : billingCycleId.slice(0, 8)}.pdf`);
   } catch (error) {
     return errorResponse(error);
   }
