@@ -1,5 +1,7 @@
 "use server";
 
+import { parsePaymentDate } from "@/lib/finance/payment-date";
+import { validatePaymentProof } from "@/lib/uploads/payment-proof";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { PaymentMethod } from "@prisma/client";
@@ -19,6 +21,7 @@ export async function registerPayment(input: {
   entryId: string;
   paymentMethod: string;
   amount: string;
+  paymentDate?: string;
   bankAccountId?: string;
   receiptUrl?: string;
   dedupeKey: string;
@@ -29,7 +32,8 @@ export async function registerPayment(input: {
   z.string().uuid().parse(input.entryId);
   z.string().uuid().parse(input.dedupeKey);
   const bankAccountId = input.bankAccountId ? z.string().uuid().parse(input.bankAccountId) : null;
-  const receiptUrl = input.receiptUrl?.trim() ? z.string().url("Informe uma URL válida para o comprovante.").parse(input.receiptUrl.trim()) : null;
+  const occurredAt = input.paymentDate ? parsePaymentDate(input.paymentDate) : undefined;
+  const receiptUrl = await validatePaymentProof(input.receiptUrl, user.id);
 
   const entry = await prisma.financeEntry.findUniqueOrThrow({ where: { id: input.entryId } });
   const requiresProof = ["fornecedor", "parceiro", "cliente"].includes(entry.party_type);
@@ -44,6 +48,7 @@ export async function registerPayment(input: {
     finance_entry_id: input.entryId,
     type: entry.type === "receita" ? "recebimento" : "pagamento",
     amount,
+    occurred_at: occurredAt,
     payment_method: paymentMethod as PaymentMethod,
     bank_account_id: bankAccountId,
     receipt_url: receiptUrl,
@@ -79,7 +84,7 @@ export async function registerPayment(input: {
     action: "pagamento_registrado",
     entityType: "finance_entry",
     entityId: input.entryId,
-    metadata: { amount: String(amount), paymentMethod },
+    metadata: { amount: String(amount), paymentMethod, effectiveDate: occurredAt?.toISOString() ?? null },
   }));
 
   // O pagamento já foi confirmado atomicamente. Falha de e-mail ou outbox

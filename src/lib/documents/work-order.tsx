@@ -1,3 +1,4 @@
+import { workOrderCollection } from "@/lib/documents/work-order-collection";
 import { serviceDocumentContext } from "@/lib/documents/service-context";
 import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text, View } from "@react-pdf/renderer";
@@ -22,6 +23,8 @@ export async function loadWorkOrderData(serviceId: string) {
       reservation: { include: { client: true } },
       driver: true,
       vehicle: true,
+      finance_entries: { where: { reversed_at: null, estorno_of_id: null, status: { not: "cancelado" } }, include: { payments: { where: { reversed_at: null, estorno_of_id: null } } } },
+      direct_collections: { where: { reversed_at: null }, select: { status: true } },
     },
   });
 
@@ -67,9 +70,7 @@ export function WorkOrderDocument({
       )}
 
       <NoticeBox title="Orientação de cobrança">
-        {service.driver_can_receive_payment
-          ? "Recebimento pelo motorista autorizado. Confirme o valor e registre o recebimento no sistema imediatamente após o serviço."
-          : "Não realizar cobrança ao passageiro. Em caso de dúvida sobre pagamento, acione a equipe Nativos antes de encerrar o atendimento."}
+        {workOrderCollection(service)}
       </NoticeBox>
 
       <View>

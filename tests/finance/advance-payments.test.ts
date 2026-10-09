@@ -29,9 +29,10 @@ describe("recebimentos antecipados de reservas", () => {
     const { reservation, service, entry } = await sale();
     expect(canRegisterEntryPayment(entry)).toBe(true);
     const key = crypto.randomUUID();
-    const input = { entryId: entry.id, amount: "240,00", paymentMethod: "pix", receiptUrl: "https://example.test/comprovante", dedupeKey: key };
+    const input = { entryId: entry.id, paymentDate: "2020-01-01", amount: "240,00", paymentMethod: "pix", receiptUrl: "https://example.test/comprovante", dedupeKey: key };
     await registerPayment(input); await registerPayment(input);
     expect(await prisma.payment.count({ where: { finance_entry_id: entry.id } })).toBe(1);
+    expect((await prisma.payment.findFirstOrThrow({ where: { finance_entry_id: entry.id } })).occurred_at?.toISOString()).toBe("2020-01-01T03:00:00.000Z");
     let title = await prisma.financeEntry.findUniqueOrThrow({ where: { id: entry.id } });
     expect(title.status).toBe("pendente");
     const summary = voucherFinancialSummary((await loadVoucherData(reservation.id)).reservation);

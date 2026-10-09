@@ -1,5 +1,6 @@
 "use client";
 
+import { bahiaDate } from "@/lib/finance/payment-date";
 import { useState, useTransition } from "react";
 import { CheckCircle2, ChevronDown } from "lucide-react";
 import { buttonClass, inputClass } from "@/lib/ui";
@@ -10,6 +11,7 @@ type RegisterPaymentInput = {
   entryId: string;
   paymentMethod: string;
   amount: string;
+  paymentDate?: string;
   bankAccountId?: string;
   receiptUrl?: string;
   dedupeKey: string;
@@ -31,6 +33,8 @@ export function RegisterPaymentForm({
   const [amount, setAmount] = useState(remainingAmount);
   const [bankAccountId, setBankAccountId] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [paymentDate, setPaymentDate] = useState(() => bahiaDate());
   const [dedupeKey, setDedupeKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -55,16 +59,31 @@ export function RegisterPaymentForm({
           <option value="">Não informada</option>{bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
         </select>
       </label>
-      <label className="grid gap-1 text-xs font-medium text-forest/65">Link do comprovante (obrigatório)
-        <input value={receiptUrl} onChange={(event) => setReceiptUrl(event.target.value)} inputMode="url" placeholder="https://..." required disabled={isPending} className={inputClass} />
+      <label className="grid gap-1 text-xs font-medium text-forest/65">Data do recebimento / pagamento
+        <input type="date" value={paymentDate} max={bahiaDate()} required onChange={event => setPaymentDate(event.target.value)} disabled={isPending} className={inputClass} />
+        <span className="text-xs font-normal">Informe a data em que o dinheiro foi recebido ou pago, inclusive em lançamentos retroativos.</span>
+      </label>
+      <label className="grid gap-1 text-xs font-medium text-forest/65">Anexar comprovante
+        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => { setProofFile(event.target.files?.[0] ?? null); setReceiptUrl(""); }} disabled={isPending} className={inputClass} />
+        <span className="text-xs font-normal">Imagem JPG, PNG, WebP ou PDF. Máximo 4 MB. O arquivo fica privado.</span>
       </label>
       <button type="button" disabled={isPending || !amount} onClick={() => startTransition(async () => {
         setError(null); setSuccess(false);
         const key = dedupeKey || crypto.randomUUID();
         setDedupeKey(key);
         try {
-          await onRegister({ entryId, paymentMethod, amount: amount.replace(",", "."), bankAccountId: bankAccountId || undefined, receiptUrl: receiptUrl || undefined, dedupeKey: key });
-          setSuccess(true); setDedupeKey(""); setOpen(false);
+          if (!paymentDate) throw new Error("Informe a data do recebimento ou pagamento.");
+          let proof = receiptUrl;
+          if (proofFile && !proof) {
+            if (proofFile.size > 4 * 1024 * 1024) throw new Error("O comprovante deve ter até 4 MB.");
+            const form = new FormData(); form.set("file", proofFile);
+            const response = await fetch("/api/admin/comprovantes", { method: "POST", body: form });
+            const result = await response.json();
+            if (!response.ok || !result.receiptUrl) throw new Error(result.error || "Não foi possível anexar o comprovante.");
+            proof = result.receiptUrl; setReceiptUrl(proof);
+          }
+          await onRegister({ entryId, paymentMethod, paymentDate, amount: amount.replace(",", "."), bankAccountId: bankAccountId || undefined, receiptUrl: proof || undefined, dedupeKey: key });
+          setSuccess(true); setDedupeKey(""); setProofFile(null); setReceiptUrl(""); setOpen(false);
         } catch (reason) {
           setError(reason instanceof Error ? reason.message : "Falha ao registrar pagamento.");
         }

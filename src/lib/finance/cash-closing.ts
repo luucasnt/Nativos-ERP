@@ -1,3 +1,4 @@
+import { paymentDateWhere } from "@/lib/finance/payment-date";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -16,9 +17,9 @@ export async function closeCash(accountId: string, counted: string, actorId: str
     const account = await tx.bankAccount.findUniqueOrThrow({ where: { id: accountId } });
     if (!account.active) throw new Error("Selecione uma conta ativa.");
     if (await tx.cashClosing.findFirst({ where: { bank_account_id: accountId, closing_date: { gte: start, lt: end }, reopened_at: null } })) throw new Error("Esta conta já possui um fechamento para hoje. Reabra-o antes de corrigir.");
-    const movements = await tx.payment.groupBy({ by: ["type"], where: { bank_account_id: accountId, created_at: { lt: start }, reversed_at: null, estorno_of_id: null }, _sum: { amount: true } });
+    const movements = await tx.payment.groupBy({ by: ["type"], where: { bank_account_id: accountId, ...paymentDateWhere({ lt: start }), reversed_at: null, estorno_of_id: null }, _sum: { amount: true } });
     const opening = movements.reduce((balance, row) => row.type === "recebimento" ? balance.plus(row._sum.amount ?? 0) : balance.minus(row._sum.amount ?? 0), account.initial_balance);
-    const today = await tx.payment.groupBy({ by: ["type"], where: { bank_account_id: accountId, created_at: { gte: start, lt: end }, reversed_at: null, estorno_of_id: null }, _sum: { amount: true } });
+    const today = await tx.payment.groupBy({ by: ["type"], where: { bank_account_id: accountId, ...paymentDateWhere({ gte: start, lt: end }), reversed_at: null, estorno_of_id: null }, _sum: { amount: true } });
     const totalIn = today.find((row) => row.type === "recebimento")?._sum.amount ?? new Prisma.Decimal(0);
     const totalOut = today.find((row) => row.type === "pagamento")?._sum.amount ?? new Prisma.Decimal(0);
     const theoretical = opening.plus(totalIn).minus(totalOut);
