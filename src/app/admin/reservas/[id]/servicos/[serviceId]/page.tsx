@@ -43,6 +43,8 @@ export default async function EditarServicoPage({
     notFound();
   }
 
+  const categories = await prisma.catalogItem.findMany({ where: { type: "tipo_veiculo", OR: [{ active: true }, { reservations_by_category: { some: { id: reservationId } } }, { services_by_category: { some: { reservation_id: reservationId } } }, { services_by_upgrade: { some: { reservation_id: reservationId } } }] }, orderBy: [{ order: "asc" }, { label: "asc" }], select: { id: true, label: true } });
+
   return (
     <div>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
@@ -91,6 +93,8 @@ export default async function EditarServicoPage({
       )}
 
       <ServiceForm
+        categories={categories}
+        reservationCategoryId={reservation.contracted_category_id}
         action={updateService.bind(null, reservationId, serviceId)}
         suppliers={suppliers}
         drivers={drivers}
@@ -99,6 +103,8 @@ export default async function EditarServicoPage({
         cancelHref={`/admin/reservas/${reservationId}`}
         isEditing
         defaultValues={{
+          contracted_category_id: service.contracted_category_id,
+          upgrade_category_id: service.upgrade_category_id,
           type: service.type,
           execution_type: service.execution_type,
           supplier_id: service.supplier_id,

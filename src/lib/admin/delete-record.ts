@@ -60,7 +60,7 @@ export async function deleteUnusedRecord(kind: RecordKind, id: string, actorId: 
         break;
       }
       case "catalog": {
-        const r = await tx.catalogItem.findUniqueOrThrow({ where: { id }, include: { _count: { select: { vehicles_by_category: true, companies_by_category: true, services_by_pacote_disposicao: true, service_expenses_by_category: true, direct_collections_by_reason: true } } } });
+        const r = await tx.catalogItem.findUniqueOrThrow({ where: { id }, include: { _count: { select: { reservations_by_category: true, services_by_category: true, services_by_upgrade: true, vehicles_by_category: true, companies_by_category: true, services_by_pacote_disposicao: true, service_expenses_by_category: true, direct_collections_by_reason: true } } } });
         linked = Object.values(r._count).some(Boolean) || Boolean(await tx.commissionDefault.findFirst({ where: { target: "company", category_key: r.key } }));
         snapshot = { key: r.key, label: r.label };
         break;

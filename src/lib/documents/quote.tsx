@@ -53,7 +53,7 @@ export function QuoteDocument({ data }: { data: Awaited<ReturnType<typeof loadQu
         <Text style={{ color: BRAND_COLORS.muted }}>Nenhum serviço incluído neste orçamento.</Text>
       ) : (
         reservation.services.map((service, index) => (
-          <ServiceBlock key={service.id} service={service} showPrice sequence={index + 1} />
+          <ServiceBlock key={service.id} service={{ ...service, contracted_category_label: service.contracted_category_label || reservation.contracted_category_label }} showPrice sequence={index + 1} />
         ))
       )}
 

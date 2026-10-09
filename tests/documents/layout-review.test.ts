@@ -55,17 +55,29 @@ describe("documentos operacionais completos", () => {
     const service = data.reservation.services[0];
     expect(service).toBeDefined();
     data.showPrice = true;
-    const assigned = { ...service, scheduled_date: new Date("2026-10-15T00:00:00Z"), scheduled_time: "14:00", pickup_location: "Aeroporto de Porto Seguro", dropoff_location: "Hotel em Trancoso", passenger_count: 4, luggage_23kg: 2, cadeirinha: 1, type: "transfer_chegada" as const, driver: { ...service.driver!, name: "Motorista de teste" }, vehicle: { ...service.vehicle!, model: "Toyota Corolla", plate: "ABC1D23" }, flight_number: "AD 1234" };
+    const assigned = { ...service, contracted_category_label: "Convencional", upgrade_category_label: "Executiva", scheduled_date: new Date("2026-10-15T00:00:00Z"), scheduled_time: "14:00", pickup_location: "Aeroporto de Porto Seguro", dropoff_location: "Hotel em Trancoso", passenger_count: 4, luggage_23kg: 2, cadeirinha: 1, type: "transfer_chegada" as const, driver: { ...service.driver!, name: "Motorista de teste" }, vehicle: { ...service.vehicle!, model: "Toyota Corolla", plate: "ABC1D23" }, flight_number: "AD 1234" };
     data.reservation.services = [assigned, { ...assigned, id: "saida", type: "transfer_saida", scheduled_time: "09:00", pickup_location: "Hotel em Trancoso", dropoff_location: "Aeroporto de Porto Seguro" }];
     const compact = await review("voucher", VoucherDocument({ data }));
     if (compact) {
       expect(compact.pages).toBe(1);
       if (compact.text) expect(compact.text).toContain("Página 1 de 1");
+      if (compact.text) {
+        const text = compact.text.replace(/\s+/g, " ");
+        expect(text).toContain("Este é seu voucher de confirmação");
+        expect(text).toContain("acompanha o voo de chegada em tempo real");
+        expect(text).toContain("Upgrade de cortesia: Executiva");
+        expect(text).toContain("sem custo adicional");
+      }
       if (compact.text) expect(compact.text).toContain("ABC1D23");
       if (compact.text) expect(compact.text).toContain("Motorista de teste");
       if (compact.text) expect(compact.text).toContain("22.891.018/0001-63");
       if (compact.text) expect(compact.text.replace(/\s/g, "").toUpperCase()).toContain("VOODESAÍDA");
     }
+    data.showPrice = false;
+    const hidden = await review("voucher-sem-financeiro", VoucherDocument({ data }));
+    expect(hidden.pages).toBe(1);
+    if (hidden.text) { expect(hidden.text).not.toContain("R$"); expect(hidden.text).toContain("Upgrade de cortesia"); }
+    data.showPrice = true;
     data.reservation.services = Array.from({ length: 12 }, (_, i) => ({ ...assigned, id: String(i) }));
     const many = await review("voucher-many", VoucherDocument({ data }));
     if (many) {

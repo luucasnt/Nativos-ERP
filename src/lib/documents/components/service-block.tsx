@@ -1,3 +1,4 @@
+import { categoryDescription } from "@/lib/reservations/categories";
 import { serviceDocumentContext } from "@/lib/documents/service-context";
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import { BRAND_COLORS } from "@/lib/documents/brand";
@@ -6,6 +7,8 @@ import { formatCurrency, formatDate } from "@/lib/documents/format";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
 
 type ServiceForBlock = {
+  contracted_category_label?: string | null;
+  upgrade_category_label?: string | null;
   driver?: { name: string } | null;
   vehicle?: { model: string; plate: string } | null;
   id: string;
@@ -99,12 +102,15 @@ const styles = StyleSheet.create({
 export function ServiceBlock({
   service,
   showPrice,
+  compact = false,
   sequence,
 }: {
   service: ServiceForBlock;
   showPrice: boolean;
+  compact?: boolean;
   sequence?: number;
 }) {
+  const category = categoryDescription(service);
   const context = serviceDocumentContext(service.type);
   const luggageTotal =
     service.luggage_10kg + service.luggage_23kg + service.luggage_32kg;
@@ -131,7 +137,7 @@ export function ServiceBlock({
   ];
 
   return (
-    <View style={styles.block} wrap={false}>
+    <View style={[styles.block, compact ? { padding: 6 } : {}]} wrap={false}>
       <View style={styles.header}>
         <View>
           <Text style={styles.sequence}>
@@ -146,16 +152,19 @@ export function ServiceBlock({
         )}
       </View>
 
+      <Text style={{ fontSize: 8, marginBottom: 3 }}>Categoria contratada: {category.contracted}</Text>
+      {category.upgrade && <Text style={{ fontSize: 8, fontWeight: 600, color: BRAND_COLORS.forest, backgroundColor: BRAND_COLORS.soft, padding: 4, marginBottom: 4 }}>{category.upgrade}</Text>}
+
       {(service.pickup_location || service.dropoff_location) && (
         <View style={styles.route}>
-          <View style={styles.routeItem}>
-            <Text style={styles.routeLabel}>{context.pickupLabel}</Text>
+          <View style={[styles.routeItem, compact ? { padding: 3, minHeight: 0 } : {}]}>
+            <Text style={[styles.routeLabel, compact ? { marginBottom: 1 } : {}]}>{context.pickupLabel}</Text>
             <Text style={styles.routeText}>
               {service.pickup_location ?? "A definir"}
             </Text>
           </View>
-          <View style={styles.routeItem}>
-            <Text style={styles.routeLabel}>{context.dropoffLabel}</Text>
+          <View style={[styles.routeItem, compact ? { padding: 3, minHeight: 0 } : {}]}>
+            <Text style={[styles.routeLabel, compact ? { marginBottom: 1 } : {}]}>{context.dropoffLabel}</Text>
             <Text style={styles.routeText}>
               {service.dropoff_location ?? "A definir"}
             </Text>
@@ -163,21 +172,22 @@ export function ServiceBlock({
         </View>
       )}
 
-      <DetailGrid
+      {compact ? <Text style={{ fontSize: 8, marginBottom: 4 }}>{detailItems.map(item => `${item.label}: ${item.value}`).join("  |  ")}</Text> : <DetailGrid
         items={detailItems}
+        compact={compact}
         columns={detailItems.length >= 3 ? 3 : 2}
-      />
+      />}
 
       {("driver" in service || "vehicle" in service) && (
-        <DetailGrid columns={3} items={[
+        compact ? <Text style={{ fontSize: 8, marginBottom: 4 }}>Motorista: {service.driver?.name || "A definir pela operação"} | Veículo: {service.vehicle?.model || "A definir pela operação"} | Placa: {service.vehicle?.plate || "A definir pela operação"}</Text> : <DetailGrid columns={3} items={[
           { label: "Motorista", value: service.driver?.name || "A definir pela operação" },
           { label: "Veículo", value: service.vehicle?.model || "A definir pela operação" },
           { label: "Placa", value: service.vehicle?.plate || "A definir pela operação" },
         ]} />
       )}
-      <Text style={styles.extra}>{context.meeting}</Text>
+      <Text style={[styles.extra, compact ? { marginBottom: 4 } : {}]}>{compact ? service.type === "transfer_chegada" ? "Encontro: área de desembarque, após retirar as bagagens. Plaquinha de recepção quando contratada." : service.type === "transfer_saida" ? "Encontro: local de embarque acima. Horário do transfer, não do voo." : "Encontro: local de embarque acima, conforme combinado com a equipe." : context.meeting}</Text>
       {(luggageTotal > 0 || seatsTotal > 0) && (
-        <Text style={styles.extra}>
+        <Text style={[styles.extra, compact ? { marginBottom: 0 } : {}]}>
           {[
             service.luggage_10kg ? `${service.luggage_10kg} bagagem(ns) até 10 kg` : "",
             service.luggage_23kg ? `${service.luggage_23kg} bagagem(ns) até 23 kg` : "",
