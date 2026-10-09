@@ -8,6 +8,7 @@ import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
 import { markReservationCommissionsEligible } from "@/lib/finance/commissions";
 import { z } from "zod";
+import { assertServiceResources } from "@/lib/services/resource-validation";
 
 // Requisito adicional pós-Fase 1 (item 6): o dono/responsável de uma
 // empresa fornecedora pode, pelo portal dele, iniciar e finalizar os
@@ -80,6 +81,7 @@ export async function startService(
     if (service.execution_status !== "agendado") {
       return { error: "Este serviço não está aguardando início." };
     }
+    if (service.driver_id || service.vehicle_id) await assertServiceResources(service);
 
     const preflight = checklistSchema.safeParse(service.preflight_checklist);
     if (!preflight.success || !["vehicle_clean", "fuel_checked", "tires_checked", "documents_ready", "passenger_items_ready"].every((key) => preflight.data[key as keyof typeof preflight.data] === true)) {

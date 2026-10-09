@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 
 const clientSchema = z.object({
+  is_vip: z.enum(["on"]).optional(),
   name: z.string().min(1, "Informe o nome."),
   document: z.string().optional(),
   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
@@ -20,6 +21,7 @@ const clientSchema = z.object({
 export type ClientFormState = { error: string | null };
 
 type ClientData = {
+  is_vip: boolean;
   name: string;
   document: string | null;
   email: string | null;
@@ -32,6 +34,7 @@ function parseClientForm(
   formData: FormData,
 ): { ok: false; error: string } | { ok: true; data: ClientData } {
   const parsed = clientSchema.safeParse({
+    is_vip: formData.get("is_vip") || undefined,
     name: formData.get("name"),
     document: formData.get("document") || undefined,
     email: formData.get("email") || undefined,
@@ -51,6 +54,7 @@ function parseClientForm(
   return {
     ok: true,
     data: {
+      is_vip: parsed.data.is_vip === "on",
       name: parsed.data.name,
       document: parsed.data.document || null,
       email: parsed.data.email || null,
@@ -78,11 +82,13 @@ export async function createClient(
   await logAudit({
     actorId: user.id,
     action: "cliente_criado",
+    metadata: { is_vip: result.data.is_vip },
     entityType: "client",
     entityId: client.id,
   });
 
   revalidatePath("/admin/clientes");
+  revalidatePath("/admin/reservas", "layout");
   redirect("/admin/clientes");
 }
 
@@ -103,11 +109,13 @@ export async function updateClient(
   await logAudit({
     actorId: user.id,
     action: "cliente_atualizado",
+    metadata: { is_vip: result.data.is_vip },
     entityType: "client",
     entityId: id,
   });
 
   revalidatePath("/admin/clientes");
+  revalidatePath("/admin/reservas", "layout");
   redirect("/admin/clientes");
 }
 

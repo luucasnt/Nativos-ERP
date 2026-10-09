@@ -1,3 +1,6 @@
+import { getClientActivity, EMPTY_CLIENT_ACTIVITY } from "@/lib/clients/activity";
+import { ClientActivitySummary } from "@/components/admin/client-activity-summary";
+import { Badge } from "@/components/ui/badge";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { deleteClient, updateClient } from "../actions";
@@ -24,15 +27,19 @@ export default async function EditarClientePage({
     notFound();
   }
 
+  const activity = (await getClientActivity([id])).get(id) ?? EMPTY_CLIENT_ACTIVITY;
+
   return (
     <div>
       <h1 className="mb-6 font-serif text-3xl text-forest">
-        Editar cliente
+        {client.name} {client.is_vip && <Badge tone="gold">VIP</Badge>}
       </h1>
+      <ClientActivitySummary activity={activity} />
       <ClientForm
         action={updateClient.bind(null, id)}
         partners={partners}
         defaultValues={{
+          is_vip: client.is_vip,
           name: client.name,
           document: client.document,
           email: client.email,

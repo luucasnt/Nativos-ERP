@@ -13,6 +13,7 @@ type ClientFormProps = {
   action: (prevState: ClientFormState, formData: FormData) => Promise<ClientFormState>;
   partners: Partner[];
   defaultValues?: {
+    is_vip: boolean;
     name: string;
     document: string | null;
     email: string | null;
@@ -106,6 +107,10 @@ export function ClientForm({ action, partners, defaultValues }: ClientFormProps)
           ))}
         </select>
       </div>
+      <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-forest">
+        <input type="checkbox" name="is_vip" defaultChecked={defaultValues?.is_vip ?? false} />
+        Cliente VIP
+      </label>
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}
       <div className={`${mobileStickyActionClass} grid grid-cols-2 gap-2 sm:flex sm:flex-row`}>
         <button type="submit" disabled={pending} className={`${buttonClass} w-full sm:w-auto`}>

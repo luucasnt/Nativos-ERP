@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Service } from "@prisma/client";
+import { assertServiceResources, lockServiceResources } from "@/lib/services/resource-validation";
 import { prisma } from "@/lib/prisma";
 import { requireInternalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
@@ -251,19 +252,26 @@ export async function createService(
     if (credit.blocked) return { error: credit.reason ?? "O fornecedor está bloqueado por pendência financeira." };
   }
 
-  const service = await prisma.service.create({
-    data: {
-      ...common.data,
-      reservation_id: reservationId,
-      original_price: parsed.data.original_price,
-      price,
-      collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
-      acceptance_status:
-        common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
-          ? "aceito"
-          : "aguardando_aceite",
-    },
-  });
+  let service: Service;
+  try {
+    service = await prisma.$transaction(async (tx) => {
+      await lockServiceResources(common.data, tx);
+      await assertServiceResources(common.data, undefined, tx);
+      return tx.service.create({
+        data: {
+          ...common.data,
+          reservation_id: reservationId,
+          original_price: parsed.data.original_price,
+          price,
+          collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
+          acceptance_status:
+            common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
+              ? "aceito"
+              : "aguardando_aceite",
+        },
+      });
+    });
+  } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível salvar o serviço." }; }
 
   await afterServiceMutation(reservationId, service.id);
 
@@ -372,25 +380,31 @@ export async function updateService(
     };
   }
 
-  await prisma.service.update({
-    where: { id: serviceId },
-    data: {
-      ...common.data,
-      price,
-      collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
-      // Troca de fornecedor/modalidade reabre o fluxo de aceite; serviço
-      // próprio não precisa de aceite de terceiro.
-      ...(executionOrSupplierChanged || ownResourcesChanged
-        ? {
-            acceptance_status:
-              common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
-                ? "aceito"
-                : "aguardando_aceite",
-            acceptance_reason: null,
-          }
-        : {}),
-    },
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await lockServiceResources(common.data, tx);
+      await assertServiceResources(common.data, existing, tx);
+      await tx.service.update({
+        where: { id: serviceId },
+        data: {
+          ...common.data,
+          price,
+          collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
+          // Troca de fornecedor/modalidade reabre o fluxo de aceite; serviço
+          // próprio não precisa de aceite de terceiro.
+          ...(executionOrSupplierChanged || ownResourcesChanged
+            ? {
+                acceptance_status:
+                  common.data.execution_type === "propria" && common.data.driver_id && common.data.vehicle_id
+                    ? "aceito"
+                    : "aguardando_aceite",
+                acceptance_reason: null,
+              }
+            : {}),
+        },
+      });
+    });
+  } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível salvar o serviço." }; }
 
   await afterServiceMutation(reservationId, serviceId);
 

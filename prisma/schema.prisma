@@ -492,6 +492,7 @@ model User {
 // =========================================================================
 
 model Client {
+  is_vip            Boolean      @default(false)
   id                String       @id @default(uuid()) @db.Uuid
   name              String
   document          String? // CPF/CNPJ

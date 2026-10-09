@@ -4,8 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { inputClass, labelClass } from "@/lib/ui";
 
-type Option = { id: string; name: string };
-type Entity = "client" | "partner" | "company" | "driver" | "vehicle";
+type Option = { id: string; name: string; description?: string };
+type Entity = "client" | "partner" | "company" | "supplier" | "driver" | "vehicle";
 
 type Props = {
   name: string;
@@ -14,9 +14,13 @@ type Props = {
   value?: string;
   initialOptions?: Option[];
   required?: boolean;
+  disabled?: boolean;
+  executionType?: "propria" | "fornecedor";
+  supplierId?: string;
+  onValueChange?: (id: string) => void;
 };
 
-export function SearchableEntitySelect({ name, label, entity, value = "", initialOptions = [], required = false }: Props) {
+export function SearchableEntitySelect({ name, label, entity, value = "", initialOptions = [], required = false, disabled = false, executionType, supplierId, onValueChange }: Props) {
   const inputId = useId();
   const listId = `${inputId}-results`;
   const selected = initialOptions.find((option) => option.id === value);
@@ -44,14 +48,15 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
   }, [required, selectedId]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || disabled) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
       let errorMessage = "Não foi possível pesquisar. Tente novamente.";
       try {
-        const response = await fetch(`/api/admin/search?entity=${entity}&q=${encodeURIComponent(query.trim())}`, {
+        const scope = `${executionType ? `&execution_type=${executionType}` : ""}${supplierId ? `&supplier_id=${encodeURIComponent(supplierId)}` : ""}`;
+        const response = await fetch(`/api/admin/search?entity=${entity}&q=${encodeURIComponent(selectedId ? "" : query.trim())}${scope}`, {
           signal: controller.signal,
           cache: "no-store",
         });
@@ -60,10 +65,10 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
           throw new Error(errorMessage);
         }
         if (!response.ok) throw new Error(errorMessage);
-        const data = await response.json() as { results?: Array<{ value?: string; title: string }> };
+        const data = await response.json() as { results?: Array<{ value?: string; title: string; description?: string }> };
         if (!Array.isArray(data.results)) throw new Error("Não foi possível pesquisar. Tente novamente.");
         if (!controller.signal.aborted) {
-          setOptions(data.results.filter((item) => item.value).map((item) => ({ id: item.value!, name: item.title })));
+          setOptions(data.results.filter((item) => item.value).map((item) => ({ id: item.value!, name: item.title, description: item.description })));
           setActiveIndex(-1);
         }
       } catch {
@@ -79,10 +84,11 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, entity, open, retry]);
+  }, [query, selectedId, entity, open, retry, disabled, executionType, supplierId]);
 
   function select(option: Option) {
     setSelectedId(option.id);
+    onValueChange?.(option.id);
     setQuery(option.name);
     setOpen(false);
     setError(null);
@@ -110,6 +116,7 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
           id={inputId}
           value={query}
           required={required}
+          disabled={disabled}
           autoComplete="off"
           role="combobox"
           aria-expanded={open}
@@ -119,6 +126,7 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
           onChange={(event) => {
             setQuery(event.target.value);
             setSelectedId("");
+            onValueChange?.("");
             setOpen(true);
             setLoading(true);
             setError(null);
@@ -140,7 +148,7 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
               if (!loading && !error && activeIndex >= 0 && options[activeIndex]) select(options[activeIndex]);
             }
           }}
-          placeholder="Digite para pesquisar…"
+          placeholder={disabled ? "Selecione primeiro o fornecedor" : "Digite para pesquisar…"}
           className={`${inputClass} pl-9 pr-9`}
         />
         <ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-forest/35" />
@@ -162,7 +170,7 @@ export function SearchableEntitySelect({ name, label, entity, value = "", initia
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => select(option)}
             className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm text-forest hover:bg-forest/[0.05] ${index === activeIndex ? "bg-forest/[0.05]" : ""}`}
-          ><span className="truncate">{option.name}</span>{option.id === selectedId && <Check size={16} aria-hidden="true" className="shrink-0 text-gold" />}</button>)}
+          ><span className="min-w-0 py-2"><span className="block truncate">{option.name}</span>{option.description && <span className="mt-0.5 block truncate text-xs text-forest/55">{option.description}</span>}</span>{option.id === selectedId && <Check size={16} aria-hidden="true" className="shrink-0 text-gold" />}</button>)}
         </div>
       </div>}
     </div>
