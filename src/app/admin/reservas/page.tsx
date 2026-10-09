@@ -1,3 +1,4 @@
+import { orderReservationsByService, reservationScheduleService } from "@/lib/reservations/list-order";
 import Link from "next/link";
 import type { Prisma, ReservationStatus } from "@prisma/client";
 import { CalendarDays, ChevronLeft, ChevronRight, Filter, Plus, Search, SlidersHorizontal } from "lucide-react";
@@ -76,22 +77,30 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
     },
   ];
 
-  const [groups, total, reservations, companies] = await Promise.all([
+  const [groups, scheduleRows, companies] = await Promise.all([
     prisma.reservation.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.reservation.count({ where }),
     prisma.reservation.findMany({
-      where, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE,
-      select: {
-        id: true, code: true, status: true, has_partial_cancellation: true,
-        client: { select: { name: true } }, origin_partner: { select: { name: true } },
-        services: { where: { execution_status: { not: "cancelado" } }, orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }], select: {
-          type: true, scheduled_date: true, scheduled_time: true, pickup_location: true, dropoff_location: true, price: true,
-          supplier: { select: { name: true } },
-        } },
-      },
+      where,
+      select: { id: true, services: { select: { scheduled_date: true, scheduled_time: true, execution_status: true, acceptance_status: true } } },
     }),
     prisma.company.findMany({ where: { roles: { hasSome: ["parceiro", "fornecedor"] } }, orderBy: { name: "asc" }, select: { id: true, name: true, roles: true } }),
   ]);
+  const total = scheduleRows.length;
+  const ordered = orderReservationsByService(scheduleRows);
+  const pageIds = ordered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(item => item.id);
+  const pageRows = await prisma.reservation.findMany({
+      where: { id: { in: pageIds } },
+      select: {
+        id: true, code: true, status: true, has_partial_cancellation: true,
+        client: { select: { name: true } }, origin_partner: { select: { name: true } },
+        services: { where: { execution_status: { not: "cancelado" }, acceptance_status: { not: "recusado" } }, orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }], select: {
+          execution_status: true, acceptance_status: true, type: true, scheduled_date: true, scheduled_time: true, pickup_location: true, dropoff_location: true, price: true,
+          supplier: { select: { name: true } },
+        } },
+      },
+    });
+  const pageById = new Map(pageRows.map(item => [item.id, item]));
+  const reservations = pageIds.flatMap(id => { const row = pageById.get(id); return row ? [row] : []; });
   const counts = new Map(groups.map((group) => [group.status, group._count._all]));
   const tabCount = (item: (typeof TABS)[number]) => item.statuses ? item.statuses.reduce((sum, status) => sum + (counts.get(status) ?? 0), 0) : groups.reduce((sum, group) => sum + group._count._all, 0);
   const partners = companies.filter((company) => company.roles.includes("parceiro"));
@@ -107,7 +116,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
 
   return <div className="mx-auto max-w-[1480px] space-y-5">
     <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div><p className="eyebrow">Central operacional</p><h1 className="page-heading mt-1">Reservas</h1><p className="page-description">Localize, acompanhe e resolva cada reserva sem sair do fluxo.</p></div>
+      <div><p className="eyebrow">Central operacional</p><h1 className="page-heading mt-1">Reservas</h1><p className="page-description">Reservas ordenadas pela data e horário do próximo serviço. Reservas sem data aparecem ao final.</p></div>
       <Link href="/admin/reservas/novo" className={`${buttonClass} w-full sm:w-auto`}><Plus size={16} /> Nova reserva</Link>
     </header>
 
@@ -159,7 +168,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
     {reservations.length === 0 ? <section className="surface-panel px-5 py-14 text-center"><CalendarDays className="mx-auto text-forest/25" size={34} /><h2 className="mt-3 text-base font-semibold text-forest">Nenhuma reserva encontrada</h2><p className="mt-1 text-sm text-forest/55">Ajuste os filtros ou cadastre uma nova reserva.</p><div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row"><Link href={`/admin/reservas?tab=${tab.key}`} className={secondaryButtonClass}>Limpar filtros</Link><Link href="/admin/reservas/novo" className={buttonClass}>Nova reserva</Link></div></section> :
       <section className="surface-panel overflow-hidden">
         <div className="hidden overflow-x-auto scrollbar-clean xl:block"><table className="w-full min-w-[980px] text-sm"><thead><tr>{["Reserva","Próximo serviço","Rota","Parceiro / fornecedor","Valor","Status",""].map((label) => <th key={label} className="bg-[#faf9f6] px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-forest/60">{label}</th>)}</tr></thead><tbody>
-          {reservations.map((reservation) => { const service = reservation.services[0]; const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <tr key={reservation.id} className="border-t border-forest/[0.075] align-middle hover:bg-forest/[0.022]">
+          {reservations.map((reservation) => { const service = reservationScheduleService(reservation.services); const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <tr key={reservation.id} className="border-t border-forest/[0.075] align-middle hover:bg-forest/[0.022]">
             <td className="px-4 py-4"><strong className="block text-forest">{reservation.code}</strong><span className="mt-1 block text-sm text-forest/58">{reservation.client.name}</span></td>
             <td className="px-4 py-4 text-sm text-forest/68">{service?.scheduled_date ? service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Sem data"}{service?.scheduled_time ? ` · ${service.scheduled_time}` : ""}<span className="mt-1 block text-xs text-forest/58">{service ? SERVICE_TYPE_LABEL[service.type] : "Sem serviço"}</span></td>
             <td className="max-w-[240px] px-4 py-4 text-sm text-forest/68"><span className="block truncate">{service?.pickup_location ?? "—"}</span><span className="block truncate text-xs text-forest/58">{service?.dropoff_location ? `para ${service.dropoff_location}` : ""}</span></td>
@@ -168,7 +177,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Pro
             <td className="px-4 py-4 text-right"><Link href={`/admin/reservas/${reservation.id}`} className="focus-ring rounded text-sm font-semibold text-forest hover:text-forest-light">Abrir</Link></td>
           </tr>; })}
         </tbody></table></div>
-        <div className="divide-y divide-forest/10 xl:hidden">{reservations.map((reservation) => { const service = reservation.services[0]; const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <Link key={reservation.id} href={`/admin/reservas/${reservation.id}`} className="focus-ring block p-4 active:bg-forest/[0.035]">
+        <div className="divide-y divide-forest/10 xl:hidden">{reservations.map((reservation) => { const service = reservationScheduleService(reservation.services); const totalValue = reservation.services.reduce((sum, item) => sum + Number(item.price), 0); return <Link key={reservation.id} href={`/admin/reservas/${reservation.id}`} className="focus-ring block p-4 active:bg-forest/[0.035]">
           <div className="flex items-start justify-between gap-3"><div><strong className="text-base text-forest">{reservation.code}</strong><p className="mt-1 text-sm font-medium text-ink">{reservation.client.name}</p></div><Badge tone={statusTone(reservation.status)}>{RESERVATION_STATUS_LABEL[reservation.status]}</Badge></div>
           <div className="mt-4 grid grid-cols-[82px_1fr] gap-x-3 gap-y-2 text-sm"><span className="text-forest/60">Data</span><span className="font-medium text-forest">{service?.scheduled_date ? service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Sem data"}{service?.scheduled_time ? ` · ${service.scheduled_time}` : ""}</span><span className="text-forest/60">Rota</span><span className="truncate text-forest/72">{service?.pickup_location ?? "—"}{service?.dropoff_location ? ` → ${service.dropoff_location}` : ""}</span><span className="text-forest/60">Valor</span><strong className="text-forest">{money.format(totalValue)}</strong></div>
         </Link>; })}</div>
