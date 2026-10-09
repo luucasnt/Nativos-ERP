@@ -1,3 +1,4 @@
+import { canRegisterEntryPayment } from "@/lib/finance/payment-availability";
 import Link from "next/link";
 import { Prisma, type FinanceEntryStatus, type FinanceEntryType } from "@prisma/client";
 import {
@@ -664,7 +665,7 @@ export default async function FinanceiroPage({
                       <Badge tone={isOverdue ? "danger" : statusTone(entry.status)}>{isOverdue ? "Vencido" : FINANCE_ENTRY_STATUS_LABEL[entry.status]}</Badge>
                     </div>
                     <div className="flex items-end justify-between gap-3"><div><span className="block text-xs text-forest/60">{entry.type === "receita" ? "A receber" : "A pagar"}</span><strong className={`mt-1 block text-lg ${entry.type === "receita" ? "text-success" : "text-danger"}`}>{money.format(Number(entry.amount))}</strong>{paid > 0 && remaining > 0 && <span className="mt-1 block text-xs text-forest/55">Pago {money.format(paid)} · saldo {money.format(remaining)}</span>}</div><span className="text-xs text-forest/60">{entry.due_date ? `Vence ${entry.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}</span></div>
-                    {entry.payment_eligible && entry.status !== "pago" && <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
+                    {canRegisterEntryPayment(entry) && <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
                     {entry.status === "pago" && entry.payments[0] && <a href={`/api/documentos/recibo/${entry.payments[0].id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir recibo</a>}
                   </article>;
                 })}
@@ -721,7 +722,7 @@ export default async function FinanceiroPage({
                           </Badge>
                         </td>
                         <td className="px-5 py-3.5">
-                          {entry.payment_eligible && entry.status !== "pago" && (() => {
+                          {canRegisterEntryPayment(entry) && (() => {
                             const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + activeCompensationAmount(entry);
                             const remaining = Math.max(0, Number(entry.amount) - paid);
                             return <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />;

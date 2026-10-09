@@ -1,3 +1,4 @@
+import { canRegisterEntryPayment } from "@/lib/finance/payment-availability";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -39,7 +40,7 @@ export default async function FinanceEntryPage({ params }: { params: Promise<{ i
       </dl>
       {!manual && <p className="text-sm text-forest/70">Este lançamento foi gerado pelo sistema. Alterações e cancelamentos devem ser feitos no registro de origem.</p>}
       {entry.reservation_id && <Link href={`/admin/reservas/${entry.reservation_id}`} className={secondaryButtonClass}>Abrir reserva de origem</Link>}
-      {entry.payment_eligible && !entry.reversed_at && !["cancelado", "pago"].includes(entry.status) && balance > 0 && <RegisterPaymentForm entryId={id} remainingAmount={balance.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
+      {canRegisterEntryPayment(entry) && balance > 0 && <RegisterPaymentForm entryId={id} remainingAmount={balance.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
     </section>
     {editable && <section className="space-y-4"><h2 className="section-heading">Editar lançamento avulso</h2>
       <ManualFinanceForm key={entry.updated_at.toISOString()} onSave={updateManualEntry.bind(null, id)} defaultValues={{ type: entry.type, party_type: entry.party_type, description: entry.description ?? "", amount: entry.amount.toString(), due_date: entry.due_date?.toISOString().slice(0, 10) ?? "", updated_at: entry.updated_at.toISOString() }} />

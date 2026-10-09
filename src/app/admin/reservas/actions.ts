@@ -12,7 +12,7 @@ import { logAudit } from "@/lib/audit";
 import { deleteUnusedRecord, deletionError } from "@/lib/admin/delete-record";
 import { generateNextReservationCode } from "@/lib/reservations/code";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
-import { generateServiceFinanceEntries } from "@/lib/finance/settlement";
+import { generateServiceSaleEntry, generateServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
 import { rejectReservationEntirely as rejectReservationEntirelyLib } from "@/lib/reservations/rejection";
 import { cancelReservation as cancelReservationLib } from "@/lib/reservations/cancellation";
@@ -23,12 +23,13 @@ import { cancelReservation as cancelReservationLib } from "@/lib/reservations/ca
 // (aceito, não cancelado) desta reserva.
 async function regenerateAcceptedServiceEntries(reservationId: string) {
   const services = await prisma.service.findMany({
-    where: { reservation_id: reservationId, acceptance_status: "aceito", execution_status: { not: "cancelado" } },
-    select: { id: true },
+    where: { reservation_id: reservationId, acceptance_status: { not: "recusado" }, execution_status: { not: "cancelado" } },
+    select: { id: true, acceptance_status: true },
   });
 
   for (const service of services) {
-    await generateServiceFinanceEntries(service.id);
+    await generateServiceSaleEntry(service.id);
+    if (service.acceptance_status === "aceito") await generateServiceFinanceEntries(service.id);
   }
 }
 
@@ -259,7 +260,13 @@ export async function updateReservation(
   let category;
   try { category = await resolveContractedCategory(formData.has("contracted_category_id") ? String(formData.get("contracted_category_id") || "") || null : current.contracted_category_id, current); }
   catch (error) { return { error: error instanceof Error ? error.message : "Categoria inválida." }; }
-  await prisma.reservation.update({ where: { id }, data: { ...result.data, ...category } });
+  try {
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${id}::uuid FOR UPDATE`;
+      if (changedFinancialRule && await tx.financeEntry.findFirst({ where: { reservation_id: id, reversed_at: null, OR: [{ status: { in: ["pendente", "vencido", "pago"] } }, { payments: { some: { reversed_at: null, estorno_of_id: null } } }] } })) throw new Error("A reserva possui recebimento ou título liquidado. Faça o ajuste/estorno antes de alterar as regras financeiras.");
+      await tx.reservation.update({ where: { id }, data: { ...result.data, ...category } });
+    });
+  } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível atualizar a reserva." }; }
 
   // Sempre recalcula: cobre requires_nf ligando/desligando, a alíquota
   // desta reserva sendo definida/limpa manualmente, ou o padrão global

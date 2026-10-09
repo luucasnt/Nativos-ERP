@@ -38,10 +38,11 @@ export function RegisterPaymentForm({
 
   return <div className="w-full min-w-0 lg:min-w-[210px]">
     <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="focus-ring inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-forest/15 bg-white px-3 text-sm font-semibold text-forest hover:border-forest/30">
-      Informar pagamento <ChevronDown size={15} className={open ? "rotate-180 transition" : "transition"} />
+      Registrar pagamento <ChevronDown size={15} className={open ? "rotate-180 transition" : "transition"} />
     </button>
     {open && <div className="mt-2 grid gap-2 rounded-xl border border-forest/12 bg-[#faf9f6] p-3 shadow-sm">
-      <label className="grid gap-1 text-xs font-medium text-forest/65">Valor pago
+      <label className="grid gap-1 text-xs font-medium text-forest/65">Valor recebido ou pago
+        <span className="text-xs font-normal">Saldo disponível: R$ {Number(remainingAmount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. Informe uma parcela ou o valor integral.</span>
         <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" disabled={isPending} className={inputClass} />
       </label>
       <label className="grid gap-1 text-xs font-medium text-forest/65">Forma de pagamento
