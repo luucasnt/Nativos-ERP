@@ -21,3 +21,20 @@ it("pede data, envia imagem/PDF como arquivo e registra referência privada sem 
   expect(fetcher).toHaveBeenCalledWith("/api/admin/comprovantes", expect.objectContaining({ method: "POST", body: expect.any(FormData) }));
   expect(register).toHaveBeenCalledWith(expect.objectContaining({ paymentDate: "2020-01-01", receiptUrl: proof, amount: "480.00" }));
 });
+it("sem anexo explica o que falta e não envia pagamento ao servidor", async () => {
+  const register = vi.fn(async () => {});
+  render(React.createElement(RegisterPaymentForm, { entryId: crypto.randomUUID(), remainingAmount: "480.00", bankAccounts: [], onRegister: register }));
+  fireEvent.click(screen.getByRole("button", { name: "Registrar pagamento" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar pagamento" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Selecione uma imagem ou PDF"));
+  expect(register).not.toHaveBeenCalled();
+  expect(screen.queryByRole("status")).toBeNull();
+});
+it("apresenta validação retornada pelo servidor sem confirmar sucesso", async () => {
+  const register = vi.fn(async () => ({ error: "Existe um caixa fechado nessa data." }));
+  render(React.createElement(RegisterPaymentForm, { entryId: crypto.randomUUID(), remainingAmount: "480.00", bankAccounts: [], proofRequired: false, onRegister: register }));
+  fireEvent.click(screen.getByRole("button", { name: "Registrar pagamento" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar pagamento" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("caixa fechado"));
+  expect(screen.queryByRole("status")).toBeNull();
+});

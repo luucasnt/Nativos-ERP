@@ -2,6 +2,7 @@
 
 import { parsePaymentDate } from "@/lib/finance/payment-date";
 import { validatePaymentProof } from "@/lib/uploads/payment-proof";
+import { unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { PaymentMethod } from "@prisma/client";
@@ -93,6 +94,21 @@ export async function registerPayment(input: {
 
   revalidatePath("/admin/financeiro");
   if (entry.reservation_id) revalidatePath(`/admin/reservas/${entry.reservation_id}`);
+}
+
+// Erros esperados voltam como estado do formulário. Exceções lançadas por
+// Server Actions têm suas mensagens ocultadas no build de produção.
+export async function registerPaymentFromForm(input: Parameters<typeof registerPayment>[0]) {
+  try {
+    await registerPayment(input);
+    return { error: null };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof z.ZodError) return { error: error.issues[0]?.message || "Confira os dados do pagamento." };
+    if (error instanceof Error && error.name === "Error") return { error: error.message };
+    console.error("Falha inesperada ao registrar pagamento", error);
+    return { error: "Não foi possível registrar o pagamento. Tente novamente ou entre em contato com a equipe." };
+  }
 }
 
 export async function updateManualEntry(id: string, _prev: { error: string | null }, formData: FormData) {

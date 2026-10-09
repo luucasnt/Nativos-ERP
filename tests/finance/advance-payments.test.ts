@@ -5,7 +5,7 @@ vi.mock("@/lib/auth/get-current-user", () => ({ requireFinancialUser: async () =
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { rejectService } from "@/lib/reservations/acceptance";
 import { prisma } from "@/lib/prisma";
-import { registerPayment } from "@/app/admin/financeiro/actions";
+import { registerPayment, registerPaymentFromForm } from "@/app/admin/financeiro/actions";
 import { createPayment, reversePayment } from "@/lib/finance/ledger";
 import { generateServiceSaleEntry, generateServiceFinanceEntries, markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
 import { canRegisterEntryPayment } from "@/lib/finance/payment-availability";
@@ -43,6 +43,12 @@ describe("recebimentos antecipados de reservas", () => {
     expect((await prisma.service.findUniqueOrThrow({ where: { id: service.id } })).execution_status).toBe("agendado");
     await markServiceFinanceEntriesEligible(service.id);
     expect((await prisma.financeEntry.findUniqueOrThrow({ where: { id: entry.id } })).status).toBe("pago");
+  });
+  it("ação do formulário retorna validação de comprovante sem exceção mascarada", async () => {
+    const { entry } = await sale();
+    const result = await registerPaymentFromForm({ entryId: entry.id, amount: "100", paymentMethod: "pix", dedupeKey: crypto.randomUUID() });
+    expect(result.error).toContain("comprovante é obrigatório");
+    expect(await prisma.payment.count({ where: { finance_entry_id: entry.id } })).toBe(0);
   });
   it("permite pagamento integral de parceiro com comprovante sem aguardar conclusão", async () => {
     const { entry } = await sale(true);
