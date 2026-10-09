@@ -73,6 +73,17 @@ describe("documentos operacionais completos", () => {
       if (compact.text) expect(compact.text).toContain("22.891.018/0001-63");
       if (compact.text) expect(compact.text.replace(/\s/g, "").toUpperCase()).toContain("VOODESAÍDA");
     }
+    const originalMode = data.reservation.collection_mode;
+    data.reservation.collection_mode = "direto";
+    const direct = await review("voucher-pagamento-motorista", VoucherDocument({ data }));
+    expect(direct.pages).toBe(1);
+    if (direct.text) {
+      expect(direct.text).toContain("Pagamento direto ao motorista");
+      expect(direct.text).toContain("a pagar diretamente ao motorista");
+      expect(direct.text).not.toContain("documento de identificação");
+      expect(direct.text).not.toContain("apresentar no embarque");
+    }
+    data.reservation.collection_mode = originalMode;
     data.showPrice = false;
     const hidden = await review("voucher-sem-financeiro", VoucherDocument({ data }));
     expect(hidden.pages).toBe(1);

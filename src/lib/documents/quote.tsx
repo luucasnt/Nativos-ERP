@@ -32,7 +32,7 @@ export function QuoteDocument({ data }: { data: Awaited<ReturnType<typeof loadQu
   const total = reservation.services.reduce((sum, service) => sum + Number(service.price), 0);
 
   return (
-    <DocumentShell company={data.company} title="Proposta comercial" documentCode={reservation.code}>
+    <DocumentShell passengerName={reservation.client.name} company={data.company} title="Proposta comercial" documentCode={reservation.code}>
       <DocumentHero
         kicker="Orçamento"
         title={reservation.client.name}

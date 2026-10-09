@@ -86,7 +86,7 @@ export function ReceptionSignDocument({
 
   return (
     <Document
-      title={"Recepção · " + data.passengerName}
+      title={"Nativos - Plaquinha - " + data.passengerName + ("reservationCode" in data ? " - " + data.reservationCode : "")}
       author="Nativos Experiences"
     >
       <Page size="A4" orientation="landscape" style={styles.page}>

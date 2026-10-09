@@ -114,10 +114,10 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   instructionNumber: {
-    width: 15,
-    height: 15,
+    width: 11,
+    height: 11,
     marginRight: 7,
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: BRAND_COLORS.soft,
     borderWidth: 1,
     borderColor: BRAND_COLORS.goldLight,

@@ -42,7 +42,7 @@ export function WorkOrderDocument({
     service.reception_passenger_name ?? service.reservation.client.name;
 
   return (
-    <DocumentShell company={data.company}
+    <DocumentShell passengerName={passengerName} company={data.company}
       title="Ordem de serviço"
       documentCode={
         service.reservation.code +

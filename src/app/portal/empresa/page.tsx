@@ -238,7 +238,7 @@ export default async function PortalEmpresaHomePage() {
                             <span>{reservation._count.services} serviço(s)</span>
                             {reservation.origin_partner_id === company.id ? <a
                               href={`/api/documentos/voucher/${reservation.id}`}
-                              download
+                              target="_blank" rel="noopener noreferrer"
                               className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-forest/15 bg-white px-4 font-semibold text-forest"
                             >
                               Voucher
@@ -274,7 +274,7 @@ export default async function PortalEmpresaHomePage() {
                           <td className="px-5 py-3.5 text-right">
                             {reservation.origin_partner_id === company.id ? <a
                               href={"/api/documentos/voucher/" + reservation.id}
-                              download
+                              target="_blank" rel="noopener noreferrer"
                               className="focus-ring rounded text-xs font-semibold text-forest hover:text-forest-light"
                             >
                               Voucher

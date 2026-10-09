@@ -138,7 +138,8 @@ export function ServiceBlock({
 
   return (
     <View style={[styles.block, compact ? { padding: 6 } : {}]} wrap={false}>
-      <View style={styles.header}>
+      <View style={[styles.header, compact ? { alignItems: "center", marginBottom: 3 } : {}]}>
+        {compact ? <Text style={[styles.title, { fontSize: 10 }]}>Serviço {sequence ? String(sequence).padStart(2, "0") : ""} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}</Text> : (
         <View>
           <Text style={styles.sequence}>
             Serviço {sequence ? String(sequence).padStart(2, "0") : ""}
@@ -147,8 +148,9 @@ export function ServiceBlock({
             {SERVICE_TYPE_LABEL[service.type] ?? service.type}
           </Text>
         </View>
+        )}
         {showPrice && (
-          <Text style={styles.price}>{formatCurrency(service.price)}</Text>
+          <Text style={[styles.price, compact ? { paddingVertical: 2 } : {}]}>{formatCurrency(service.price)}</Text>
         )}
       </View>
 
