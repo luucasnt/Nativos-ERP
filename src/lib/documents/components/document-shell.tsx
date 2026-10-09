@@ -1,19 +1,20 @@
+import type { DocumentCompany } from "@/lib/documents/company";
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { registerBrandFonts } from "@/lib/documents/register-fonts";
 import { BRAND_COLORS, BRAND_FONTS } from "@/lib/documents/brand";
-import { WordmarkPdf } from "@/lib/documents/components/wordmark-pdf";
 import { formatDate } from "@/lib/documents/format";
 
 registerBrandFonts();
 
+// Evite lineHeight numérico: o renderer 4.9 reaplica a conversão em cada
+// etapa de paginação. As métricas das fontes mantêm texto e rodapé legíveis.
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 92,
-    paddingBottom: 58,
+    paddingTop: 84,
+    paddingBottom: 90,
     paddingHorizontal: 38,
     fontFamily: BRAND_FONTS.sans,
     fontSize: 9.5,
-    lineHeight: 1.45,
     color: BRAND_COLORS.ink,
     backgroundColor: BRAND_COLORS.white,
   },
@@ -55,7 +56,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: "absolute",
-    bottom: 22,
+    bottom: 16,
+    height: 66,
     left: 38,
     right: 38,
     paddingTop: 8,
@@ -63,13 +65,14 @@ const styles = StyleSheet.create({
     borderTopColor: BRAND_COLORS.line,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
   },
   footerText: {
     fontSize: 7,
     color: BRAND_COLORS.muted,
   },
   pageNumber: {
+    height: 12,
     fontSize: 7,
     fontWeight: 600,
     color: BRAND_COLORS.forest,
@@ -78,23 +81,33 @@ const styles = StyleSheet.create({
 
 export function DocumentShell({
   title,
+  company,
   documentCode,
   issuedAt = new Date(),
   children,
   size = "A4",
 }: {
+  company?: DocumentCompany;
   title: string;
   documentCode?: string;
   issuedAt?: Date;
   children: React.ReactNode;
   size?: "A4" | [number, number];
 }) {
+  const footerLines = [
+    (company?.name ?? "Nativos Experiences") + (company?.document ? " - CNPJ/CPF " + company.document : ""),
+    [company?.address, [company?.city, company?.state].filter(Boolean).join(" / ")].filter(Boolean).join(" - "),
+    [company?.phone, company?.email, company?.website?.replace(/^https?:\/\//, "").replace(/\/$/, "")].filter(Boolean).join(" | "),
+    company?.footer,
+    "Obrigado por escolher a Nativos Experiences.",
+  ].filter(Boolean).join("\n");
+
   return (
     <Document title={title} author="Nativos Experiences" subject={documentCode}>
       <Page size={size} style={styles.page}>
         <View style={styles.topBar} fixed />
-        <View style={styles.header} fixed>
-          <WordmarkPdf size={23} tone="forest-on-cream" />
+        <View style={styles.header} fixed wrap={false}>
+          <Text style={{ fontFamily: BRAND_FONTS.serif, fontStyle: "italic", fontSize: 30, color: BRAND_COLORS.forest }}>nativos</Text>
           <View style={styles.headerRight}>
             <Text style={styles.headerTitle}>{title}</Text>
             <Text style={styles.headerMeta}>
@@ -106,17 +119,16 @@ export function DocumentShell({
 
         {children}
 
-        <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>
-            nativosexperiences.com · WhatsApp +55 73 99168-1630
-          </Text>
+        <View style={styles.footer} fixed wrap={false}>
+          <Text style={[styles.footerText, { width: 440 }]}>{footerLines}</Text>
+        </View>
           <Text
-            style={styles.pageNumber}
+            fixed
+            style={[styles.pageNumber, { position: "absolute", bottom: 16, right: 38, width: 70, textAlign: "right" }]}
             render={({ pageNumber, totalPages }) =>
               "Página " + pageNumber + " de " + totalPages
             }
           />
-        </View>
       </Page>
     </Document>
   );

@@ -1,3 +1,4 @@
+import { loadDocumentCompany } from "@/lib/documents/company";
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { DocumentShell } from "@/lib/documents/components/document-shell";
@@ -33,7 +34,6 @@ const styles = StyleSheet.create({
   },
   clauseText: {
     fontSize: 8.5,
-    lineHeight: 1.55,
     textAlign: "justify",
     color: BRAND_COLORS.ink,
   },
@@ -65,13 +65,13 @@ export async function loadContractData(reservationId: string) {
     return a.order - b.order;
   });
 
-  return { reservation, clauses: sortedClauses };
+  return { reservation, clauses: sortedClauses, company: await loadDocumentCompany() };
 }
 export function ContractDocument({ data }: { data: Awaited<ReturnType<typeof loadContractData>> }) {
   const { reservation, clauses } = data;
 
   return (
-    <DocumentShell title="Contrato de prestação de serviços" documentCode={reservation.code}>
+    <DocumentShell company={data.company} title="Contrato de prestação de serviços" documentCode={reservation.code}>
       <DocumentHero
         kicker="Instrumento particular"
         title="Prestação de serviços"
@@ -86,7 +86,7 @@ export function ContractDocument({ data }: { data: Awaited<ReturnType<typeof loa
             label: "Contratante",
             value: reservation.client.name + (reservation.client.document ? " · " + reservation.client.document : ""),
           },
-          { label: "Contratada", value: "Nativos Experiences" },
+          { label: "Contratada", value: data.company.name + (data.company.document ? " - CNPJ/CPF " + data.company.document : "") },
           { label: "Contato do contratante", value: reservation.client.email ?? reservation.client.phone ?? "Não informado" },
           { label: "Objeto", value: reservation.services.length + " serviço(s) da reserva " + reservation.code },
         ]}
@@ -111,7 +111,7 @@ export function ContractDocument({ data }: { data: Awaited<ReturnType<typeof loa
         ))
       )}
 
-      <Text style={{ marginTop: 15, fontSize: 8.5, lineHeight: 1.5, color: BRAND_COLORS.muted }}>
+      <Text style={{ marginTop: 15, fontSize: 8.5, color: BRAND_COLORS.muted }}>
         As partes declaram ter lido e aceitado as condições acima, reconhecendo a validade deste documento e de sua assinatura física ou eletrônica.
       </Text>
 

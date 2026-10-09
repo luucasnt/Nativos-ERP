@@ -1,3 +1,4 @@
+import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { DocumentShell } from "@/lib/documents/components/document-shell";
@@ -38,7 +39,7 @@ export async function loadReceiptData(paymentId: string) {
     payment.finance_entry.party_id,
   );
 
-  return { payment, partyName };
+  return { payment, partyName, company: await loadDocumentCompany() };
 }
 
 export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof loadReceiptData>> }) {
@@ -48,7 +49,7 @@ export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof load
   const relationship = payment.type === "recebimento" ? "Recebido de" : "Pago a";
 
   return (
-    <DocumentShell
+    <DocumentShell company={data.company}
       title="Recibo"
       documentCode={"REC-" + payment.id.slice(0, 8).toUpperCase()}
       issuedAt={payment.created_at}
@@ -98,7 +99,7 @@ export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof load
         </Text>
       </View>
 
-      <Text style={{ marginTop: 18, fontSize: 7.5, lineHeight: 1.45, color: BRAND_COLORS.muted }}>
+      <Text style={{ marginTop: 18, fontSize: 7.5, color: BRAND_COLORS.muted }}>
         Documento gerado eletronicamente pelo Nativos ERP. Este recibo não substitui nota fiscal quando sua emissão for exigida.
       </Text>
     </DocumentShell>

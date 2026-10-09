@@ -1,3 +1,5 @@
+import { serviceDocumentContext } from "@/lib/documents/service-context";
+import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { resolveShowPrice } from "@/lib/documents/price-visibility";
@@ -5,7 +7,6 @@ import { DocumentShell } from "@/lib/documents/components/document-shell";
 import { ServiceBlock } from "@/lib/documents/components/service-block";
 import {
   DetailGrid,
-  DocumentHero,
   NoticeBox,
   OperationalChecklist,
   SectionHeading,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/documents/components/pdf-ui";
 import { BRAND_COLORS } from "@/lib/documents/brand";
 import { formatDateTime } from "@/lib/documents/format";
-import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
 
 export async function loadWorkOrderData(serviceId: string) {
   const service = await prisma.service.findUniqueOrThrow({
@@ -26,7 +26,7 @@ export async function loadWorkOrderData(serviceId: string) {
   });
 
   const showPrice = await resolveShowPrice(service.os_show_price, "os_default");
-  return { service, showPrice };
+  return { service, showPrice, company: await loadDocumentCompany() };
 }
 
 export function WorkOrderDocument({
@@ -39,7 +39,7 @@ export function WorkOrderDocument({
     service.reception_passenger_name ?? service.reservation.client.name;
 
   return (
-    <DocumentShell
+    <DocumentShell company={data.company}
       title="Ordem de serviço"
       documentCode={
         service.reservation.code +
@@ -47,12 +47,6 @@ export function WorkOrderDocument({
         service.id.slice(0, 8).toUpperCase()
       }
     >
-      <DocumentHero
-        kicker="Operação"
-        title={SERVICE_TYPE_LABEL[service.type] ?? service.type}
-        description={"Passageiro: " + passengerName}
-      />
-
       <DetailGrid
         columns={3}
         items={[
@@ -61,13 +55,6 @@ export function WorkOrderDocument({
           {
             label: "Telefone",
             value: service.reservation.client.phone ?? "Não informado",
-          },
-          { label: "Motorista", value: service.driver?.name ?? "A definir" },
-          {
-            label: "Veículo",
-            value: service.vehicle
-              ? service.vehicle.model + " · " + service.vehicle.plate
-              : "A definir",
           },
         ]}
       />
@@ -85,20 +72,14 @@ export function WorkOrderDocument({
           : "Não realizar cobrança ao passageiro. Em caso de dúvida sobre pagamento, acione a equipe Nativos antes de encerrar o atendimento."}
       </NoticeBox>
 
-      <View break>
+      <View>
         <SectionHeading>Checklist do motorista</SectionHeading>
         <OperationalChecklist
           items={[
             "Conferir passageiro, telefone, quantidade de pessoas, bagagens e assentos infantis.",
             "Confirmar origem, destino, horário e rota antes de iniciar o deslocamento.",
             "Verificar limpeza, climatização, combustível e condições de segurança do veículo.",
-            ...(service.flight_number
-              ? [
-                  "Acompanhar o voo " +
-                    service.flight_number +
-                    " e posicionar-se no desembarque com antecedência.",
-                ]
-              : []),
+            serviceDocumentContext(service.type).driverInstruction,
             "Registrar início e conclusão no portal; comunicar imediatamente qualquer ocorrência.",
           ]}
         />
@@ -108,7 +89,7 @@ export function WorkOrderDocument({
           style={{
             flexDirection: "row",
             gap: 7,
-            marginBottom: 16,
+            marginBottom: 8,
           }}
           wrap={false}
         >
@@ -130,7 +111,7 @@ export function WorkOrderDocument({
               key={item.label}
               style={{
                 flex: 1,
-                minHeight: 48,
+                minHeight: 35,
                 padding: 9,
                 borderWidth: 1,
                 borderColor: BRAND_COLORS.line,
@@ -157,8 +138,8 @@ export function WorkOrderDocument({
         <SectionHeading>Registro de ocorrências</SectionHeading>
         <View
           style={{
-            height: 92,
-            marginBottom: 18,
+            height: 45,
+            marginBottom: 10,
             padding: 9,
             borderWidth: 1,
             borderColor: BRAND_COLORS.line,

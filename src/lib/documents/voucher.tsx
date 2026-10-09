@@ -1,3 +1,4 @@
+import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { resolveShowPrice } from "@/lib/documents/price-visibility";
@@ -5,8 +6,7 @@ import { DocumentShell } from "@/lib/documents/components/document-shell";
 import { ServiceBlock } from "@/lib/documents/components/service-block";
 import {
   DetailGrid,
-  DocumentHero,
-  InstructionList,
+  NoticeBox,
   SectionHeading,
   TotalPanel,
 } from "@/lib/documents/components/pdf-ui";
@@ -20,7 +20,8 @@ export async function loadVoucherData(reservationId: string) {
       client: true,
       services: {
         where: { execution_status: { not: "cancelado" } },
-        orderBy: { scheduled_date: "asc" },
+        orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }, { id: "asc" }],
+        include: { driver: true, vehicle: true },
       },
     },
   });
@@ -29,7 +30,7 @@ export async function loadVoucherData(reservationId: string) {
     reservation.voucher_show_price,
     "voucher_default",
   );
-  return { reservation, showPrice };
+  return { reservation, showPrice, company: await loadDocumentCompany() };
 }
 export function VoucherDocument({
   data,
@@ -41,35 +42,9 @@ export function VoucherDocument({
     (sum, service) => sum + Number(service.price),
     0,
   );
-  const includesAirportArrival = reservation.services.some(
-    (service) =>
-      service.type === "transfer_chegada" || Boolean(service.flight_number),
-  );
-  const passengerInstructions = [
-    "Esteja pronto no local de embarque com 10 minutos de antecedência e mantenha o telefone informado na reserva disponível.",
-    ...(includesAirportArrival
-      ? [
-          "Na chegada ao aeroporto, retire suas bagagens e siga para o desembarque. O motorista aguardará identificado; avise a equipe se houver atraso na retirada.",
-        ]
-      : []),
-    "Em recepções de aeroporto, há 20 minutos de tolerância gratuita. Após 40 minutos sem contato, o atendimento poderá ser registrado como não comparecimento.",
-    "Solicite alterações de dados ou rota com pelo menos 3 horas de antecedência. Cancelamentos ou remarcações devem ser solicitados com 24 horas de antecedência.",
-    "Confira passageiros, bagagens e assentos infantis descritos em cada serviço. Qualquer diferença deve ser informada antes do embarque.",
-    "A categoria do veículo é garantida; o modelo pode variar conforme disponibilidade. Suporte Nativos: WhatsApp +55 73 99168-1630.",
-  ];
 
   return (
-    <DocumentShell title="Voucher de reserva" documentCode={reservation.code}>
-      <DocumentHero
-        kicker="Reserva confirmada"
-        title={reservation.client.name}
-        description={
-          "Código " +
-          reservation.code +
-          " · Confira os serviços e as orientações antes do embarque."
-        }
-      />
-
+    <DocumentShell company={data.company} title="Voucher de reserva" documentCode={reservation.code}>
       <DetailGrid
         columns={3}
         items={[
@@ -83,12 +58,6 @@ export function VoucherDocument({
             value: reservation.client.email ?? "Não informado",
           },
         ]}
-      />
-
-      <InstructionList
-        title="Orientações ao passageiro"
-        subtitle="Informações importantes para um atendimento tranquilo e pontual."
-        items={passengerInstructions}
       />
 
       <SectionHeading>Serviços incluídos</SectionHeading>
@@ -106,6 +75,10 @@ export function VoucherDocument({
           />
         ))
       )}
+
+      <NoticeBox title="Antes do serviço">
+        Confira passageiros, bagagens e assentos infantis. {reservation.services.some(service => service.type !== "transfer_chegada") ? "Esteja pronto 10 minutos antes do embarque. " : ""} Siga o ponto de encontro indicado em cada serviço. Para dúvidas ou alterações, contate a Nativos.
+      </NoticeBox>
 
       {showPrice && (
         <TotalPanel

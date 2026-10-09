@@ -1,3 +1,4 @@
+import { loadDocumentCompany } from "@/lib/documents/company";
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { BRAND_COLORS } from "@/lib/documents/brand";
@@ -107,7 +108,7 @@ export async function loadInvoiceData(billingCycleId: string) {
     }),
   ]);
 
-  return { billingCycle, bankAccount };
+  return { billingCycle, bankAccount, company: await loadDocumentCompany() };
 }
 
 export function InvoiceDocument({ data }: { data: Awaited<ReturnType<typeof loadInvoiceData>> }) {
@@ -116,7 +117,7 @@ export function InvoiceDocument({ data }: { data: Awaited<ReturnType<typeof load
   const remaining = Math.max(0, Number(cycle.total_amount) - Number(cycle.paid_amount));
 
   return (
-    <DocumentShell
+    <DocumentShell company={data.company}
       title="Fatura de serviços"
       documentCode={"FAT-" + cycle.id.slice(0, 8).toUpperCase()}
       issuedAt={cycle.updated_at}
@@ -207,7 +208,7 @@ export function InvoiceDocument({ data }: { data: Awaited<ReturnType<typeof load
         </NoticeBox>
       )}
 
-      <Text style={{ marginTop: 4, fontSize: 7.5, lineHeight: 1.45, color: BRAND_COLORS.muted }}>
+      <Text style={{ marginTop: 4, fontSize: 7.5, color: BRAND_COLORS.muted }}>
         Esta fatura consolida os serviços vinculados ao ciclo informado e não substitui nota fiscal quando exigida.
       </Text>
     </DocumentShell>

@@ -3,15 +3,15 @@ import { BRAND_COLORS, BRAND_FONTS } from "@/lib/documents/brand";
 
 const styles = StyleSheet.create({
   hero: {
-    marginBottom: 20,
-    padding: 18,
+    marginBottom: 10,
+    padding: 10,
     borderRadius: 6,
     backgroundColor: BRAND_COLORS.soft,
     borderLeftWidth: 3,
     borderLeftColor: BRAND_COLORS.gold,
   },
   kicker: {
-    marginBottom: 5,
+    marginBottom: 3,
     fontSize: 7.5,
     fontWeight: 600,
     textTransform: "uppercase",
@@ -20,9 +20,8 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontFamily: BRAND_FONTS.serif,
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: 600,
-    lineHeight: 1.15,
     color: BRAND_COLORS.forest,
   },
   heroDescription: {
@@ -33,7 +32,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 5,
     fontSize: 8,
     fontWeight: 600,
     textTransform: "uppercase",
@@ -44,11 +43,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginBottom: 16,
+    marginBottom: 5,
   },
   gridItem: {
-    minHeight: 43,
-    padding: 8,
+    minHeight: 24,
+    padding: 5,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     borderRadius: 4,
@@ -68,7 +67,7 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.ink,
   },
   notice: {
-    marginBottom: 16,
+    marginBottom: 5,
     padding: 10,
     borderRadius: 4,
     backgroundColor: "#fbf5e9",
@@ -83,19 +82,18 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     fontSize: 8,
-    lineHeight: 1.45,
     color: BRAND_COLORS.muted,
   },
   instructionBox: {
-    marginBottom: 16,
-    padding: 12,
+    marginBottom: 5,
+    padding: 5,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     borderRadius: 5,
     backgroundColor: BRAND_COLORS.white,
   },
   instructionHeader: {
-    marginBottom: 8,
+    marginBottom: 5,
     paddingBottom: 7,
     borderBottomWidth: 1,
     borderBottomColor: BRAND_COLORS.line,
@@ -125,7 +123,6 @@ const styles = StyleSheet.create({
     borderColor: BRAND_COLORS.goldLight,
     fontSize: 7,
     fontWeight: 600,
-    lineHeight: 1.8,
     textAlign: "center",
     color: BRAND_COLORS.forest,
   },
@@ -133,11 +130,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 1,
     fontSize: 7.7,
-    lineHeight: 1.42,
     color: BRAND_COLORS.ink,
   },
   checklist: {
-    marginBottom: 16,
+    marginBottom: 5,
     padding: 11,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
@@ -160,14 +156,13 @@ const styles = StyleSheet.create({
   checklistText: {
     flex: 1,
     fontSize: 7.8,
-    lineHeight: 1.35,
     color: BRAND_COLORS.ink,
   },
   total: {
-    marginTop: 10,
+    marginTop: 4,
     marginLeft: "auto",
     width: 230,
-    padding: 14,
+    padding: 9,
     borderRadius: 5,
     backgroundColor: BRAND_COLORS.white,
     borderWidth: 1,
@@ -184,9 +179,8 @@ const styles = StyleSheet.create({
   totalValue: {
     marginTop: 4,
     fontFamily: BRAND_FONTS.serif,
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 600,
-    lineHeight: 1.15,
     color: BRAND_COLORS.forest,
   },
   totalNote: {
@@ -195,7 +189,7 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.muted,
   },
   signatures: {
-    marginTop: 20,
+    marginTop: 14,
     flexDirection: "row",
     gap: 26,
   },

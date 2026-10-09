@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from "node:fs";
 // Smoke test de verdade: gera cada um dos 5 documentos + a plaquinha em
 // PDF real contra dados já existentes no banco de seed, só para provar
 // que renderToBuffer não lança (fontes carregam, o layout não quebra).
@@ -17,7 +18,11 @@ const prisma = new PrismaClient();
 const RESERVATION_ID = "50000000-0000-0000-0000-000000000001";
 const SERVICE_ID = "60000000-0000-0000-0000-000000000001";
 
-function isPdf(buffer: Buffer) {
+function isPdf(buffer: Buffer, name: string) {
+  if (process.env.PDF_REVIEW_DIR) {
+    mkdirSync(process.env.PDF_REVIEW_DIR, { recursive: true });
+    writeFileSync(`${process.env.PDF_REVIEW_DIR}/${name}.pdf`, buffer);
+  }
   return buffer.subarray(0, 5).toString("ascii") === "%PDF-";
 }
 
@@ -25,32 +30,32 @@ describe("geração de PDF (smoke test contra dados reais de seed)", () => {
   it("voucher", async () => {
     const data = await loadVoucherData(RESERVATION_ID);
     const buffer = await renderToBuffer(VoucherDocument({ data }));
-    expect(isPdf(buffer)).toBe(true);
+    expect(isPdf(buffer, "voucher-seed")).toBe(true);
   });
 
   it("ordem de serviço", async () => {
     const data = await loadWorkOrderData(SERVICE_ID);
     const buffer = await renderToBuffer(WorkOrderDocument({ data }));
-    expect(isPdf(buffer)).toBe(true);
+    expect(isPdf(buffer, "os-seed")).toBe(true);
   });
 
   it("orçamento", async () => {
     const data = await loadQuoteData(RESERVATION_ID);
     const buffer = await renderToBuffer(QuoteDocument({ data }));
-    expect(isPdf(buffer)).toBe(true);
+    expect(isPdf(buffer, "orcamento")).toBe(true);
   });
 
   it("contrato", async () => {
     const data = await loadContractData(RESERVATION_ID);
     const buffer = await renderToBuffer(ContractDocument({ data }));
-    expect(isPdf(buffer)).toBe(true);
+    expect(isPdf(buffer, "contrato")).toBe(true);
   });
 
   it("recibo", async () => {
     const payment = await prisma.payment.findFirstOrThrow();
     const data = await loadReceiptData(payment.id);
     const buffer = await renderToBuffer(ReceiptDocument({ data }));
-    expect(isPdf(buffer)).toBe(true);
+    expect(isPdf(buffer, "recibo")).toBe(true);
   });
 
   it("plaquinha de recepção", async () => {
@@ -69,7 +74,7 @@ describe("geração de PDF (smoke test contra dados reais de seed)", () => {
     try {
       const data = await loadReceptionSignData(service.id);
       const buffer = await renderToBuffer(ReceptionSignDocument({ data }));
-      expect(isPdf(buffer)).toBe(true);
+      expect(isPdf(buffer, "plaquinha-seed")).toBe(true);
     } finally {
       await prisma.service.delete({ where: { id: service.id } }).catch(() => {});
     }
