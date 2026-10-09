@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
 
 const RESULT_LIMIT = 5;
+const SELECT_LIMIT = 20;
+const ENTITIES = ["client", "partner", "company", "driver", "vehicle"];
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -13,7 +15,13 @@ export async function GET(request: Request) {
 
   const query = new URL(request.url).searchParams.get("q")?.trim().slice(0, 60) ?? "";
   const entity = new URL(request.url).searchParams.get("entity");
-  if (query.length < 2) return NextResponse.json({ results: [] });
+  if (entity && !ENTITIES.includes(entity)) {
+    return NextResponse.json({ error: "Tipo de cadastro inválido." }, { status: 400 });
+  }
+  // Selectors load existing registrations on focus, including an empty
+  // search. Global search keeps its two-character minimum.
+  if (!entity && query.length < 2) return NextResponse.json({ results: [] });
+  const limit = entity ? SELECT_LIMIT : RESULT_LIMIT;
 
   const contains = { contains: query, mode: "insensitive" as const };
   const [reservations, clients, drivers, vehicles, companies] = await Promise.all([
@@ -26,22 +34,22 @@ export async function GET(request: Request) {
     }),
     entity && entity !== "client" ? Promise.resolve([]) : prisma.client.findMany({
       where: { OR: [{ name: contains }, { phone: contains }, { email: contains }, { document: contains }] },
-      orderBy: { name: "asc" }, take: RESULT_LIMIT,
+      orderBy: { name: "asc" }, take: limit,
       select: { id: true, name: true, phone: true },
     }),
     entity && entity !== "driver" ? Promise.resolve([]) : prisma.driver.findMany({
       where: { OR: [{ name: contains }, { phone: contains }, { email: contains }, { document: contains }] },
-      orderBy: { name: "asc" }, take: RESULT_LIMIT,
+      orderBy: { name: "asc" }, take: limit,
       select: { id: true, name: true, phone: true },
     }),
     entity && entity !== "vehicle" ? Promise.resolve([]) : prisma.vehicle.findMany({
       where: { OR: [{ plate: contains }, { model: contains }] },
-      orderBy: { model: "asc" }, take: RESULT_LIMIT,
+      orderBy: { model: "asc" }, take: limit,
       select: { id: true, model: true, plate: true },
     }),
     entity && !["company", "partner"].includes(entity) ? Promise.resolve([]) : prisma.company.findMany({
       where: { ...(entity === "partner" ? { roles: { has: "parceiro" } } : {}), OR: [{ name: contains }, { contact_name: contains }, { contact_phone: contains }, { contact_email: contains }, { document: contains }] },
-      orderBy: { name: "asc" }, take: RESULT_LIMIT,
+      orderBy: { name: "asc" }, take: limit,
       select: { id: true, name: true, roles: true },
     }),
   ]);

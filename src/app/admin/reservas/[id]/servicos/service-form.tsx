@@ -118,24 +118,15 @@ export function ServiceForm({
 
       {executionType === "fornecedor" && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="supplier_id" className={labelClass}>
-            Fornecedor *
-          </label>
           <SearchableEntitySelect name="supplier_id" label="Fornecedor" entity="company" value={defaultValues?.supplier_id ?? ""} initialOptions={suppliers} required />
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label htmlFor="driver_id" className={labelClass}>
-            Motorista
-          </label>
           <SearchableEntitySelect name="driver_id" label="Motorista" entity="driver" value={defaultValues?.driver_id ?? ""} initialOptions={drivers} />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="vehicle_id" className={labelClass}>
-            Veículo
-          </label>
           <SearchableEntitySelect name="vehicle_id" label="Veículo" entity="vehicle" value={defaultValues?.vehicle_id ?? ""} initialOptions={vehicles} />
         </div>
       </div>
