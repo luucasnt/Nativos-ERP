@@ -10,6 +10,7 @@
 //    tratado como "criar ou devolver o que já existe", nunca como erro de
 //    duplicidade a ignorar silenciosamente nem como duplicata a criar de
 //    novo — a chamada é sempre segura de repetir.
+import { effectivePaymentDate } from "@/lib/finance/payment-date";
 import { canRegisterEntryPayment, isReservationSale } from "@/lib/finance/payment-availability";
 import { Prisma } from "@prisma/client";
 import type {
@@ -178,10 +179,13 @@ type CreatePaymentInput = {
   payment_method: PaymentMethod;
   bank_account_id?: string | null;
   receipt_url?: string | null;
+  occurred_at?: Date;
   dedupe_key: string;
 };
 
 export async function createPayment(input: CreatePaymentInput) {
+  const occurredAt = input.occurred_at ?? new Date();
+  if (Number.isNaN(occurredAt.getTime()) || occurredAt.getTime() > new Date().getTime()) throw new Error("Data de pagamento inválida ou futura.");
   const existing = await prisma.payment.findUnique({ where: { dedupe_key: input.dedupe_key } });
   if (existing) {
     return existing;
@@ -221,8 +225,8 @@ export async function createPayment(input: CreatePaymentInput) {
         await tx.$queryRaw`SELECT id FROM bank_accounts WHERE id = ${input.bank_account_id}::uuid FOR UPDATE`;
         const account = await tx.bankAccount.findUnique({ where: { id: input.bank_account_id }, select: { active: true } });
         if (!account?.active) throw new Error("Selecione uma conta bancária ativa.");
-        const { start, end } = businessDay();
-        if (await tx.cashClosing.findFirst({ where: { bank_account_id: input.bank_account_id, closing_date: { gte: start, lt: end }, reopened_at: null } })) throw new Error("O caixa de hoje está fechado. Reabra o fechamento antes de registrar movimentações.");
+        const { start } = businessDay(occurredAt);
+        if (await tx.cashClosing.findFirst({ where: { bank_account_id: input.bank_account_id, closing_date: { gte: start }, reopened_at: null } })) throw new Error("Existe um caixa fechado nessa data ou depois dela. Reabra os fechamentos afetados antes de registrar a movimentação retroativa.");
       }
 
       const amount = new Prisma.Decimal(input.amount);
@@ -251,6 +255,7 @@ export async function createPayment(input: CreatePaymentInput) {
           payment_method: input.payment_method,
           bank_account_id: input.bank_account_id,
           receipt_url: input.receipt_url,
+          occurred_at: occurredAt,
           dedupe_key: input.dedupe_key,
         },
       });
@@ -304,7 +309,7 @@ export async function reversePayment(
         await tx.$queryRaw`SELECT id FROM bank_accounts WHERE id = ${original.bank_account_id}::uuid FOR UPDATE`;
         const closing = await tx.cashClosing.findFirst({ where: {
           bank_account_id: original.bank_account_id, reopened_at: null,
-          closing_date: { gte: businessDay(original.created_at).start },
+          closing_date: { gte: businessDay(effectivePaymentDate(original)).start },
         }, select: { id: true } });
         if (closing) throw new Error("Este pagamento pertence a um caixa fechado. Revise o fechamento antes de estornar.");
       }

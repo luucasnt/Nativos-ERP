@@ -1,3 +1,4 @@
+import { effectivePaymentDate } from "@/lib/finance/payment-date";
 import { canRegisterEntryPayment } from "@/lib/finance/payment-availability";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -50,7 +51,8 @@ export default async function FinanceEntryPage({ params }: { params: Promise<{ i
     <section className="surface-panel space-y-4 p-5"><h2 className="section-heading">Pagamentos e estornos</h2>
       {!entry.payments.length && <p className="text-sm text-forest/60">Nenhum pagamento registrado.</p>}
       <ul className="space-y-4">{entry.payments.map((payment) => <li key={payment.id} className="space-y-3 rounded-lg border border-forest/10 p-4">
-        <p className="text-sm"><strong>{money.format(Number(payment.amount))}</strong> · {PAYMENT_METHOD_LABEL[payment.payment_method]} · {payment.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })} · {payment.estorno_of_id ? "Estorno" : payment.reversed_at ? "Estornado" : "Registrado"}</p>
+        <p className="text-sm"><strong>{money.format(Number(payment.amount))}</strong> · {PAYMENT_METHOD_LABEL[payment.payment_method]} · {effectivePaymentDate(payment).toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })} · {payment.estorno_of_id ? "Estorno" : payment.reversed_at ? "Estornado" : "Registrado"}</p>
+        {payment.receipt_url && <a href={`/api/admin/comprovantes/${payment.id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir comprovante</a>}
         {payment.reversal_reason && <p className="text-sm text-forest/60">Motivo: {payment.reversal_reason}</p>}
         {!payment.reversed_at && !payment.estorno_of_id && <>
           <a href={`/api/documentos/recibo/${payment.id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir recibo</a>

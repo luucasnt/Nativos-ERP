@@ -1,3 +1,4 @@
+import { effectivePaymentDate } from "@/lib/finance/payment-date";
 import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
@@ -73,7 +74,8 @@ export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof load
             label: "Forma de pagamento",
             value: PAYMENT_METHOD_LABEL[payment.payment_method] ?? payment.payment_method,
           },
-          { label: "Data e hora", value: formatDateTime(payment.created_at) },
+          { label: "Data do recebimento / pagamento", value: effectivePaymentDate(payment).toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) },
+          { label: "Registrado no sistema", value: formatDateTime(payment.created_at) },
           { label: "Reserva", value: entry.reservation?.code ?? "Não vinculada" },
           { label: "Conta", value: payment.bank_account?.name ?? "Não informada" },
         ]}

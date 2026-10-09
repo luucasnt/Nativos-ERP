@@ -94,6 +94,15 @@ describe("documentos operacionais completos", () => {
     const data = await loadWorkOrderData(serviceId);
     const result = await review("os", WorkOrderDocument({ data }));
     if (result) expect(result.pages).toBe(1);
+    data.service.reservation.collection_mode = "direto";
+    data.service.collection_actor = "motorista_proprio";
+    data.service.finance_entries = [];
+    data.service.direct_collections = [];
+    data.service.driver_can_receive_payment = false;
+    data.showPrice = false;
+    const direct = await review("os-cobranca-direta", WorkOrderDocument({ data }));
+    expect(direct.pages).toBe(1);
+    if (direct.text) expect(direct.text.replace(/\s+/g, " ")).toContain("deve receber diretamente do cliente: R$");
   });
   it("fatura usa o mesmo padrão profissional", async () => {
     const prisma = new PrismaClient();
