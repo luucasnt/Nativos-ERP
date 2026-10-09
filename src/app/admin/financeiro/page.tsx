@@ -25,7 +25,7 @@ import {
 } from "@/lib/finance/labels";
 import { prisma } from "@/lib/prisma";
 import { buttonClass, inputClass, secondaryButtonClass } from "@/lib/ui";
-import { registerPayment } from "./actions";
+import { registerPaymentFromForm as registerPayment } from "./actions";
 import { requireFinancialUser } from "@/lib/auth/get-current-user";
 
 const money = new Intl.NumberFormat("pt-BR", {
@@ -665,7 +665,7 @@ export default async function FinanceiroPage({
                       <Badge tone={isOverdue ? "danger" : statusTone(entry.status)}>{isOverdue ? "Vencido" : FINANCE_ENTRY_STATUS_LABEL[entry.status]}</Badge>
                     </div>
                     <div className="flex items-end justify-between gap-3"><div><span className="block text-xs text-forest/60">{entry.type === "receita" ? "A receber" : "A pagar"}</span><strong className={`mt-1 block text-lg ${entry.type === "receita" ? "text-success" : "text-danger"}`}>{money.format(Number(entry.amount))}</strong>{paid > 0 && remaining > 0 && <span className="mt-1 block text-xs text-forest/55">Pago {money.format(paid)} · saldo {money.format(remaining)}</span>}</div><span className="text-xs text-forest/60">{entry.due_date ? `Vence ${entry.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : entry.created_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" })}</span></div>
-                    {canRegisterEntryPayment(entry) && <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
+                    {canRegisterEntryPayment(entry) && <RegisterPaymentForm proofRequired={["cliente", "parceiro", "fornecedor"].includes(entry.party_type)} entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
                     {entry.status === "pago" && entry.payments[0] && <a href={`/api/documentos/recibo/${entry.payments[0].id}`} target="_blank" rel="noreferrer" className={secondaryButtonClass}>Abrir recibo</a>}
                   </article>;
                 })}
@@ -725,7 +725,7 @@ export default async function FinanceiroPage({
                           {canRegisterEntryPayment(entry) && (() => {
                             const paid = entry.payments.reduce((sum, payment) => sum + Number(payment.amount), 0) + activeCompensationAmount(entry);
                             const remaining = Math.max(0, Number(entry.amount) - paid);
-                            return <RegisterPaymentForm entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />;
+                            return <RegisterPaymentForm proofRequired={["cliente", "parceiro", "fornecedor"].includes(entry.party_type)} entryId={entry.id} remainingAmount={remaining.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />;
                           })()}
                           {entry.status === "pago" && entry.payments[0] && (
                             <a

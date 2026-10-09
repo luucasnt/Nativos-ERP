@@ -22,11 +22,13 @@ export function RegisterPaymentForm({
   remainingAmount,
   bankAccounts,
   onRegister,
+  proofRequired = true,
 }: {
   entryId: string;
   remainingAmount: string;
   bankAccounts: BankAccount[];
-  onRegister: (input: RegisterPaymentInput) => Promise<void>;
+  proofRequired?: boolean;
+  onRegister: (input: RegisterPaymentInput) => Promise<void | { error: string | null }>;
 }) {
   const [open, setOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("pix");
@@ -63,7 +65,7 @@ export function RegisterPaymentForm({
         <input type="date" value={paymentDate} max={bahiaDate()} required onChange={event => setPaymentDate(event.target.value)} disabled={isPending} className={inputClass} />
         <span className="text-xs font-normal">Informe a data em que o dinheiro foi recebido ou pago, inclusive em lançamentos retroativos.</span>
       </label>
-      <label className="grid gap-1 text-xs font-medium text-forest/65">Anexar comprovante
+      <label className="grid gap-1 text-xs font-medium text-forest/65">Anexar comprovante{proofRequired ? " (obrigatório)" : " (opcional)"}
         <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => { setProofFile(event.target.files?.[0] ?? null); setReceiptUrl(""); }} disabled={isPending} className={inputClass} />
         <span className="text-xs font-normal">Imagem JPG, PNG, WebP ou PDF. Máximo 4 MB. O arquivo fica privado.</span>
       </label>
@@ -72,6 +74,7 @@ export function RegisterPaymentForm({
         const key = dedupeKey || crypto.randomUUID();
         setDedupeKey(key);
         try {
+          if (proofRequired && !proofFile && !receiptUrl) throw new Error("Selecione uma imagem ou PDF em Anexar comprovante antes de confirmar o pagamento.");
           if (!paymentDate) throw new Error("Informe a data do recebimento ou pagamento.");
           let proof = receiptUrl;
           if (proofFile && !proof) {
@@ -82,7 +85,8 @@ export function RegisterPaymentForm({
             if (!response.ok || !result.receiptUrl) throw new Error(result.error || "Não foi possível anexar o comprovante.");
             proof = result.receiptUrl; setReceiptUrl(proof);
           }
-          await onRegister({ entryId, paymentMethod, paymentDate, amount: amount.replace(",", "."), bankAccountId: bankAccountId || undefined, receiptUrl: proof || undefined, dedupeKey: key });
+          const result = await onRegister({ entryId, paymentMethod, paymentDate, amount: amount.replace(",", "."), bankAccountId: bankAccountId || undefined, receiptUrl: proof || undefined, dedupeKey: key });
+          if (result?.error) throw new Error(result.error);
           setSuccess(true); setDedupeKey(""); setProofFile(null); setReceiptUrl(""); setOpen(false);
         } catch (reason) {
           setError(reason instanceof Error ? reason.message : "Falha ao registrar pagamento.");

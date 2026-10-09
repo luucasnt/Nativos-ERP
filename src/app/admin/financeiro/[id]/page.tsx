@@ -11,7 +11,7 @@ import { secondaryButtonClass } from "@/lib/ui";
 import { ManualFinanceForm } from "../novo/manual-finance-form";
 import { FinanceReasonAction } from "@/components/admin/finance-reason-action";
 import { RegisterPaymentForm } from "@/components/admin/register-payment-form";
-import { cancelManualEntry, registerPayment, reverseRegisteredPayment, updateManualEntry } from "../actions";
+import { cancelManualEntry, registerPaymentFromForm as registerPayment, reverseRegisteredPayment, updateManualEntry } from "../actions";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -41,7 +41,7 @@ export default async function FinanceEntryPage({ params }: { params: Promise<{ i
       </dl>
       {!manual && <p className="text-sm text-forest/70">Este lançamento foi gerado pelo sistema. Alterações e cancelamentos devem ser feitos no registro de origem.</p>}
       {entry.reservation_id && <Link href={`/admin/reservas/${entry.reservation_id}`} className={secondaryButtonClass}>Abrir reserva de origem</Link>}
-      {canRegisterEntryPayment(entry) && balance > 0 && <RegisterPaymentForm entryId={id} remainingAmount={balance.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
+      {canRegisterEntryPayment(entry) && balance > 0 && <RegisterPaymentForm proofRequired={["cliente", "parceiro", "fornecedor"].includes(entry.party_type)} entryId={id} remainingAmount={balance.toFixed(2)} bankAccounts={bankAccounts} onRegister={registerPayment} />}
     </section>
     {editable && <section className="space-y-4"><h2 className="section-heading">Editar lançamento avulso</h2>
       <ManualFinanceForm key={entry.updated_at.toISOString()} onSave={updateManualEntry.bind(null, id)} defaultValues={{ type: entry.type, party_type: entry.party_type, description: entry.description ?? "", amount: entry.amount.toString(), due_date: entry.due_date?.toISOString().slice(0, 10) ?? "", updated_at: entry.updated_at.toISOString() }} />
