@@ -1,0 +1,20 @@
+import { expect, it } from "vitest";
+import { prisma } from "@/lib/prisma";
+import { loadVoucherData } from "@/lib/documents/voucher";
+import { voucherFinancialSummary } from "@/lib/documents/voucher-finance";
+it("voucher ignora estornos, despesas e repasses internos no valor pago", async () => {
+  const client = await prisma.client.create({ data: { name: "Cliente saldo voucher" } });
+  const reservation = await prisma.reservation.create({ data: { code: crypto.randomUUID(), client_id: client.id, voucher_show_price: true } });
+  const service = await prisma.service.create({ data: { reservation_id: reservation.id, type: "transfer_chegada", execution_type: "propria", original_price: "480", price: "480", acceptance_status: "aceito" } });
+  const sale = await prisma.financeEntry.create({ data: { type: "receita", category: "venda_servico", origin_type: "manual", status: "pendente", payment_eligible: true, amount: "480", party_type: "cliente", party_id: client.id, service_id: service.id, reservation_id: reservation.id } });
+  await prisma.payment.create({ data: { finance_entry_id: sale.id, type: "recebimento", amount: "120", payment_method: "pix" } });
+  const reversed = await prisma.payment.create({ data: { finance_entry_id: sale.id, type: "recebimento", amount: "30", payment_method: "pix", reversed_at: new Date() } });
+  await prisma.payment.create({ data: { finance_entry_id: sale.id, type: "pagamento", amount: "30", payment_method: "pix", estorno_of_id: reversed.id } });
+  const transfer = await prisma.financeEntry.create({ data: { type: "receita", category: "repasse_fornecedor", origin_type: "manual", status: "pendente", payment_eligible: true, amount: "200", party_type: "fornecedor", party_id: crypto.randomUUID(), service_id: service.id, reservation_id: reservation.id } });
+  await prisma.payment.create({ data: { finance_entry_id: transfer.id, type: "recebimento", amount: "200", payment_method: "pix" } });
+  const data = await loadVoucherData(reservation.id);
+  const finance = voucherFinancialSummary(data.reservation);
+  expect(data.reservation.finance_entries).toHaveLength(1);
+  expect(finance.paid.toFixed(2)).toBe("120.00");
+  expect(finance.remaining.toFixed(2)).toBe("360.00");
+});

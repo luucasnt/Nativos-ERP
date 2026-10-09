@@ -60,7 +60,7 @@ export function WorkOrderDocument({
       />
 
       <SectionHeading>Detalhes do serviço</SectionHeading>
-      <ServiceBlock service={service} showPrice={showPrice} sequence={1} />
+      <ServiceBlock service={{ ...service, contracted_category_label: service.contracted_category_label || service.reservation.contracted_category_label }} showPrice={showPrice} sequence={1} />
 
       {service.notes && (
         <NoticeBox title="Orientações da operação">{service.notes}</NoticeBox>

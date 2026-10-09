@@ -12,12 +12,15 @@ type Option = { id: string; name: string };
 
 type ReservationFormProps = {
   action: (prevState: ReservationFormState, formData: FormData) => Promise<ReservationFormState>;
+  categories?: Array<{ id: string; label: string }>;
   clients: Option[];
   partners: Option[];
   companies: Option[];
   drivers: Option[];
   cancelHref: string;
   defaultValues?: {
+    contracted_category_id?: string | null;
+    voucher_show_price?: boolean | null;
     client_id: string;
     origin_partner_id: string | null;
     referrer_type: string | null;
@@ -35,6 +38,7 @@ type ReservationFormProps = {
 
 export function ReservationForm({
   action,
+  categories = [],
   clients,
   partners,
   companies,
@@ -59,6 +63,21 @@ export function ReservationForm({
       <div className="flex flex-col gap-1">
         <SearchableEntitySelect name="client_id" label="Cliente" entity="client" value={defaultValues?.client_id} initialOptions={clients} required />
       </div>
+
+      <fieldset className="grid gap-4 rounded-xl border border-forest/10 p-4">
+        <legend className="font-serif text-lg text-forest">Contratação e voucher</legend>
+        <label className={labelClass} htmlFor="contracted_category_id">Categoria contratada pelo cliente</label>
+        <select id="contracted_category_id" name="contracted_category_id" defaultValue={defaultValues?.contracted_category_id ?? ""} className={inputClass}>
+          <option value="">A confirmar / definir por serviço</option>
+          {categories.map(category => <option key={category.id} value={category.id}>{category.label}</option>)}
+        </select>
+        <p className="text-xs text-forest/60">Categoria padrão dos novos serviços. Serviços de categorias diferentes podem ser ajustados individualmente.</p>
+        <label className={labelClass} htmlFor="voucher_show_price">Informações financeiras no voucher do cliente</label>
+        <select id="voucher_show_price" name="voucher_show_price" defaultValue={defaultValues?.voucher_show_price == null ? "herda" : defaultValues.voucher_show_price ? "sim" : "nao"} className={inputClass}>
+          <option value="herda">Usar padrão de documentos</option><option value="sim">Mostrar valores, pagamentos e saldo</option><option value="nao">Ocultar todas as informações financeiras</option>
+        </select>
+        <p className="text-xs text-forest/60">Controla o PDF do voucher. Custos, comissões e repasses internos não aparecem.</p>
+      </fieldset>
 
       <fieldset className="flex flex-col gap-3 rounded-xl border border-forest/10 p-4">
         <legend className="font-serif text-lg text-forest">Origem e relacionamento</legend>

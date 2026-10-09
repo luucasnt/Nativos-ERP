@@ -14,6 +14,8 @@ type CatalogOption = { id: string; label: string };
 
 type ServiceFormProps = {
   action: (prevState: ServiceFormState, formData: FormData) => Promise<ServiceFormState>;
+  categories?: Array<{ id: string; label: string }>;
+  reservationCategoryId?: string | null;
   suppliers: Option[];
   drivers: (Option & ResourceOwnership)[];
   vehicles: (Option & ResourceOwnership)[];
@@ -21,6 +23,8 @@ type ServiceFormProps = {
   cancelHref: string;
   isEditing?: boolean;
   defaultValues?: {
+    contracted_category_id?: string | null;
+    upgrade_category_id?: string | null;
     type: string;
     execution_type: string;
     supplier_id: string | null;
@@ -57,6 +61,8 @@ type ServiceFormProps = {
 
 export function ServiceForm({
   action,
+  categories = [],
+  reservationCategoryId,
   suppliers,
   drivers,
   vehicles,
@@ -66,6 +72,9 @@ export function ServiceForm({
   defaultValues,
 }: ServiceFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [contractedCategoryId, setContractedCategoryId] = useState(defaultValues?.contracted_category_id || reservationCategoryId || "");
+  const [upgradeEnabled, setUpgradeEnabled] = useState(Boolean(defaultValues?.upgrade_category_id));
+  const [upgradeCategoryId, setUpgradeCategoryId] = useState(defaultValues?.upgrade_category_id || "");
   const [type, setType] = useState(defaultValues?.type ?? "transfer_chegada");
   const [executionType, setExecutionType] = useState<ExecutionType>((defaultValues?.execution_type as ExecutionType) ?? "propria");
   const [supplierId, setSupplierId] = useState(defaultValues?.supplier_id ?? "");
@@ -122,6 +131,16 @@ export function ServiceForm({
           </select>
         </div>
       </div>
+
+      <fieldset className="grid gap-3 rounded-xl border border-forest/10 p-4">
+        <legend className="font-serif text-lg text-forest">Categoria e upgrade</legend>
+        <label htmlFor="contracted_category_id" className={labelClass}>Categoria contratada</label>
+        <select id="contracted_category_id" name="contracted_category_id" className={inputClass} value={contractedCategoryId} onChange={event => { setContractedCategoryId(event.target.value); setUpgradeEnabled(false); setUpgradeCategoryId(""); }}>
+          <option value="">A confirmar</option>{categories.map(category => <option key={category.id} value={category.id}>{category.label}</option>)}
+        </select>
+        <label className="flex items-center gap-2 text-sm text-forest"><input type="checkbox" name="category_upgrade_enabled" checked={upgradeEnabled} disabled={!contractedCategoryId} onChange={event => { setUpgradeEnabled(event.target.checked); if (!event.target.checked) setUpgradeCategoryId(""); }} />Oferecer upgrade de categoria como cortesia</label>
+        {upgradeEnabled && <><label htmlFor="upgrade_category_id" className={labelClass}>Categoria superior oferecida ao cliente</label><select id="upgrade_category_id" name="upgrade_category_id" required value={upgradeCategoryId} onChange={event => setUpgradeCategoryId(event.target.value)} className={inputClass}><option value="">Selecione a categoria do upgrade</option>{categories.filter(category => category.id !== contractedCategoryId).map(category => <option key={category.id} value={category.id}>{category.label}</option>)}</select><p className="text-xs text-forest/65">O cliente verá a categoria contratada e o upgrade de cortesia, sem custo adicional. Selecione um veículo da categoria oferecida, adequado aos passageiros e às bagagens.</p></>}
+      </fieldset>
 
       {executionType === "fornecedor" && (
         <div className="flex flex-col gap-1">

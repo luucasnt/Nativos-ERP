@@ -636,6 +636,9 @@ model CatalogItem {
   created_at DateTime        @default(now())
   updated_at DateTime        @updatedAt
 
+  reservations_by_category      Reservation[]      @relation("ReservationContractedCategory")
+  services_by_category          Service[]          @relation("ServiceContractedCategory")
+  services_by_upgrade           Service[]          @relation("ServiceUpgradeCategory")
   vehicles_by_category          Vehicle[]          @relation("VehicleCategory")
   companies_by_category         Company[]          @relation("CompanyCategory")
   services_by_pacote_disposicao Service[]          @relation("ServicePacoteDisposicao")
@@ -710,19 +713,23 @@ model Reservation {
   // Opções de exibição de documento (requisito adicional pós-Fase 1):
   // null = usa o padrão global definido em Setting ("documentos_exibicao_valor");
   // true/false = substitui o padrão só para esta reserva.
-  voucher_show_price Boolean?
+  voucher_show_price        Boolean?
+  contracted_category_id    String?  @db.Uuid
+  contracted_category_label String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  client         Client   @relation(fields: [client_id], references: [id])
-  origin_partner Company? @relation("ReservationOriginPartner", fields: [origin_partner_id], references: [id])
+  contracted_category CatalogItem? @relation("ReservationContractedCategory", fields: [contracted_category_id], references: [id], onDelete: Restrict)
+  client              Client       @relation(fields: [client_id], references: [id])
+  origin_partner      Company?     @relation("ReservationOriginPartner", fields: [origin_partner_id], references: [id])
 
   services                   Service[]
   change_requests            ChangeRequest[]
   finance_entries            FinanceEntry[]
   billing_cycle_reservations BillingCycleReservation[]
 
+  @@index([contracted_category_id])
   @@index([status, created_at(sort: Desc)])
   @@index([client_id])
   @@index([origin_partner_id])
@@ -730,13 +737,17 @@ model Reservation {
 }
 
 model Service {
-  id             String        @id @default(uuid()) @db.Uuid
-  reservation_id String        @db.Uuid
-  type           ServiceType
-  execution_type ExecutionType
-  supplier_id    String?       @db.Uuid
-  driver_id      String?       @db.Uuid
-  vehicle_id     String?       @db.Uuid
+  id                        String        @id @default(uuid()) @db.Uuid
+  reservation_id            String        @db.Uuid
+  type                      ServiceType
+  execution_type            ExecutionType
+  supplier_id               String?       @db.Uuid
+  driver_id                 String?       @db.Uuid
+  vehicle_id                String?       @db.Uuid
+  contracted_category_id    String?       @db.Uuid
+  contracted_category_label String?
+  upgrade_category_id       String?       @db.Uuid
+  upgrade_category_label    String?
 
   // INFERIDO: campos operacionais mínimos (agenda/local/capacidade) — não
   // itemizados na especificação, mas indispensáveis para um serviço de
@@ -808,16 +819,20 @@ model Service {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  reservation       Reservation  @relation(fields: [reservation_id], references: [id])
-  supplier          Company?     @relation("ServiceSupplier", fields: [supplier_id], references: [id])
-  driver            Driver?      @relation(fields: [driver_id], references: [id])
-  vehicle           Vehicle?     @relation(fields: [vehicle_id], references: [id])
-  pacote_disposicao CatalogItem? @relation("ServicePacoteDisposicao", fields: [pacote_disposicao_id], references: [id])
+  contracted_category CatalogItem? @relation("ServiceContractedCategory", fields: [contracted_category_id], references: [id], onDelete: Restrict)
+  upgrade_category    CatalogItem? @relation("ServiceUpgradeCategory", fields: [upgrade_category_id], references: [id], onDelete: Restrict)
+  reservation         Reservation  @relation(fields: [reservation_id], references: [id])
+  supplier            Company?     @relation("ServiceSupplier", fields: [supplier_id], references: [id])
+  driver              Driver?      @relation(fields: [driver_id], references: [id])
+  vehicle             Vehicle?     @relation(fields: [vehicle_id], references: [id])
+  pacote_disposicao   CatalogItem? @relation("ServicePacoteDisposicao", fields: [pacote_disposicao_id], references: [id])
 
   service_expenses   ServiceExpense[]
   finance_entries    FinanceEntry[]
   direct_collections DirectCollection[]
 
+  @@index([contracted_category_id])
+  @@index([upgrade_category_id])
   @@index([reservation_id, created_at])
   @@index([scheduled_date, execution_status, scheduled_time])
   @@index([supplier_id, acceptance_status, execution_status])

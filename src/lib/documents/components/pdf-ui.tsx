@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   instructionText: {
     flex: 1,
     paddingTop: 1,
-    fontSize: 7.7,
+    fontSize: 7.4,
     color: BRAND_COLORS.ink,
   },
   checklist: {
@@ -231,9 +231,11 @@ export function SectionHeading({ children }: { children: React.ReactNode }) {
 export function DetailGrid({
   items,
   columns = 2,
+  compact = false,
 }: {
   items: Array<{ label: string; value: string }>;
   columns?: 2 | 3;
+  compact?: boolean;
 }) {
   const width = columns === 3 ? "31.9%" : "48.8%";
 
@@ -242,11 +244,11 @@ export function DetailGrid({
       {items.map((item) => (
         <View
           key={item.label}
-          style={[styles.gridItem, { width }]}
+          style={[styles.gridItem, { width }, compact ? { padding: 2, minHeight: 0, borderWidth: 0, backgroundColor: BRAND_COLORS.soft } : {}]}
           wrap={false}
         >
-          <Text style={styles.label}>{item.label}</Text>
-          <Text style={styles.value}>{item.value || "—"}</Text>
+          <Text style={[styles.label, compact ? { marginBottom: 1 } : {}]}>{item.label}</Text>
+          <Text style={[styles.value, compact ? { fontSize: 8 } : {}]}>{item.value || "—"}</Text>
         </View>
       ))}
     </View>

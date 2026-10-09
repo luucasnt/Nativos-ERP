@@ -1,5 +1,7 @@
 "use server";
 
+import { resolveServiceCategories } from "@/lib/reservations/categories";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -33,6 +35,9 @@ const intField = z
   .refine((v) => v === "" || (Number.isInteger(Number(v)) && Number(v) >= 0), "Informe um número inteiro maior ou igual a zero.");
 
 const baseServiceFields = {
+  contracted_category_id: z.string().uuid().optional().or(z.literal("")),
+  upgrade_category_id: z.string().uuid().optional().or(z.literal("")),
+  category_upgrade_enabled: z.enum(["on"]).optional(),
   type: z.enum([
     "transfer_chegada",
     "transfer_saida",
@@ -108,6 +113,9 @@ function toDecimalOrNull(value: string) {
 
 function readBaseFields(formData: FormData) {
   return {
+    contracted_category_id: formData.get("contracted_category_id") || undefined,
+    upgrade_category_id: formData.get("upgrade_category_id") || undefined,
+    category_upgrade_enabled: formData.get("category_upgrade_enabled") || undefined,
     type: formData.get("type"),
     execution_type: formData.get("execution_type"),
     supplier_id: formData.get("supplier_id") || undefined,
@@ -142,6 +150,7 @@ function readBaseFields(formData: FormData) {
 }
 
 function mapCommonData(d: z.infer<typeof updateServiceSchema>) {
+  if (d.category_upgrade_enabled === "on" && !d.upgrade_category_id) return { ok: false as const, error: "Selecione a categoria superior oferecida como cortesia." };
   if (d.execution_type === "fornecedor" && !d.supplier_id) {
     return { ok: false as const, error: "Selecione o fornecedor que executa este serviço." };
   }
@@ -257,9 +266,11 @@ export async function createService(
     service = await prisma.$transaction(async (tx) => {
       await lockServiceResources(common.data, tx);
       await assertServiceResources(common.data, undefined, tx);
+      const categories = await resolveServiceCategories(parsed.data.contracted_category_id || reservation.contracted_category_id, parsed.data.category_upgrade_enabled === "on" ? parsed.data.upgrade_category_id || null : null, undefined, common.data.vehicle_id, tx);
       return tx.service.create({
         data: {
           ...common.data,
+          ...categories,
           reservation_id: reservationId,
           original_price: parsed.data.original_price,
           price,
@@ -297,6 +308,7 @@ export async function createService(
   await logAudit({
     actorId: user.id,
     action: "servico_criado",
+    metadata: { contracted_category: service.contracted_category_label, courtesy_upgrade: service.upgrade_category_label },
     entityType: "service",
     entityId: service.id,
   });
@@ -384,10 +396,12 @@ export async function updateService(
     await prisma.$transaction(async (tx) => {
       await lockServiceResources(common.data, tx);
       await assertServiceResources(common.data, existing, tx);
+      const categories = await resolveServiceCategories(formData.has("contracted_category_id") ? parsed.data.contracted_category_id || reservation.contracted_category_id : existing.contracted_category_id || reservation.contracted_category_id, formData.has("contracted_category_id") ? (parsed.data.category_upgrade_enabled === "on" ? parsed.data.upgrade_category_id || null : null) : existing.upgrade_category_id, existing, common.data.vehicle_id, tx);
       await tx.service.update({
         where: { id: serviceId },
         data: {
           ...common.data,
+          ...categories,
           price,
           collection_actor: computeCollectionActor(reservation.collection_mode, common.data.execution_type),
           // Troca de fornecedor/modalidade reabre o fluxo de aceite; serviço
@@ -430,9 +444,10 @@ export async function updateService(
   await logAudit({
     actorId: user.id,
     action: "servico_atualizado",
+    metadata: { troca_fornecedor_ou_modalidade: executionOrSupplierChanged, contracted_category_id: parsed.data.contracted_category_id || null, courtesy_upgrade_id: parsed.data.category_upgrade_enabled === "on" ? parsed.data.upgrade_category_id || null : null },
     entityType: "service",
     entityId: serviceId,
-    metadata: executionOrSupplierChanged ? { troca_fornecedor_ou_modalidade: true } : undefined,
+    // A alteração de categoria não muda o preço contratado.
   });
 
   revalidatePath(`/admin/reservas/${reservationId}`);

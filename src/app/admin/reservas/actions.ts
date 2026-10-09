@@ -1,5 +1,7 @@
 "use server";
 
+import { resolveContractedCategory } from "@/lib/reservations/categories";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -31,6 +33,8 @@ async function regenerateAcceptedServiceEntries(reservationId: string) {
 }
 
 const reservationSchema = z.object({
+  contracted_category_id: z.string().uuid().optional().or(z.literal("")),
+  voucher_show_price: z.enum(["herda", "sim", "nao"]).optional(),
   relationship_mode: z.enum(["direto", "indicacao", "intermediado"]),
   client_id: z.string().uuid("Selecione o cliente."),
   origin_partner_id: z.string().uuid().optional().or(z.literal("")),
@@ -58,6 +62,8 @@ export type ReservationFormState = { error: string | null };
 
 function parse(formData: FormData) {
   const parsed = reservationSchema.safeParse({
+    contracted_category_id: formData.get("contracted_category_id") || undefined,
+    voucher_show_price: formData.get("voucher_show_price") || undefined,
     relationship_mode: formData.get("relationship_mode"),
     client_id: formData.get("client_id"),
     origin_partner_id: formData.get("origin_partner_id") || undefined,
@@ -102,6 +108,7 @@ function parse(formData: FormData) {
   return {
     ok: true as const,
     data: {
+      voucher_show_price: d.voucher_show_price === undefined ? undefined : d.voucher_show_price === "herda" ? null : d.voucher_show_price === "sim",
       client_id: d.client_id,
       origin_partner_id: d.relationship_mode === "intermediado" ? d.origin_partner_id || null : null,
       referrer_type: d.relationship_mode === "indicacao" ? d.referrer_type || null : null,
@@ -172,11 +179,16 @@ export async function createReservation(
   const relationshipError = await validateRelationshipEntities(result.data);
   if (relationshipError) return { error: relationshipError };
 
+  let category;
+  try { category = await resolveContractedCategory(String(formData.get("contracted_category_id") || "") || null); }
+  catch (error) { return { error: error instanceof Error ? error.message : "Categoria inválida." }; }
+
   let reservation: Awaited<ReturnType<typeof prisma.reservation.create>> | null = null;
   for (let attempt = 0; attempt < 4 && !reservation; attempt += 1) {
     const code = await generateNextReservationCode();
     try {
-      reservation = await prisma.reservation.create({ data: { ...result.data, code } });
+      reservation = await prisma.reservation.create({ data: { ...result.data,
+          ...category, code } });
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
     }
@@ -244,7 +256,10 @@ export async function updateReservation(
     };
   }
 
-  await prisma.reservation.update({ where: { id }, data: result.data });
+  let category;
+  try { category = await resolveContractedCategory(formData.has("contracted_category_id") ? String(formData.get("contracted_category_id") || "") || null : current.contracted_category_id, current); }
+  catch (error) { return { error: error instanceof Error ? error.message : "Categoria inválida." }; }
+  await prisma.reservation.update({ where: { id }, data: { ...result.data, ...category } });
 
   // Sempre recalcula: cobre requires_nf ligando/desligando, a alíquota
   // desta reserva sendo definida/limpa manualmente, ou o padrão global

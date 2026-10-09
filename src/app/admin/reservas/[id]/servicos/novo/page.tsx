@@ -38,12 +38,16 @@ export default async function NovoServicoPage({
     notFound();
   }
 
+  const categories = await prisma.catalogItem.findMany({ where: { type: "tipo_veiculo", OR: [{ active: true }, { reservations_by_category: { some: { id: reservationId } } }, { services_by_category: { some: { reservation_id: reservationId } } }, { services_by_upgrade: { some: { reservation_id: reservationId } } }] }, orderBy: [{ order: "asc" }, { label: "asc" }], select: { id: true, label: true } });
+
   return (
     <div>
       <h1 className="mb-6 font-serif text-3xl text-forest">
         Novo serviço — {reservation.code}
       </h1>
       <ServiceForm
+        categories={categories}
+        reservationCategoryId={reservation.contracted_category_id}
         action={createService.bind(null, reservationId)}
         suppliers={suppliers}
         drivers={drivers}

@@ -46,7 +46,7 @@ export async function loadContractData(reservationId: string) {
       client: true,
       services: {
         where: { execution_status: { not: "cancelado" } },
-        select: { id: true },
+        select: { id: true, contracted_category_label: true, upgrade_category_label: true },
       },
     },
   });
@@ -88,6 +88,7 @@ export function ContractDocument({ data }: { data: Awaited<ReturnType<typeof loa
           },
           { label: "Contratada", value: data.company.name + (data.company.document ? " - CNPJ/CPF " + data.company.document : "") },
           { label: "Contato do contratante", value: reservation.client.email ?? reservation.client.phone ?? "Não informado" },
+          { label: "Categorias contratadas", value: [...new Set(reservation.services.map(service => service.contracted_category_label || reservation.contracted_category_label || "A confirmar"))].join(", ") || reservation.contracted_category_label || "A confirmar" },
           { label: "Objeto", value: reservation.services.length + " serviço(s) da reserva " + reservation.code },
         ]}
       />
@@ -95,6 +96,8 @@ export function ContractDocument({ data }: { data: Awaited<ReturnType<typeof loa
       <NoticeBox title="Objeto do contrato">
         A contratada prestará os serviços de transporte, receptivo ou experiência descritos na reserva vinculada, conforme condições operacionais confirmadas entre as partes.
       </NoticeBox>
+
+      {reservation.services.some(service => service.upgrade_category_label) && <NoticeBox title="Upgrade de cortesia">Categoria oferecida sem custo adicional: {[...new Set(reservation.services.map(service => service.upgrade_category_label).filter(Boolean))].join(", ")}. Mantidas as condições da categoria contratada.</NoticeBox>}
 
       <SectionHeading>Cláusulas e condições</SectionHeading>
       {clauses.length === 0 ? (
