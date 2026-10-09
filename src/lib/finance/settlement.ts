@@ -271,6 +271,24 @@ async function upsertProgrammedEntry(serviceId: string, reservationId: string, s
 // zero o conjunto de lançamentos "programado" que ele deveria ter,
 // criando/ajustando os que ainda fazem sentido e cancelando (nunca
 // apagando) os que deixaram de se aplicar.
+// A venda existe quando o serviço é cadastrado, mesmo aguardando aceite
+// do fornecedor. Receber do cliente não antecipa despesas ou repasses.
+export async function generateServiceSaleEntry(serviceId: string, db?: Prisma.TransactionClient): Promise<void> {
+  if (!db) return prisma.$transaction(tx => generateServiceSaleEntry(serviceId, tx));
+  const relation = await db.service.findUniqueOrThrow({ where: { id: serviceId }, select: { reservation_id: true } });
+  await db.$queryRaw`SELECT id FROM reservations WHERE id = ${relation.reservation_id}::uuid FOR UPDATE`;
+  await db.$queryRaw`SELECT id FROM services WHERE id = ${serviceId}::uuid FOR UPDATE`;
+  const current = await db.service.findUniqueOrThrow({ where: { id: serviceId }, include: { reservation: true } });
+  if (current.execution_status === "cancelado" || current.acceptance_status === "recusado" || ["cancelado", "rejeitado"].includes(current.reservation.status)) return;
+  const { reservationId, input } = await loadSettlementInput(serviceId, db);
+  const sale = computeServiceSettlementEntries(input).find(spec => spec.category === "venda_servico");
+  if (sale) await upsertProgrammedEntry(serviceId, reservationId, sale, db);
+  else {
+    const obsolete = await db.financeEntry.findMany({ where: { service_id: serviceId, category: "venda_servico", status: "programado", reversed_at: null } });
+    for (const entry of obsolete) await cancelUnpaidFinanceEntry(entry.id, db);
+  }
+}
+
 export async function generateServiceFinanceEntries(serviceId: string, db?: Prisma.TransactionClient): Promise<void> {
   if (!db) return prisma.$transaction((tx) => generateServiceFinanceEntries(serviceId, tx));
   const relation = await db.service.findUniqueOrThrow({ where: { id: serviceId }, select: { reservation_id: true } });
@@ -446,6 +464,11 @@ async function compensateGrossRepassPairIfPresent(serviceId: string) {
 // cancelado.
 export async function cancelServiceFinanceEntries(serviceId: string, db?: Prisma.TransactionClient): Promise<void> {
   if (!db) return prisma.$transaction((tx) => cancelServiceFinanceEntries(serviceId, tx));
+  const settled = await db.financeEntry.findFirst({ where: { service_id: serviceId, reversed_at: null, OR: [
+    { status: "pago", category: { not: "cortesia" } },
+    { payments: { some: { reversed_at: null, estorno_of_id: null } } },
+  ] } });
+  if (settled) throw new Error("Este serviço já possui recebimento ou pagamento. Solicite à equipe financeira o ajuste/estorno antes de recusar ou cancelar.");
   const entries = await db.financeEntry.findMany({
     where: { service_id: serviceId, reversed_at: null, status: { in: ["programado", "pendente", "vencido"] } },
   });

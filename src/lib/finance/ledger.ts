@@ -10,6 +10,7 @@
 //    tratado como "criar ou devolver o que já existe", nunca como erro de
 //    duplicidade a ignorar silenciosamente nem como duplicata a criar de
 //    novo — a chamada é sempre segura de repetir.
+import { canRegisterEntryPayment, isReservationSale } from "@/lib/finance/payment-availability";
 import { Prisma } from "@prisma/client";
 import type {
   CompensationCounterpartyType,
@@ -84,10 +85,8 @@ export async function createFinanceEntry(input: CreateFinanceEntryInput, db: Pri
   }
 }
 
-// Regra não-negociável (spec seção 6, item 5): um lançamento só fica
-// elegível a pagamento quando o marco operacional (serviço concluído) foi
-// atingido — nunca antes. Esta função é o único lugar que liga
-// payment_eligible=true, e só é chamada quando esse marco é confirmado.
+// Despesas e repasses ficam elegíveis no marco operacional. Recebimentos
+// da venda ao cliente/parceiro admitem antecipação em createPayment.
 export async function markFinanceEntryEligible(entryId: string) {
   // An atomic predicate prevents a concurrent settlement from being
   // overwritten by a retry of the operational completion event.
@@ -203,8 +202,17 @@ export async function createPayment(input: CreatePaymentInput) {
         where: { id: input.finance_entry_id },
         include: { compensacao: true },
       });
-      if (!entry.payment_eligible || entry.reversed_at || entry.status === "cancelado") {
+      if (!canRegisterEntryPayment(entry)) {
         throw new Error("Este lançamento não está elegível para pagamento.");
+      }
+      if (isReservationSale(entry)) {
+        const service = await tx.service.findUniqueOrThrow({ where: { id: entry.service_id! }, include: { reservation: true } });
+        const reservation = service.reservation;
+        const partner = reservation.collection_mode === "faturado";
+        const expectedParty = partner ? reservation.origin_partner_id : reservation.client_id;
+        if (service.reservation_id !== entry.reservation_id || service.execution_status === "cancelado" || service.acceptance_status === "recusado" || ["cancelado", "rejeitado"].includes(reservation.status) || reservation.is_cortesia || reservation.collection_mode === "direto" || entry.party_id !== expectedParty || entry.party_type !== (partner ? "parceiro" : "cliente")) {
+          throw new Error("A venda não está disponível para recebimento nesta reserva. Confira o responsável pela cobrança e o status do serviço.");
+        }
       }
       if (input.type !== (entry.type === "receita" ? "recebimento" : "pagamento")) {
         throw new Error("O sentido do pagamento não corresponde ao lançamento.");

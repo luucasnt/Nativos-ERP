@@ -16,7 +16,7 @@ import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { recalculateReservationTax } from "@/lib/reservations/tax";
 import { terminateService } from "@/lib/reservations/termination";
 import { acceptService, rejectService } from "@/lib/reservations/acceptance";
-import { generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
+import { generateServiceSaleEntry, generateServiceFinanceEntries, cancelServiceFinanceEntries } from "@/lib/finance/settlement";
 import { recalculateReservationCommissions } from "@/lib/finance/commissions";
 import { notifyCompanyPortalUsers, notifyDriverPortalUser } from "@/lib/notifications";
 import { checkPartnerBillingLimit, detectDriverVehicleConflict } from "@/lib/alerts/detectors";
@@ -203,8 +203,9 @@ async function afterServiceMutation(reservationId: string, serviceId: string) {
 
   if (service.execution_status === "cancelado" || service.acceptance_status === "recusado") {
     await cancelServiceFinanceEntries(serviceId);
-  } else if (service.acceptance_status === "aceito") {
-    await generateServiceFinanceEntries(serviceId);
+  } else {
+    await generateServiceSaleEntry(serviceId);
+    if (service.acceptance_status === "aceito") await generateServiceFinanceEntries(serviceId);
   }
 
   await detectDriverVehicleConflict(serviceId);
@@ -394,6 +395,9 @@ export async function updateService(
 
   try {
     await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${reservationId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM services WHERE id = ${serviceId}::uuid FOR UPDATE`;
+      if (financialDataChanged && await tx.financeEntry.findFirst({ where: { service_id: serviceId, reversed_at: null, OR: [{ status: { in: ["pendente", "vencido", "pago"] } }, { payments: { some: { reversed_at: null, estorno_of_id: null } } }] } })) throw new Error("Este serviço já possui recebimento ou título liquidado. Faça o ajuste/estorno antes de alterar dados financeiros.");
       await lockServiceResources(common.data, tx);
       await assertServiceResources(common.data, existing, tx);
       const categories = await resolveServiceCategories(formData.has("contracted_category_id") ? parsed.data.contracted_category_id || reservation.contracted_category_id : existing.contracted_category_id || reservation.contracted_category_id, formData.has("contracted_category_id") ? (parsed.data.category_upgrade_enabled === "on" ? parsed.data.upgrade_category_id || null : null) : existing.upgrade_category_id, existing, common.data.vehicle_id, tx);
