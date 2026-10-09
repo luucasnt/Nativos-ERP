@@ -69,6 +69,7 @@ export function DocumentShell({
   title,
   company,
   documentCode,
+  passengerName,
   issuedAt = new Date(),
   children,
   size = "A4",
@@ -76,6 +77,7 @@ export function DocumentShell({
   company?: DocumentCompany;
   title: string;
   documentCode?: string;
+  passengerName?: string;
   issuedAt?: Date;
   children: React.ReactNode;
   size?: "A4" | [number, number];
@@ -89,7 +91,7 @@ export function DocumentShell({
   ].filter(Boolean).join("\n");
 
   return (
-    <Document title={title} author="Nativos Experiences" subject={documentCode}>
+    <Document title={["Nativos", title, passengerName, documentCode].filter(Boolean).join(" - ")} author="Nativos Experiences" subject={documentCode}>
       <Page size={size} style={styles.page}>
         <View style={styles.topBar} fixed />
         <View style={styles.header} fixed wrap={false}>

@@ -1,4 +1,4 @@
-import { voucherFinancialSummary } from "@/lib/documents/voucher-finance";
+import { voucherFinancialSummary, voucherPaymentInstructions } from "@/lib/documents/voucher-finance";
 import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +40,7 @@ export function VoucherDocument({
 }) {
   const { reservation, showPrice } = data;
   const finance = voucherFinancialSummary(reservation);
+  const paymentInstructions = voucherPaymentInstructions(reservation);
   const arrival = reservation.services.some(service => service.type === "transfer_chegada");
   const departure = reservation.services.some(service => service.type === "transfer_saida");
   const instructions = [
@@ -50,13 +51,13 @@ export function VoucherDocument({
     ...(!arrival && !departure ? ["Esteja no local de encontro combinado 10 minutos antes do horário do serviço."] : []),
     "Em caso de imprevisto, atraso ou dificuldade no encontro, avise a equipe imediatamente. Mantenha o telefone e o WhatsApp disponíveis.",
     "Confira datas, horários, locais, passageiros, bagagens e assentos infantis. Alterações devem ser confirmadas pela equipe com antecedência.",
-    "Tenha o voucher e um documento de identificação no embarque. Informe com antecedência necessidades de acessibilidade ou assistência.",
+    "Informe à equipe, com antecedência, necessidades de acessibilidade ou assistência para organizarmos seu atendimento.",
     "Confira seus pertences ao desembarcar. Em caso de objeto esquecido, informe à equipe o código da reserva e o serviço realizado.",
   ];
 
   return (
-    <DocumentShell company={data.company} title="Voucher de reserva" documentCode={reservation.code}>
-      <Text style={{ fontSize: 9, marginBottom: 8 }}>Este é seu voucher de confirmação da reserva {reservation.code}. Obrigado por escolher a Nativos Experiences. Reunimos abaixo os detalhes dos serviços contratados e as orientações para sua viagem. Guarde este documento para consultar e apresentar no embarque.</Text>
+    <DocumentShell passengerName={reservation.client.name} company={data.company} title="Voucher de reserva" documentCode={reservation.code}>
+      <Text style={{ fontSize: 9, marginBottom: 8 }}>Este é seu voucher de confirmação da reserva {reservation.code}. Obrigado por escolher a Nativos Experiences. Reunimos abaixo os detalhes dos serviços contratados e as orientações para sua viagem. Nossa equipe está à disposição para ajudar antes, durante e após o atendimento.</Text>
       <DetailGrid
         compact
         columns={3}
@@ -92,16 +93,16 @@ export function VoucherDocument({
 
       <InstructionList title="Orientações para sua viagem" items={instructions} />
       {showPrice && (
-        <View wrap={false} style={{ padding: 8, borderWidth: 1, borderColor: BRAND_COLORS.line, marginTop: 4 }}>
+        <View wrap={false} style={{ borderWidth: 1, borderColor: BRAND_COLORS.goldLight, borderRadius: 5, marginTop: 4, padding: 7 }}>
+          <Text style={{ fontSize: 9, fontWeight: 600, color: BRAND_COLORS.forest, marginBottom: 5 }}>{paymentInstructions.heading}</Text>
           <DetailGrid compact columns={3} items={[
-            { label: "Valor da reserva", value: formatCurrency(finance.total) },
-            { label: "Valor pago registrado", value: finance.partnerBilling ? "Tratado com o parceiro" : formatCurrency(finance.paid) },
-            { label: "Saldo a pagar", value: finance.partnerBilling ? "Cobrança ao parceiro" : formatCurrency(finance.remaining) },
+            { label: "Total contratado", value: formatCurrency(finance.total) },
+            { label: "Pagamento registrado", value: finance.partnerBilling ? "Responsabilidade do parceiro" : formatCurrency(finance.paid) },
+            { label: "Saldo restante", value: finance.partnerBilling ? "Cobrança ao parceiro" : formatCurrency(finance.remaining) },
           ]} />
-          <Text style={{ fontSize: 7, color: BRAND_COLORS.muted }}>
-            {reservation.is_cortesia ? "Reserva oferecida como cortesia." : finance.partnerBilling ? "Condições de pagamento tratadas com o parceiro responsável. Este voucher não representa cobrança ao passageiro." : "Pagamentos conforme registros válidos no sistema na emissão deste voucher. Envie o comprovante à equipe para conferência."}
-            {finance.credit.gt(0) && !finance.partnerBilling ? " Crédito registrado: " + formatCurrency(finance.credit) + "." : ""}
-          </Text>
+          <Text style={{ fontSize: 7.4, color: BRAND_COLORS.ink }}>{paymentInstructions.message}</Text>
+          {(paymentInstructions.collections.some(item => item.receiver === "motorista") ? paymentInstructions.collections : []).map(item => <Text key={item.sequence} style={{ fontSize: 7.4, marginTop: 3 }}>Serviço {String(item.sequence).padStart(2, "0")}: {formatCurrency(item.amount)} a pagar {item.receiver === "motorista" ? "diretamente ao motorista" + (item.driverName ? " " + item.driverName : " responsável") : "à Nativos"}.</Text>)}
+          {finance.credit.gt(0) && !finance.partnerBilling && <Text style={{ fontSize: 7.4, marginTop: 3 }}>Crédito registrado: {formatCurrency(finance.credit)}. Consulte nossa equipe para o ajuste.</Text>}
         </View>
       )}
     </DocumentShell>

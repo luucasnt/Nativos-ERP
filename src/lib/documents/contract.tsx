@@ -71,7 +71,7 @@ export function ContractDocument({ data }: { data: Awaited<ReturnType<typeof loa
   const { reservation, clauses } = data;
 
   return (
-    <DocumentShell company={data.company} title="Contrato de prestação de serviços" documentCode={reservation.code}>
+    <DocumentShell passengerName={reservation.client.name} company={data.company} title="Contrato de prestação de serviços" documentCode={reservation.code}>
       <DocumentHero
         kicker="Instrumento particular"
         title="Prestação de serviços"

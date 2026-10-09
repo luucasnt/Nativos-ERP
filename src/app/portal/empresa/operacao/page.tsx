@@ -187,7 +187,7 @@ export default async function PortalEmpresaOperacaoPage() {
                       <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} />
                       <a
                         href={`/api/documentos/os/${service.id}`}
-                        download
+                        target="_blank" rel="noopener noreferrer"
                         className="focus-ring inline-flex min-h-12 items-center justify-center rounded-lg border border-forest/15 bg-white text-sm font-semibold text-forest active:bg-forest/5"
                       >
                         Abrir OS
@@ -195,7 +195,7 @@ export default async function PortalEmpresaOperacaoPage() {
                       {service.reception_sign_enabled && service.reception_passenger_name && (
                         <a
                           href={`/api/documentos/plaquinha/${service.id}`}
-                          download
+                          target="_blank" rel="noopener noreferrer"
                           className="focus-ring col-span-2 inline-flex min-h-12 items-center justify-center rounded-lg border border-forest/15 bg-white text-sm font-semibold text-forest active:bg-forest/5"
                         >
                           Abrir plaquinha
@@ -249,7 +249,7 @@ export default async function PortalEmpresaOperacaoPage() {
                         <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} />
                         <a
                           href={"/api/documentos/os/" + service.id}
-                          download
+                          target="_blank" rel="noopener noreferrer"
                           className="focus-ring rounded text-xs font-semibold text-forest hover:text-forest-light"
                         >
                           OS
@@ -257,7 +257,7 @@ export default async function PortalEmpresaOperacaoPage() {
                         {service.reception_sign_enabled && service.reception_passenger_name && (
                           <a
                             href={`/api/documentos/plaquinha/${service.id}`}
-                            download
+                            target="_blank" rel="noopener noreferrer"
                             className="focus-ring rounded text-xs font-semibold text-forest hover:text-forest-light"
                           >
                             Plaquinha

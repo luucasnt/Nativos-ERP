@@ -67,13 +67,13 @@ export default async function EditarServicoPage({
       </p>
 
       <div className="mb-6 flex flex-wrap gap-4 text-sm">
-        <a href={`/api/documentos/os/${serviceId}`} download className="text-forest underline decoration-gold hover:text-forest-light">
+        <a href={`/api/documentos/os/${serviceId}`} target="_blank" rel="noopener noreferrer" className="text-forest underline decoration-gold hover:text-forest-light">
           Ordem de serviço
         </a>
         {service.reception_sign_enabled && (
           <a
             href={`/api/documentos/plaquinha/${serviceId}`}
-            download
+            target="_blank" rel="noopener noreferrer"
             className="text-forest underline decoration-gold hover:text-forest-light"
           >
             Plaquinha de recepção

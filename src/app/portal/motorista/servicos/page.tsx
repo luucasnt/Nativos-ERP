@@ -227,7 +227,7 @@ export default async function PortalMotoristaServicosPage() {
                   )}
                   <a
                     href={"/api/documentos/os/" + service.id}
-                    download
+                    target="_blank" rel="noopener noreferrer"
                     className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest hover:bg-forest/[0.035]"
                   >
                     <FileText size={14} aria-hidden="true" />
@@ -236,7 +236,7 @@ export default async function PortalMotoristaServicosPage() {
                   {service.reception_sign_enabled && service.reception_passenger_name && (
                     <a
                       href={`/api/documentos/plaquinha/${service.id}`}
-                      download
+                      target="_blank" rel="noopener noreferrer"
                       className="focus-ring col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-forest/16 bg-white px-3 text-xs font-semibold text-forest hover:bg-forest/[0.035] sm:col-span-1"
                     >
                       <FileText size={14} aria-hidden="true" />

@@ -40,7 +40,7 @@ export async function loadReceiptData(paymentId: string) {
     payment.finance_entry.party_id,
   );
 
-  return { payment, partyName, company: await loadDocumentCompany() };
+  return { payment, partyName, passengerName: payment.finance_entry.reservation ? (await prisma.client.findUniqueOrThrow({ where: { id: payment.finance_entry.reservation.client_id }, select: { name: true } })).name : partyName, company: await loadDocumentCompany() };
 }
 
 export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof loadReceiptData>> }) {
@@ -50,7 +50,7 @@ export function ReceiptDocument({ data }: { data: Awaited<ReturnType<typeof load
   const relationship = payment.type === "recebimento" ? "Recebido de" : "Pago a";
 
   return (
-    <DocumentShell company={data.company}
+    <DocumentShell passengerName={data.passengerName} company={data.company}
       title="Recibo"
       documentCode={[entry.reservation?.code, "REC-" + payment.id.slice(0, 8).toUpperCase()].filter(Boolean).join(" · ")}
       issuedAt={payment.created_at}
