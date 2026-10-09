@@ -57,9 +57,6 @@ export function ReservationForm({
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label htmlFor="client_id" className={labelClass}>
-          Cliente *
-        </label>
         <SearchableEntitySelect name="client_id" label="Cliente" entity="client" value={defaultValues?.client_id} initialOptions={clients} required />
       </div>
 
@@ -90,8 +87,7 @@ export function ReservationForm({
 
         {relationshipMode === "intermediado" && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="origin_partner_id" className={labelClass}>Parceiro responsável pelo atendimento *</label>
-            <SearchableEntitySelect name="origin_partner_id" label="Parceiro responsável" entity="partner" value={defaultValues?.origin_partner_id ?? ""} initialOptions={partners} required />
+            <SearchableEntitySelect name="origin_partner_id" label="Parceiro responsável pelo atendimento" entity="partner" value={defaultValues?.origin_partner_id ?? ""} initialOptions={partners} required />
             <p className="text-xs leading-5 text-forest/60">A Nativos trata operação e financeiro com o parceiro. Voucher e informações comerciais não são enviados diretamente ao passageiro.</p>
           </div>
         )}
@@ -120,10 +116,7 @@ export function ReservationForm({
 
         {referrerType && referrerType !== "pessoa_fisica" && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="referrer_id" className={labelClass}>
-              Indicador *
-            </label>
-            <SearchableEntitySelect name="referrer_id" label="Indicador" entity={referrerType === "company" ? "company" : referrerType === "driver" ? "driver" : "client"} value={defaultValues?.referrer_id ?? ""} initialOptions={referrerType === "company" ? companies : referrerType === "driver" ? drivers : clients} required />
+            <SearchableEntitySelect key={referrerType} name="referrer_id" label="Indicador" entity={referrerType === "company" ? "company" : referrerType === "driver" ? "driver" : "client"} value={referrerType === defaultValues?.referrer_type ? defaultValues?.referrer_id ?? "" : ""} initialOptions={referrerType === "company" ? companies : referrerType === "driver" ? drivers : clients} required />
           </div>
         )}
 
