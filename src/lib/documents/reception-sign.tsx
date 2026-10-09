@@ -2,7 +2,7 @@ import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { registerBrandFonts } from "@/lib/documents/register-fonts";
 import { BRAND_COLORS, BRAND_FONTS } from "@/lib/documents/brand";
-import { WordmarkPdf } from "@/lib/documents/components/wordmark-pdf";
+
 
 registerBrandFonts();
 
@@ -33,17 +33,8 @@ const styles = StyleSheet.create({
     right: 22,
     bottom: 22,
     left: 22,
-    borderWidth: 2,
-    borderColor: BRAND_COLORS.forest,
-  },
-  innerFrame: {
-    position: "absolute",
-    top: 29,
-    right: 29,
-    bottom: 29,
-    left: 29,
     borderWidth: 0.7,
-    borderColor: BRAND_COLORS.gold,
+    borderColor: BRAND_COLORS.forest,
   },
   header: {
     alignItems: "center",
@@ -55,32 +46,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   welcome: {
-    marginBottom: 14,
-    fontSize: 9,
+    marginBottom: 20,
+    fontSize: 14,
     fontWeight: 600,
     textTransform: "uppercase",
     letterSpacing: 2.2,
-    color: BRAND_COLORS.gold,
+    color: BRAND_COLORS.forest,
   },
   name: {
-    fontFamily: BRAND_FONTS.serif,
-    fontWeight: 600,
-    lineHeight: 1.05,
+    fontFamily: "Poppins",
+    fontWeight: 700,
     color: BRAND_COLORS.forest,
     textAlign: "center",
   },
   line: {
     marginTop: 22,
-    width: 64,
+    width: 170,
     height: 1,
-    backgroundColor: BRAND_COLORS.gold,
+    backgroundColor: BRAND_COLORS.forest,
   },
   footer: {
     alignItems: "center",
   },
   footerText: {
-    fontSize: 8,
-    letterSpacing: 1.1,
+    fontSize: 13,
+    letterSpacing: 0,
     color: BRAND_COLORS.muted,
   },
 });
@@ -91,7 +81,7 @@ export function ReceptionSignDocument({
   data: Awaited<ReturnType<typeof loadReceptionSignData>>;
 }) {
   const normalizedLength = Math.max(1, data.passengerName.trim().length);
-  const nameSize = Math.max(34, Math.min(67, 980 / normalizedLength));
+  const nameSize = Math.max(24, Math.min(76, 1900 / normalizedLength));
 
   return (
     <Document
@@ -100,19 +90,20 @@ export function ReceptionSignDocument({
     >
       <Page size="A4" orientation="landscape" style={styles.page}>
         <View style={styles.frame} />
-        <View style={styles.innerFrame} />
+
         <View style={styles.header}>
-          <WordmarkPdf size={31} tone="forest-on-cream" />
+          <Text style={{ fontFamily: BRAND_FONTS.serif, fontStyle: "italic", fontSize: 47, marginTop: 18 }}>nativos <Text style={{ color: BRAND_COLORS.muted }}>experiences</Text></Text>
         </View>
         <View style={styles.center}>
-          <Text style={styles.welcome}>Bem-vindo</Text>
+          <Text style={styles.welcome}>BEM-VINDO</Text>
+          <View style={[styles.line, { marginTop: 0, marginBottom: 25 }]} />
           <Text style={[styles.name, { fontSize: nameSize }]}>
-            {data.passengerName}
+            {data.passengerName.trim().length > 22 ? data.passengerName.trim().replace(/\s+/, "\n") : data.passengerName}
           </Text>
           <View style={styles.line} />
         </View>
         <View style={styles.footer}>
-          <Text style={styles.footerText}>NATIVOS EXPERIENCES · TRANCOSO</Text>
+          <Text style={styles.footerText}>Nativos Experiences - nascidos em Trancoso.</Text>
         </View>
       </Page>
     </Document>

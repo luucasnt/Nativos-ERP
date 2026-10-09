@@ -1,3 +1,4 @@
+import { loadDocumentCompany } from "@/lib/documents/company";
 import { Text } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { DocumentShell } from "@/lib/documents/components/document-shell";
@@ -24,14 +25,14 @@ export async function loadQuoteData(reservationId: string) {
     },
   });
 
-  return { reservation };
+  return { reservation, company: await loadDocumentCompany() };
 }
 export function QuoteDocument({ data }: { data: Awaited<ReturnType<typeof loadQuoteData>> }) {
   const { reservation } = data;
   const total = reservation.services.reduce((sum, service) => sum + Number(service.price), 0);
 
   return (
-    <DocumentShell title="Proposta comercial" documentCode={reservation.code}>
+    <DocumentShell company={data.company} title="Proposta comercial" documentCode={reservation.code}>
       <DocumentHero
         kicker="Orçamento"
         title={reservation.client.name}

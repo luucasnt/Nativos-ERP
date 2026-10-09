@@ -1,3 +1,4 @@
+import { serviceDocumentContext } from "@/lib/documents/service-context";
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import { BRAND_COLORS } from "@/lib/documents/brand";
 import { DetailGrid } from "@/lib/documents/components/pdf-ui";
@@ -5,6 +6,8 @@ import { formatCurrency, formatDate } from "@/lib/documents/format";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
 
 type ServiceForBlock = {
+  driver?: { name: string } | null;
+  vehicle?: { model: string; plate: string } | null;
   id: string;
   type: string;
   scheduled_date: Date | null;
@@ -24,15 +27,15 @@ type ServiceForBlock = {
 
 const styles = StyleSheet.create({
   block: {
-    marginBottom: 10,
-    padding: 12,
+    marginBottom: 4,
+    padding: 8,
     borderWidth: 1,
     borderColor: BRAND_COLORS.line,
     borderRadius: 5,
     backgroundColor: BRAND_COLORS.white,
   },
   header: {
-    marginBottom: 10,
+    marginBottom: 4,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
@@ -60,14 +63,14 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.forest,
   },
   route: {
-    marginBottom: 10,
+    marginBottom: 4,
     flexDirection: "row",
     gap: 7,
   },
   routeItem: {
     flex: 1,
-    minHeight: 43,
-    padding: 9,
+    minHeight: 26,
+    padding: 5,
     borderRadius: 4,
     backgroundColor: BRAND_COLORS.soft,
     borderWidth: 1,
@@ -86,10 +89,9 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.ink,
   },
   extra: {
-    marginTop: -7,
+    marginTop: 0,
     marginBottom: 8,
-    fontSize: 7.5,
-    lineHeight: 1.45,
+    fontSize: 8,
     color: BRAND_COLORS.muted,
   },
 });
@@ -103,6 +105,7 @@ export function ServiceBlock({
   showPrice: boolean;
   sequence?: number;
 }) {
+  const context = serviceDocumentContext(service.type);
   const luggageTotal =
     service.luggage_10kg + service.luggage_23kg + service.luggage_32kg;
   const seatsTotal =
@@ -110,7 +113,7 @@ export function ServiceBlock({
 
   const detailItems = [
     {
-      label: "Data e horário",
+      label: context.timeLabel,
       value:
         formatDate(service.scheduled_date) +
         (service.scheduled_time ? " · " + service.scheduled_time : ""),
@@ -123,7 +126,7 @@ export function ServiceBlock({
           : String(service.passenger_count),
     },
     ...(service.flight_number
-      ? [{ label: "Voo", value: service.flight_number }]
+      ? [{ label: context.flightLabel, value: service.flight_number }]
       : []),
   ];
 
@@ -146,13 +149,13 @@ export function ServiceBlock({
       {(service.pickup_location || service.dropoff_location) && (
         <View style={styles.route}>
           <View style={styles.routeItem}>
-            <Text style={styles.routeLabel}>Origem</Text>
+            <Text style={styles.routeLabel}>{context.pickupLabel}</Text>
             <Text style={styles.routeText}>
               {service.pickup_location ?? "A definir"}
             </Text>
           </View>
           <View style={styles.routeItem}>
-            <Text style={styles.routeLabel}>Destino</Text>
+            <Text style={styles.routeLabel}>{context.dropoffLabel}</Text>
             <Text style={styles.routeText}>
               {service.dropoff_location ?? "A definir"}
             </Text>
@@ -165,16 +168,24 @@ export function ServiceBlock({
         columns={detailItems.length >= 3 ? 3 : 2}
       />
 
-      {luggageTotal > 0 && (
-        <Text style={styles.extra}>
-          Bagagem · {service.luggage_10kg} até 10 kg · {service.luggage_23kg}{" "}
-          até 23 kg · {service.luggage_32kg} até 32 kg
-        </Text>
+      {("driver" in service || "vehicle" in service) && (
+        <DetailGrid columns={3} items={[
+          { label: "Motorista", value: service.driver?.name || "A definir pela operação" },
+          { label: "Veículo", value: service.vehicle?.model || "A definir pela operação" },
+          { label: "Placa", value: service.vehicle?.plate || "A definir pela operação" },
+        ]} />
       )}
-      {seatsTotal > 0 && (
+      <Text style={styles.extra}>{context.meeting}</Text>
+      {(luggageTotal > 0 || seatsTotal > 0) && (
         <Text style={styles.extra}>
-          Assentos infantis · {service.bebe_conforto} bebê conforto ·{" "}
-          {service.cadeirinha} cadeirinha · {service.booster} elevação
+          {[
+            service.luggage_10kg ? `${service.luggage_10kg} bagagem(ns) até 10 kg` : "",
+            service.luggage_23kg ? `${service.luggage_23kg} bagagem(ns) até 23 kg` : "",
+            service.luggage_32kg ? `${service.luggage_32kg} bagagem(ns) até 32 kg` : "",
+            service.bebe_conforto ? `${service.bebe_conforto} bebê conforto` : "",
+            service.cadeirinha ? `${service.cadeirinha} cadeirinha` : "",
+            service.booster ? `${service.booster} assento de elevação` : "",
+          ].filter(Boolean).join(" | ")}
         </Text>
       )}
     </View>

@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     "/api/documentos/**/*": [
       "./node_modules/pdfkit/js/standard-fonts/**/*",
       "./node_modules/pdfkit/js/data/**/*",
+      "./src/lib/documents/fonts/*.ttf",
     ],
   },
   async headers() {

@@ -36,6 +36,8 @@ export function registerBrandFonts() {
     ],
   });
 
+  Font.register({ family: "Poppins", src: path.join(FONTS_DIR, "poppins-700.ttf"), fontWeight: 700 });
+
   // @react-pdf/renderer tenta hifenizar palavras por padrão, o que quebra
   // nomes próprios e valores em português de forma estranha.
   Font.registerHyphenationCallback((word) => [word]);
