@@ -1,3 +1,5 @@
+import { requireInternalUser, canAccessFinance } from "@/lib/auth/get-current-user";
+import { SupplierRequestActions } from "@/components/admin/supplier-request-actions";
 import Link from "next/link";
 import type { ChangeRequestStatus, Prisma } from "@prisma/client";
 import { AlertTriangle, Clock3, Filter, Inbox, Search } from "lucide-react";
@@ -16,7 +18,7 @@ const TABS = [
   { key: "todas", label: "Todas", statuses: null },
 ] as const;
 const STATUS_LABEL: Record<string, string> = { solicitada: "Solicitada", em_analise: "Em análise", aprovada: "Aprovada", rejeitada: "Rejeitada", concluida: "Concluída", aguardando_comprovante: "Aguardando comprovante", comprovante_em_analise: "Comprovante em análise", pago: "Paga" };
-const TYPE_LABEL: Record<string, string> = { nova_reserva: "Nova reserva", alteracao: "Alteração", cancelamento: "Cancelamento", pagamento_fatura: "Pagamento de fatura", repasse_nativos: "Repasse à Nativos", repasse_motorista: "Repasse ao motorista", contestacao_valor: "Contestação de valor", troca_recurso: "Troca de recurso", cadastro_motorista: "Cadastro de motorista", cadastro_veiculo: "Cadastro de veículo", correcao_horario: "Correção de horário", correcao_informacao: "Correção de informação", antecipacao_fatura: "Antecipação de fatura", outro: "Outro" };
+const TYPE_LABEL: Record<string, string> = { pagamento_fornecedor: "Pagamento da Nativos ao fornecedor", acesso_motorista: "Acesso ao portal do motorista", pagamento_repasse_fornecedor: "Pagamento do fornecedor à Nativos", nova_reserva: "Nova reserva", alteracao: "Alteração", cancelamento: "Cancelamento", pagamento_fatura: "Pagamento de fatura", repasse_nativos: "Solicitação de repasse", repasse_motorista: "Repasse ao motorista", contestacao_valor: "Contestação de valor", troca_recurso: "Troca de recurso", cadastro_motorista: "Cadastro de motorista", cadastro_veiculo: "Cadastro de veículo", correcao_horario: "Correção de horário", correcao_informacao: "Correção de informação", antecipacao_fatura: "Antecipação de fatura", outro: "Outro" };
 type Params = { tab?: string; q?: string; categoria?: string; page?: string };
 
 function href(params: Params, changes: Record<string, string | undefined>) {
@@ -33,10 +35,13 @@ function tone(status: ChangeRequestStatus): "success" | "warning" | "danger" | "
 }
 function details(value: Prisma.JsonValue | null) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return Object.entries(value).map(([key, item]) => ({ label: key.replaceAll("_", " "), value: typeof item === "string" || typeof item === "number" ? String(item) : JSON.stringify(item) }));
+  return Object.entries(value).filter(([key]) => !["receipt_url", "submitted_by_id"].includes(key)).map(([key, item]) => ({ label: key.replaceAll("_", " "), value: typeof item === "string" || typeof item === "number" ? String(item) : JSON.stringify(item) }));
 }
 
 export default async function SolicitacoesPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const actor = await requireInternalUser();
+  const canReviewFinance = canAccessFinance(actor);
+  const canApproveAccess = actor.is_owner && actor.role === "admin";
   const params = await searchParams;
   const tab = TABS.find((item) => item.key === params.tab) ?? TABS[0];
   const query = params.q?.trim() ?? "";
@@ -62,6 +67,7 @@ export default async function SolicitacoesPage({ searchParams }: { searchParams:
   const driverNames = new Map(drivers.map((driver) => [driver.id, driver.name]));
   const counts = new Map(groups.map((group) => [group.status, group._count._all]));
   const tabCount = (item: (typeof TABS)[number]) => item.statuses ? item.statuses.reduce((sum, status) => sum + (counts.get(status) ?? 0), 0) : groups.reduce((sum, group) => sum + group._count._all, 0);
+  const bankAccounts = canReviewFinance ? await prisma.bankAccount.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [];
   const now = new Date();
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -89,7 +95,7 @@ export default async function SolicitacoesPage({ searchParams }: { searchParams:
         <div className="grid gap-4 p-4 sm:grid-cols-[1fr_220px]"><div className="space-y-4"><dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="text-forest/60">Solicitante</dt><dd className="font-medium text-forest">{requester}</dd><dt className="text-forest/60">Reserva</dt><dd>{request.reservation ? <Link href={`/admin/reservas/${request.reservation.id}`} className="font-semibold text-forest underline-offset-4 hover:underline">{request.reservation.code}</Link> : "Não vinculada"}</dd><dt className="text-forest/60">Recebida</dt><dd className="text-forest/72">{request.created_at.toLocaleString("pt-BR", { timeZone: "America/Bahia", dateStyle: "short", timeStyle: "short" })}</dd></dl>
           {requestDetails.length > 0 && <div className="rounded-xl bg-forest/[0.045] p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-forest/60">Detalhes do pedido</p>{requestDetails.map((detail) => <p key={detail.label} className="mb-2 last:mb-0"><span className="block text-xs capitalize text-forest/60">{detail.label}</span><span className="text-sm leading-relaxed text-ink">{detail.value}</span></p>)}</div>}
           {request.type === "alteracao" && request.status === "aprovada" && request.reservation && <p className="rounded-lg border border-warning/20 bg-warning/[0.06] p-3 text-sm text-forest"><AlertTriangle size={15} className="mr-1 inline text-warning" />A aprovação autoriza a análise. Aplique a alteração na reserva e depois marque como concluída.</p>}
-        </div><div><div className="mb-3 flex items-center gap-2 text-xs text-forest/60"><Clock3 size={14} /> Prazo: {request.category === "financeiro" ? "2 horas" : "30 minutos"}</div><ChangeRequestReviewActions id={request.id} currentStatus={request.status} /></div></div>
+        </div><div><div className="mb-3 flex items-center gap-2 text-xs text-forest/60"><Clock3 size={14} /> Prazo: {request.category === "financeiro" ? "2 horas" : "30 minutos"}</div>{(request.type === "acesso_motorista" && canApproveAccess || request.type === "pagamento_repasse_fornecedor" && canReviewFinance) && <SupplierRequestActions id={request.id} type={request.type} status={request.status} bankAccounts={bankAccounts} />}<ChangeRequestReviewActions id={request.id} currentStatus={request.status} restricted={["acesso_motorista", "pagamento_repasse_fornecedor"].includes(request.type)} /></div></div>
       </article>;
     })}</div>}
     <footer className="flex flex-col items-center justify-between gap-3 text-sm text-forest/55 sm:flex-row"><span>{total} itens · página {page} de {totalPages}</span><div className="flex gap-2">{page > 1 && <Link href={href(params, { page: String(page - 1) })} className={secondaryButtonClass}>Anterior</Link>}{page < totalPages && <Link href={href(params, { page: String(page + 1) })} className={secondaryButtonClass}>Próxima</Link>}</div></footer>

@@ -61,6 +61,8 @@ export default async function PortalEmpresaOperacaoPage() {
         id: true,
         type: true,
         execution_status: true,
+        preflight_checklist: true,
+        completion_checklist: true,
         scheduled_date: true,
         scheduled_time: true,
         reception_sign_enabled: true,
@@ -184,7 +186,7 @@ export default async function PortalEmpresaOperacaoPage() {
                       <p><strong className="font-medium text-forest">Veículo:</strong> {service.vehicle ? `${service.vehicle.model} · ${service.vehicle.plate}` : "A definir"}</p>
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-2">
-                      <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} />
+                      <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} preflightChecklist={service.preflight_checklist as import("@/components/portal/service-checklist").Checklist | null} completionChecklist={service.completion_checklist as import("@/components/portal/service-checklist").Checklist | null} />
                       <a
                         href={`/api/documentos/os/${service.id}`}
                         target="_blank" rel="noopener noreferrer"
@@ -246,7 +248,7 @@ export default async function PortalEmpresaOperacaoPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-3">
-                        <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} />
+                        <ServiceExecutionActions serviceId={service.id} executionStatus={service.execution_status} preflightChecklist={service.preflight_checklist as import("@/components/portal/service-checklist").Checklist | null} completionChecklist={service.completion_checklist as import("@/components/portal/service-checklist").Checklist | null} />
                         <a
                           href={"/api/documentos/os/" + service.id}
                           target="_blank" rel="noopener noreferrer"
@@ -289,7 +291,7 @@ export default async function PortalEmpresaOperacaoPage() {
                     {service.reservation.code} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                   </span>
                 </span>
-                <DirectCollectionActions
+                <DirectCollectionActions uploadEndpoint="/api/portal/comprovantes"
                   serviceId={service.id}
                   reasons={reasons}
                   onConfirmReceived={confirmReceivedPortalEmpresa}

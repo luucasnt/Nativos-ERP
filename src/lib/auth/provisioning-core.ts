@@ -45,9 +45,10 @@ function toAppMetadata(user: {
 export async function syncAppMetadataWithClient(admin: SupabaseAdminClient, userId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
-  await admin.auth.admin.updateUserById(user.auth_user_id, {
+  const { error } = await admin.auth.admin.updateUserById(user.auth_user_id, {
     app_metadata: toAppMetadata(user),
   });
+  if (error) throw error;
 }
 
 type CreateInternalUserInput = {
@@ -131,6 +132,11 @@ export async function createPortalUserWithClient(
       linked_driver_id: input.linkedDriverId,
       must_change_password: true,
     },
+  }).catch(async error => {
+    // Compensa somente o Auth criado nesta tentativa se o vínculo falhar.
+    // Não remove cadastros ou acessos que já existiam.
+    await admin.auth.admin.deleteUser(data.user!.id).catch(() => {});
+    throw error;
   });
 
   await syncAppMetadataWithClient(admin, user.id);

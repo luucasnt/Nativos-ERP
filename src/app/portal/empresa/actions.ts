@@ -1,5 +1,8 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
+import { validatePaymentProof } from "@/lib/uploads/payment-proof";
+import { driverAccessSchema, supplierAccessDriver, supplierRemittanceEntry, supplierRemittanceSchema, validateRemittanceAmount } from "@/lib/change-requests/supplier-workflows";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -38,9 +41,9 @@ async function assertOwnSupplierService(serviceId: string) {
 export async function confirmReceivedPortalEmpresa(serviceId: string, receiptUrl: string): Promise<DirectCollectionState> {
   try {
     const { user } = await assertOwnSupplierService(serviceId);
-    const proof = z.string().url("Anexe um comprovante válido.").parse(receiptUrl);
+    const proof = await validatePaymentProof(z.string().min(1, "Anexe um comprovante válido.").parse(receiptUrl), user.id);
 
-    await confirmDirectCollectionReceived(serviceId, proof);
+    await confirmDirectCollectionReceived(serviceId, proof ?? undefined);
     await ensureDirectSupplierRepasseRequest(serviceId, user.linked_company_id);
 
     await logAudit({
@@ -569,7 +572,7 @@ export async function submitRepasseRequestEmpresa(
   }
 
   const changeRequest = await submitChangeRequest({
-    type: "repasse_nativos",
+    type: "pagamento_fornecedor",
     requesterType: "company",
     requesterId: user.linked_company_id,
     companyId: user.linked_company_id,
@@ -587,4 +590,38 @@ export async function submitRepasseRequestEmpresa(
   revalidatePath("/portal/empresa/financeiro");
   revalidatePath("/portal/empresa/solicitacoes");
   return { error: null };
+}
+
+export async function requestSupplierDriverAccess(_previous: { error: string | null; success?: string }, formData: FormData) {
+  try {
+    const user = await assertActiveCompanyPortalUser();
+    if (!user.linked_company.roles.includes("fornecedor")) throw new Error("Acesso restrito ao fornecedor.");
+    const details = driverAccessSchema.parse({ driver_id: formData.get("driver_id"), email: String(formData.get("email") ?? "").trim().toLowerCase(), submitted_by_id: user.id });
+    await supplierAccessDriver(details.driver_id, user.linked_company_id);
+    const existing = await prisma.user.findUnique({ where: { linked_driver_id: details.driver_id } });
+    if (existing) throw new Error("Este motorista já possui acesso. Solicite à Nativos a revisão ou recuperação do acesso existente.");
+    const pending = await prisma.changeRequest.findFirst({ where: { company_id: user.linked_company_id, type: "acesso_motorista", status: { in: ["solicitada", "em_analise", "aprovada"] }, allocation_details: { path: ["driver_id"], equals: details.driver_id } } });
+    if (pending) return { error: null, success: `Solicitação ${pending.protocol} já está em análise.` };
+    const latest = await prisma.changeRequest.findFirst({ where: { company_id: user.linked_company_id, type: "acesso_motorista", allocation_details: { path: ["driver_id"], equals: details.driver_id } }, orderBy: { created_at: "desc" }, select: { id: true } });
+    const request = await submitChangeRequest({ type: "acesso_motorista", requesterType: "company", requesterId: user.linked_company_id, companyId: user.linked_company_id, allocationDetails: details, dedupeKey: `driver-access:${user.linked_company_id}:${details.driver_id}:${latest?.id ?? "initial"}`, audit: { actorId: user.id, action: "acesso_motorista_solicitado", metadata: { driverId: details.driver_id, companyId: user.linked_company_id } } });
+    revalidatePath("/portal/empresa/equipe"); revalidatePath("/admin/solicitacoes");
+    return { error: null, success: `Solicitação ${request.protocol} enviada para aprovação da Nativos.` };
+  } catch (error) { unstable_rethrow(error); return { error: error instanceof z.ZodError ? error.issues[0]?.message ?? "Dados inválidos." : error instanceof Error ? error.message : "Falha ao solicitar acesso." }; }
+}
+
+export async function reportSupplierRemittance(_previous: { error: string | null; success?: string }, formData: FormData) {
+  try {
+    const user = await assertActiveCompanyPortalUser();
+    if (!user.linked_company.roles.includes("fornecedor")) throw new Error("Acesso restrito ao fornecedor.");
+    const details = supplierRemittanceSchema.parse({ entry_id: formData.get("entry_id"), amount: String(formData.get("amount") ?? "").replace(",", "."), payment_date: formData.get("payment_date"), payment_method: formData.get("payment_method"), receipt_url: formData.get("receipt_url"), submitted_by_id: user.id, nota: formData.get("nota") ?? "" });
+    const { entry, balance } = await supplierRemittanceEntry(details.entry_id, user.linked_company_id);
+    validateRemittanceAmount(details.amount, balance, details.payment_date);
+    await validatePaymentProof(details.receipt_url, user.id);
+    if (!details.receipt_url.startsWith("storage://payment-receipts/")) throw new Error("Anexe um comprovante em imagem ou PDF.");
+    const pending = await prisma.changeRequest.findFirst({ where: { company_id: user.linked_company_id, type: "pagamento_repasse_fornecedor", status: { in: ["solicitada", "em_analise", "aprovada", "comprovante_em_analise"] }, allocation_details: { path: ["entry_id"], equals: entry.id } } });
+    if (pending) throw new Error(`Já existe um comprovante em análise para este lançamento: ${pending.protocol}. Aguarde a conferência.`);
+    const request = await submitChangeRequest({ type: "pagamento_repasse_fornecedor", requesterType: "company", requesterId: user.linked_company_id, companyId: user.linked_company_id, reservationId: entry.reservation_id, allocationDetails: { ...details, service_id: entry.service_id }, dedupeKey: `supplier-remittance:${user.linked_company_id}:${z.string().uuid().parse(formData.get("dedupe_key"))}`, audit: { actorId: user.id, action: "repasse_fornecedor_informado", metadata: { entryId: entry.id, serviceId: entry.service_id, reservationId: entry.reservation_id, amount: details.amount } } });
+    revalidatePath("/admin/solicitacoes"); revalidatePath("/portal/empresa/financeiro");
+    return { error: null, success: `Repasse ${request.protocol} enviado. O saldo será atualizado após a confirmação financeira da Nativos.` };
+  } catch (error) { unstable_rethrow(error); return { error: error instanceof z.ZodError ? error.issues[0]?.message ?? "Dados inválidos." : error instanceof Error ? error.message : "Falha ao informar repasse." }; }
 }

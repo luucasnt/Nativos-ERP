@@ -23,6 +23,7 @@ export async function submitChangeRequest(params: {
   reservationId?: string | null;
   allocationDetails?: Prisma.InputJsonValue;
   dedupeKey: string;
+  audit?: { actorId: string; action: string; metadata: Prisma.InputJsonValue };
 }) {
   const existing = await prisma.changeRequest.findUnique({ where: { dedupe_key: params.dedupeKey } });
   if (existing) {
@@ -32,7 +33,7 @@ export async function submitChangeRequest(params: {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const protocol = await generateNextProtocol();
     try {
-      return await prisma.changeRequest.create({
+      return await prisma.$transaction(async (tx) => { const request = await tx.changeRequest.create({
         data: {
           protocol,
           category: changeRequestCategoryForType(params.type),
@@ -44,6 +45,9 @@ export async function submitChangeRequest(params: {
           allocation_details: params.allocationDetails,
           dedupe_key: params.dedupeKey,
         },
+      });
+      if (params.audit) await tx.auditLog.create({ data: { actor_id: params.audit.actorId, action: params.audit.action, entity_type: "change_request", entity_id: request.id, metadata: params.audit.metadata } });
+      return request;
       });
     } catch (error) {
       if (!(error instanceof PrismaRuntime.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;

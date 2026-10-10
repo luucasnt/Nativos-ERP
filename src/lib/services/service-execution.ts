@@ -106,6 +106,10 @@ export async function startService(
     return { error: error instanceof Error ? error.message : "Falha ao iniciar o serviço." };
   }
 
+  revalidatePath("/portal/motorista/servicos");
+  revalidatePath("/portal/empresa/operacao");
+  revalidatePath("/portal/empresa/financeiro");
+  revalidatePath("/admin/financeiro");
   revalidatePath("/portal/motorista");
   revalidatePath("/portal/empresa");
   return { error: null };
@@ -151,6 +155,10 @@ export async function completeService(
     return { error: error instanceof Error ? error.message : "Falha ao finalizar o serviço." };
   }
 
+  revalidatePath("/portal/motorista/servicos");
+  revalidatePath("/portal/empresa/operacao");
+  revalidatePath("/portal/empresa/financeiro");
+  revalidatePath("/admin/financeiro");
   revalidatePath("/portal/motorista");
   revalidatePath("/portal/empresa");
   return { error: null };
