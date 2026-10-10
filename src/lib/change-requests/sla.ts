@@ -16,6 +16,8 @@ const SLA_MINUTES: Record<ChangeRequestCategory, number> = {
 // correção de horário/informação, troca de recurso) é operacional.
 const FINANCEIRO_TYPES = new Set([
   "pagamento_fatura",
+  "pagamento_repasse_fornecedor",
+  "pagamento_fornecedor",
   "repasse_nativos",
   "repasse_motorista",
   "contestacao_valor",

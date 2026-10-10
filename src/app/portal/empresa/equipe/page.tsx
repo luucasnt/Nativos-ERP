@@ -1,3 +1,4 @@
+import { SupplierDriverAccessForm } from "@/components/portal/supplier-workflow-forms";
 import { redirect } from "next/navigation";
 import { CarFront, Plus, Users } from "lucide-react";
 import { DriverRegistrationForm } from "@/components/portal/driver-registration-form";
@@ -42,6 +43,8 @@ export default async function PortalEmpresaEquipePage() {
     }),
   ]);
 
+  const accesses = await prisma.user.findMany({ where: { linked_driver_id: { in: drivers.map(d => d.id) } }, select: { linked_driver_id: true, status: true } });
+  const requests = await prisma.changeRequest.findMany({ where: { company_id: company.id, type: "acesso_motorista" }, orderBy: { created_at: "desc" }, select: { protocol: true, status: true, allocation_details: true } });
   return (
     <div className="mx-auto max-w-[1360px] space-y-6">
       <header>
@@ -64,7 +67,7 @@ export default async function PortalEmpresaEquipePage() {
           ) : (
             <ul className="divide-y divide-forest/[0.075]">
               {drivers.map((driver) => (
-                <li key={driver.id} className="flex items-center gap-3 px-5 py-3.5">
+                <li key={driver.id}><div className="flex items-center gap-3 px-5 py-3.5">
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-forest/[0.07] text-xs font-semibold text-forest">
                     {driver.name.slice(0, 1).toUpperCase()}
                   </span>
@@ -72,7 +75,8 @@ export default async function PortalEmpresaEquipePage() {
                     <strong className="block truncate text-xs text-ink">{driver.name}</strong>
                     <span className="mt-1 block text-[11px] text-forest/55">{driver.phone ?? driver.email ?? "Contato não informado"}</span>
                   </span>
-                  <Badge tone={approvalTone(driver.approval_status)}>{approvalLabel(driver.approval_status)}</Badge>
+                  <Badge tone={approvalTone(driver.approval_status)}>{approvalLabel(driver.approval_status)}</Badge></div>
+                  {(() => { const access = accesses.find(a => a.linked_driver_id === driver.id); const request = requests.find(r => r.allocation_details && typeof r.allocation_details === "object" && !Array.isArray(r.allocation_details) && r.allocation_details.driver_id === driver.id); if (access) return <p className="px-5 pb-3 text-xs text-forest/70">Acesso ao portal: {access.status === "ativo" ? "ativo" : "inativo (contate a Nativos)"}</p>; if (request && ["solicitada", "em_analise", "aprovada"].includes(request.status)) return <p className="px-5 pb-3 text-xs text-forest/70">Acesso em análise · {request.protocol}</p>; return driver.status === "ativo" && driver.approval_status === "aprovado" ? <SupplierDriverAccessForm driverId={driver.id} email={driver.portal_email ?? driver.email} dedupeKey={crypto.randomUUID()} /> : null; })()}
                 </li>
               ))}
             </ul>

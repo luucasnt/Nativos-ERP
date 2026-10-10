@@ -74,6 +74,7 @@ export async function provisionCompanyOrDriverLogin(input: {
 
   const existingUser = await prisma.user.findFirst({
     where: {
+      account_type: "portal",
       OR: [
         companyId ? { linked_company_id: companyId } : undefined,
         driverId ? { linked_driver_id: driverId } : undefined,
@@ -82,6 +83,7 @@ export async function provisionCompanyOrDriverLogin(input: {
   });
 
   if (existingUser) {
+    if (existingUser.status !== "ativo" || (driverId && existingUser.linked_driver_id && existingUser.linked_driver_id !== driverId) || (companyId && existingUser.linked_company_id && existingUser.linked_company_id !== companyId)) throw new Error("O acesso existente está inativo ou vinculado a outro cadastro. Revise os vínculos antes de prosseguir.");
     const updated = await prisma.user.update({
       where: { id: existingUser.id },
       data: {

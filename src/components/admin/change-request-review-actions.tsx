@@ -16,7 +16,7 @@ const NEXT: Record<string, string[]> = {
   pago: ["pago", "concluida"],
 };
 
-export function ChangeRequestReviewActions({ id, currentStatus }: { id: string; currentStatus: string }) {
+export function ChangeRequestReviewActions({ id, currentStatus, restricted = false }: { id: string; currentStatus: string; restricted?: boolean }) {
   const [status, setStatus] = useState(currentStatus);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function ChangeRequestReviewActions({ id, currentStatus }: { id: string; 
   if (terminal) return <p className="text-sm text-forest/55">Fluxo encerrado.</p>;
   return <div className="grid gap-2">
     <select value={status} onChange={(event) => setStatus(event.target.value)} disabled={isPending} className={inputClass}>
-      {(NEXT[currentStatus] ?? [currentStatus]).map((value) => <option key={value} value={value}>{LABELS[value] ?? value}</option>)}
+      {(NEXT[currentStatus] ?? [currentStatus]).filter(value => !restricted || [currentStatus, "em_analise", "rejeitada"].includes(value)).map((value) => <option key={value} value={value}>{LABELS[value] ?? value}</option>)}
     </select>
     <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} placeholder="Resposta ao solicitante" disabled={isPending} className={inputClass} />
     <button type="button" disabled={isPending || status === currentStatus} onClick={() => startTransition(async () => { setError(null); setSuccess(false); try { await updateChangeRequestStatus(id, status, note); setSuccess(true); } catch (cause) { setError(cause instanceof Error ? cause.message : "Falha ao atualizar a solicitação."); } })} className={`${buttonClass} min-h-11 w-full`}>

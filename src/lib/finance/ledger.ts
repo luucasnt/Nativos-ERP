@@ -181,6 +181,7 @@ type CreatePaymentInput = {
   receipt_url?: string | null;
   occurred_at?: Date;
   dedupe_key: string;
+  supplierRequest?: { id: string; reviewerId: string };
 };
 
 export async function createPayment(input: CreatePaymentInput) {
@@ -193,6 +194,12 @@ export async function createPayment(input: CreatePaymentInput) {
 
   try {
     return await prisma.$transaction(async (tx) => {
+      if (input.supplierRequest) {
+        await tx.$queryRaw`SELECT id FROM change_requests WHERE id = ${input.supplierRequest.id}::uuid FOR UPDATE`;
+        const request = await tx.changeRequest.findUniqueOrThrow({ where: { id: input.supplierRequest.id } });
+        const details = request.allocation_details as Record<string, unknown> | null;
+        if (request.type !== "pagamento_repasse_fornecedor" || ["rejeitada", "concluida"].includes(request.status) || details?.entry_id !== input.finance_entry_id || Number(details?.amount) !== Number(input.amount)) throw new Error("O protocolo não está disponível ou não corresponde ao recebimento.");
+      }
       const relation = await tx.financeEntry.findUniqueOrThrow({ where: { id: input.finance_entry_id }, select: { reservation_id: true } });
       if (relation.reservation_id) await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${relation.reservation_id}::uuid FOR UPDATE`;
       // Serializa liquidações do mesmo título. Sem este lock, dois cliques
@@ -206,6 +213,11 @@ export async function createPayment(input: CreatePaymentInput) {
         where: { id: input.finance_entry_id },
         include: { compensacao: true },
       });
+      if (input.supplierRequest) {
+        const request = await tx.changeRequest.findUniqueOrThrow({ where: { id: input.supplierRequest.id } });
+        const service = entry.service_id ? await tx.service.findUnique({ where: { id: entry.service_id }, include: { direct_collections: true } }) : null;
+        if (entry.party_type !== "fornecedor" || entry.party_id !== request.company_id || entry.reservation_id !== request.reservation_id || entry.type !== "receita" || entry.category !== "repasse_fornecedor" || !service || service.supplier_id !== request.company_id || service.collection_actor !== "fornecedor" || service.execution_status !== "concluido" || !service.direct_collections.some(c => c.status === "received" && !c.reversed_at && c.financial_responsible_id === request.company_id)) throw new Error("O recebimento não corresponde à cobrança direta confirmada deste fornecedor.");
+      }
       if (!canRegisterEntryPayment(entry)) {
         throw new Error("Este lançamento não está elegível para pagamento.");
       }
@@ -266,6 +278,22 @@ export async function createPayment(input: CreatePaymentInput) {
         data: { status: fullyPaid ? "pago" : "pendente", payment_eligible: !fullyPaid },
       });
 
+      if (input.supplierRequest) {
+        const request = await tx.changeRequest.findUniqueOrThrow({ where: { id: input.supplierRequest.id } });
+        await tx.changeRequest.update({ where: { id: request.id }, data: {
+          status: "pago", reviewed_by_id: input.supplierRequest.reviewerId, reviewed_at: new Date(),
+          response_note: "Repasse recebido pela Nativos e registrado no lançamento financeiro vinculado.",
+          allocation_details: { ...(request.allocation_details as Prisma.JsonObject), payment_id: payment.id },
+        } });
+        if (fullyPaid && entry.service_id) {
+          const originalRequest = await tx.changeRequest.findUnique({ where: { dedupe_key: `direct-repasse:${entry.service_id}` } });
+          if (originalRequest && !["rejeitada", "concluida"].includes(originalRequest.status)) {
+            await tx.changeRequest.update({ where: { id: originalRequest.id }, data: { status: "concluida", reviewed_by_id: input.supplierRequest.reviewerId, reviewed_at: new Date(), response_note: `Saldo do serviço liquidado pelo protocolo ${request.protocol}.`, allocation_details: { ...(originalRequest.allocation_details as Prisma.JsonObject), payment_request_id: request.id, payment_id: payment.id } } });
+            await tx.auditLog.create({ data: { actor_id: input.supplierRequest.reviewerId, action: "repasse_direto_liquidado", entity_type: "change_request", entity_id: originalRequest.id, metadata: { paymentId: payment.id, paymentRequestId: request.id, entryId: entry.id } } });
+          }
+        }
+        await tx.auditLog.create({ data: { actor_id: input.supplierRequest.reviewerId, action: "repasse_fornecedor_confirmado", entity_type: "change_request", entity_id: request.id, metadata: { entryId: entry.id, serviceId: entry.service_id, reservationId: entry.reservation_id, paymentId: payment.id, amount: amount.toString() } } });
+      }
       return payment;
     });
   } catch (error) {

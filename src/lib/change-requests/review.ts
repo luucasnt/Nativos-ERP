@@ -27,8 +27,13 @@ export async function reviewChangeRequest(params: {
   status: ChangeRequestStatus;
   reviewerId: string;
   responseNote?: string | null;
+  expectedStatus?: ChangeRequestStatus;
 }) {
-  const changeRequest = await prisma.changeRequest.update({
+  if (params.expectedStatus) {
+    const result = await prisma.changeRequest.updateMany({ where: { id: params.id, status: params.expectedStatus }, data: { status: params.status, reviewed_by_id: params.reviewerId, reviewed_at: new Date(), response_note: params.responseNote || null } });
+    if (result.count !== 1) throw new Error("A solicitação foi atualizada por outra pessoa. Recarregue a página.");
+  }
+  const changeRequest = params.expectedStatus ? await prisma.changeRequest.findUniqueOrThrow({ where: { id: params.id }, include: { reservation: true } }) : await prisma.changeRequest.update({
     where: { id: params.id },
     data: {
       status: params.status,

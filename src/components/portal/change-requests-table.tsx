@@ -34,6 +34,10 @@ function statusTone(
   return "neutral";
 }
 function requestTypeLabel(type: string) {
+  if (type === "pagamento_fornecedor") return "Pagamento da Nativos ao fornecedor";
+  if (type === "repasse_nativos") return "Solicitação de repasse";
+  if (type === "acesso_motorista") return "Acesso ao portal do motorista";
+  if (type === "pagamento_repasse_fornecedor") return "Pagamento do fornecedor à Nativos";
   return type
     .replaceAll("_", " ")
     .replace(/^./, (first) => first.toLocaleUpperCase("pt-BR"));

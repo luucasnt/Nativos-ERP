@@ -48,6 +48,8 @@ export default async function PortalMotoristaHomePage() {
       id: true,
       type: true,
       execution_status: true,
+        preflight_checklist: true,
+        completion_checklist: true,
       scheduled_date: true,
       scheduled_time: true,
       pickup_location: true,
@@ -212,7 +214,7 @@ export default async function PortalMotoristaHomePage() {
               <div className="grid grid-cols-2 gap-2 lg:min-w-48 lg:grid-cols-1">
                 <ServiceExecutionActions
                   serviceId={nextService.id}
-                  executionStatus={nextService.execution_status}
+                  executionStatus={nextService.execution_status} preflightChecklist={nextService.preflight_checklist as import("@/components/portal/service-checklist").Checklist | null} completionChecklist={nextService.completion_checklist as import("@/components/portal/service-checklist").Checklist | null}
                 />
                 {(nextService.pickup_location ||
                   nextService.dropoff_location) && (

@@ -36,6 +36,8 @@ export default async function PortalMotoristaServicosPage() {
         id: true,
         type: true,
         execution_status: true,
+        preflight_checklist: true,
+        completion_checklist: true,
         scheduled_date: true,
         scheduled_time: true,
         pickup_location: true,
@@ -45,8 +47,6 @@ export default async function PortalMotoristaServicosPage() {
         notes: true,
         reception_sign_enabled: true,
         reception_passenger_name: true,
-        preflight_checklist: true,
-        completion_checklist: true,
         incident_notes: true,
         reservation: { select: { code: true, client: { select: { name: true, phone: true } } } },
         vehicle: { select: { model: true, plate: true } },
@@ -197,7 +197,7 @@ export default async function PortalMotoristaServicosPage() {
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:max-w-72 lg:justify-end">
                   <ServiceExecutionActions
                     serviceId={service.id}
-                    executionStatus={service.execution_status}
+                    executionStatus={service.execution_status} preflightChecklist={service.preflight_checklist as import("@/components/portal/service-checklist").Checklist | null} completionChecklist={service.completion_checklist as import("@/components/portal/service-checklist").Checklist | null}
                   />
                   {(service.pickup_location || service.dropoff_location) && (
                     <a
@@ -246,7 +246,7 @@ export default async function PortalMotoristaServicosPage() {
                 </div>
               </div>
               <div className="grid gap-4 border-t border-forest/10 bg-[#faf9f6] p-4 sm:p-5">
-                <ServiceChecklist serviceId={service.id} phase="preflight" initialValue={service.preflight_checklist as Record<string, boolean> | null} />
+                {service.execution_status === "agendado" && <ServiceChecklist serviceId={service.id} phase="preflight" initialValue={service.preflight_checklist as Record<string, boolean> | null} />}
                 {service.execution_status === "em_andamento" && <ServiceChecklist serviceId={service.id} phase="completion" initialValue={service.completion_checklist as Record<string, boolean> | null} />}
               </div>
             </article>

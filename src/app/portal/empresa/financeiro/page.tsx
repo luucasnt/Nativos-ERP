@@ -1,3 +1,4 @@
+import { SupplierRemittanceForm } from "@/components/portal/supplier-workflow-forms";
 import { ArrowDownLeft, ArrowUpRight, FileText, WalletCards } from "lucide-react";
 import { FinanceExtractTable } from "@/components/portal/finance-extract-table";
 import { RepasseRequestForm } from "@/components/portal/repasse-request-form";
@@ -21,7 +22,7 @@ export default async function PortalEmpresaFinanceiroPage() {
   const isPartner = company.roles.includes("parceiro");
   const isBilledPartner = isPartner && (company.billing_enabled || company.modelo_parceiro === "faturado" || company.modelo_parceiro === "ambos");
 
-  const [supplierExtract, partnerExtract, repasseEntries, billingCycles] = await Promise.all([
+  const [supplierExtract, partnerExtract, repasseEntries, billingCycles, remittanceEntries, remittanceRequests] = await Promise.all([
     isSupplier ? getPartyFinanceExtract("fornecedor", company.id) : Promise.resolve([]),
     isPartner ? getPartyFinanceExtract("parceiro", company.id) : Promise.resolve([]),
     isSupplier
@@ -52,6 +53,8 @@ export default async function PortalEmpresaFinanceiroPage() {
           take: 24,
         })
       : Promise.resolve([]),
+    isSupplier ? prisma.financeEntry.findMany({ where: { party_type: "fornecedor", party_id: company.id, type: "receita", category: "repasse_fornecedor", status: { in: ["pendente", "vencido"] }, payment_eligible: true, service: { is: { supplier_id: company.id, collection_actor: "fornecedor", execution_status: "concluido", direct_collections: { some: { status: "received", reversed_at: null, financial_responsible_id: company.id } } } } }, include: { reservation: { select: { id: true, code: true } }, compensacao: { select: { amount: true, status: true, reversed_at: true } }, payments: { where: { reversed_at: null, estorno_of_id: null }, select: { amount: true } } }, orderBy: { created_at: "asc" } }) : Promise.resolve([]),
+    isSupplier ? prisma.changeRequest.findMany({ where: { company_id: company.id, type: "pagamento_repasse_fornecedor" }, include: { reservation: { select: { code: true } } }, orderBy: { created_at: "desc" }, take: 30 }) : Promise.resolve([]),
   ]);
 
   function dueDate(cycle: (typeof billingCycles)[number]) {
@@ -228,9 +231,10 @@ export default async function PortalEmpresaFinanceiroPage() {
         </div>
       </section>
 
+      {isSupplier && <section className="surface-panel p-5"><h2 className="section-heading">Informar pagamento à Nativos</h2><p className="mb-4 mt-2 text-sm text-forest/65">Use quando sua equipe recebeu do passageiro e transferiu o saldo devido à Nativos. Informe cada serviço separadamente, com data e comprovante. A baixa depende da conferência financeira.</p>{remittanceEntries.some(e => openBalance(e) > 0) ? <SupplierRemittanceForm dedupeKey={crypto.randomUUID()} entries={remittanceEntries.filter(e => openBalance(e) > 0).map(e => ({ id: e.id, label: `${e.reservation?.code ?? "Reserva"} · ${e.description ?? e.category} · saldo ${money.format(openBalance(e))}` }))} /> : <p className="text-sm text-forest/60">Nenhum repasse disponível. Conclua o serviço e confirme o recebimento do passageiro em Minha operação.</p>}{remittanceRequests.length > 0 && <div className="mt-5 border-t border-forest/10 pt-4"><h3 className="text-sm font-semibold">Pagamentos informados</h3><ul className="mt-2 grid gap-2">{remittanceRequests.map(r => <li key={r.id} className="rounded-lg bg-forest/[0.04] p-3 text-sm"><strong>{r.protocol}</strong> · {r.reservation?.code} · {r.status === "pago" ? "Recebimento confirmado" : r.status === "rejeitada" ? "Rejeitado" : "Em análise"}<p className="mt-1 text-xs">{r.response_note ?? "Aguardando conferência financeira da Nativos."}</p><a href={`/api/portal/comprovantes/${r.id}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold underline">Ver comprovante</a></li>)}</ul><a href="/portal/empresa/solicitacoes" className="mt-3 inline-block text-sm font-semibold underline">Acompanhar todos os protocolos</a></div>}</section>}
       {isSupplier && (
         <section className="surface-panel p-5">
-          <h2 className="section-heading">Solicitar repasse</h2>
+          <h2 className="section-heading">Solicitar pagamento da Nativos</h2>
           <p className="mb-4 mt-1 text-xs leading-5 text-forest/58">
             Selecione lançamentos elegíveis e envie o pedido para a equipe financeira.
           </p>
