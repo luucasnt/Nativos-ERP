@@ -1,3 +1,4 @@
+import { serviceDayRange } from "@/lib/services/schedule-date";
 import { effectivePaymentDate } from "@/lib/finance/payment-date";
 import { canRegisterEntryPayment } from "@/lib/finance/payment-availability";
 import Link from "next/link";
@@ -55,7 +56,8 @@ export default async function ReservaDetailPage({ params, searchParams }: { para
   if (!reservation || !user) notFound();
   const financeAllowed = canAccessFinance(user);
   const activeServices = reservation.services.filter((service) => service.execution_status !== "cancelado");
-  const nextService = activeServices.find((service) => !service.scheduled_date || service.scheduled_date >= new Date()) ?? activeServices[0];
+  const today = serviceDayRange().start;
+  const nextService = activeServices.find((service) => !service.scheduled_date || service.scheduled_date >= today) ?? activeServices[0];
   const sold = activeServices.reduce((sum, service) => sum + Number(service.price), 0);
   const revenue = reservation.finance_entries.filter((entry) => entry.type === "receita").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const expense = reservation.finance_entries.filter((entry) => entry.type === "despesa").reduce((sum, entry) => sum + Number(entry.amount), 0);

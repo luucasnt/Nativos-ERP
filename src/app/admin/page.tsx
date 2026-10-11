@@ -1,3 +1,4 @@
+import { serviceDayRange } from "@/lib/services/schedule-date";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import {
@@ -20,21 +21,6 @@ import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
 
-function bahiaDayRange() {
-  const now = new Date();
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bahia",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-  const start = new Date(`${date}T00:00:00-03:00`);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-  const weekEnd = new Date(start);
-  weekEnd.setUTCDate(weekEnd.getUTCDate() + 8);
-  return { now, start, end, weekEnd };
-}
 const EXECUTION_LABEL: Record<string, string> = {
   agendado: "Agendado",
   em_andamento: "Em andamento",
@@ -63,7 +49,7 @@ type DashboardCounters = {
 
 export default async function AdminHomePage() {
   const user = await getCurrentUser();
-  const { now, start, end, weekEnd } = bahiaDayRange();
+  const { now, start, end, weekEnd } = serviceDayRange();
 
   const [counterRows, todayServices, upcomingServices] = await Promise.all([
     prisma.$queryRaw<DashboardCounters[]>(Prisma.sql`

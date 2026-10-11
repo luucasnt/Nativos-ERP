@@ -1,3 +1,4 @@
+import { serviceDayRange } from "@/lib/services/schedule-date";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CircleDashed, MapPin, UserRoundCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -5,18 +6,11 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { prisma } from "@/lib/prisma";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
 
-function bahiaRange() {
-  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bahia", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const start = new Date(`${date}T00:00:00-03:00`);
-  const end = new Date(start); end.setUTCDate(end.getUTCDate() + 1);
-  return { start, end };
-}
-
 const tone: Record<string, "success" | "info" | "warning" | "danger" | "neutral"> = { agendado: "neutral", em_andamento: "info", concluido: "success", cancelado: "danger" };
 const label: Record<string, string> = { agendado: "Agendado", em_andamento: "Em andamento", concluido: "Concluído", cancelado: "Cancelado" };
 
 export default async function ControlTowerPage() {
-  const { start, end } = bahiaRange();
+  const { start, end } = serviceDayRange();
   const [services, pendingAcceptance, unassigned, overdue, openRequests] = await Promise.all([
     prisma.service.findMany({ where: { scheduled_date: { gte: start, lt: end }, execution_status: { not: "cancelado" } }, orderBy: [{ scheduled_time: "asc" }, { created_at: "asc" }], take: 80, select: { id: true, type: true, scheduled_time: true, execution_status: true, acceptance_status: true, pickup_location: true, dropoff_location: true, driver_id: true, vehicle_id: true, reservation: { select: { id: true, code: true, client: { select: { name: true } } } }, driver: { select: { name: true } }, vehicle: { select: { model: true, plate: true } } } }),
     prisma.service.count({ where: { execution_type: "fornecedor", acceptance_status: "aguardando_aceite", execution_status: "agendado" } }),
