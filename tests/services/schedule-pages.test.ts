@@ -1,0 +1,26 @@
+import { afterAll, afterEach, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/auth/get-current-user", () => ({ getCurrentUser: vi.fn(async () => null) }));
+import { PrismaClient } from "@prisma/client";
+import AdminHomePage from "@/app/admin/page";
+import ControlTowerPage from "@/app/admin/controle/page";
+const prisma = new PrismaClient();
+afterAll(() => prisma.$disconnect());
+afterEach(() => vi.useRealTimers());
+it("painel e Torre de controle mostram o serviço de hoje e deixam o de amanhã nos próximos", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-11T14:51:00Z"));
+  const client = await prisma.client.create({ data: { name: "Teste das telas de hoje" } });
+  const tomorrowClient = await prisma.client.create({ data: { name: `Passageiro amanhã ${crypto.randomUUID()}` } });
+  const todayReservation = await prisma.reservation.create({ data: { code: `HOJE-${crypto.randomUUID()}`, client_id: client.id } });
+  const tomorrowReservation = await prisma.reservation.create({ data: { code: `AMANHA-${crypto.randomUUID()}`, client_id: tomorrowClient.id } });
+  await prisma.service.create({ data: { reservation_id: todayReservation.id, type: "transfer_saida", execution_type: "propria", scheduled_date: new Date("2026-10-11"), scheduled_time: "00:01", price: 380, original_price: 380 } });
+  await prisma.service.create({ data: { reservation_id: tomorrowReservation.id, type: "transfer_saida", execution_type: "propria", scheduled_date: new Date("2026-10-12"), scheduled_time: "00:01", price: 380, original_price: 380 } });
+  const dashboard = renderToStaticMarkup(await AdminHomePage());
+  const todayPanel = dashboard.slice(dashboard.indexOf("Operação de hoje"), dashboard.indexOf("Ações necessárias"));
+  expect(todayPanel).toContain(todayReservation.code); expect(todayPanel).not.toContain(tomorrowReservation.code);
+  expect(dashboard).toContain(tomorrowClient.name);
+  expect(todayPanel).not.toContain(tomorrowClient.name);
+  const tower = renderToStaticMarkup(await ControlTowerPage());
+  expect(tower).toContain(todayReservation.code); expect(tower).not.toContain(tomorrowReservation.code); expect(tower).not.toContain(tomorrowClient.name);
+});

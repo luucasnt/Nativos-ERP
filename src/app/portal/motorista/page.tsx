@@ -1,3 +1,4 @@
+import { serviceDayRange, serviceDateKey } from "@/lib/services/schedule-date";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -17,16 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { requireDriverPortalUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
-
-function bahiaDateKey(date: Date | null) {
-  if (!date) return "";
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bahia",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
 
 function routeUrl(origin: string | null, destination: string | null) {
   const params = new URLSearchParams({ api: "1" });
@@ -75,9 +66,9 @@ export default async function PortalMotoristaHomePage() {
   });
 
   const nextService = services[0] ?? null;
-  const todayKey = bahiaDateKey(new Date());
+  const todayKey = serviceDayRange().date;
   const todayServices = services.filter(
-    (service) => bahiaDateKey(service.scheduled_date) === todayKey,
+    (service) => serviceDateKey(service.scheduled_date) === todayKey,
   );
   const remainingTodayServices = todayServices.filter(
     (service) => service.id !== nextService?.id,

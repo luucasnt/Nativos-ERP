@@ -1,3 +1,4 @@
+import { serviceDateKey } from "@/lib/services/schedule-date";
 import Link from "next/link";
 import { BriefcaseBusiness, CalendarDays, WalletCards } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -31,7 +32,7 @@ export default async function MotoristaProducaoPage() {
   const dailyEntries = entries.filter((entry) => entry.auto_key?.startsWith("driver_daily:"));
   const earned = [...commissionEntries, ...dailyEntries].reduce((sum, entry) => sum + Number(entry.amount), 0);
   const pending = entries.filter((entry) => ["programado", "pendente", "vencido"].includes(entry.status)).reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const days = new Set(services.map((service) => service.completed_at ?? service.scheduled_date).filter(Boolean).map((date) => dateKey(date!))).size;
+  const days = new Set(services.map((service) => service.completed_at ? dateKey(service.completed_at) : serviceDateKey(service.scheduled_date)).filter(Boolean)).size;
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-6">
@@ -58,7 +59,7 @@ export default async function MotoristaProducaoPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs text-forest/60">
-                      {(service.completed_at ?? service.scheduled_date)?.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) ?? "—"}
+                      {(service.completed_at ? service.completed_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) : service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC" })) ?? "—"}
                     </p>
                     <strong className="mt-1 block truncate text-sm text-forest">
                       Reserva {service.reservation.code}
@@ -77,7 +78,7 @@ export default async function MotoristaProducaoPage() {
           <div className="hidden overflow-x-auto scrollbar-clean xl:block"><table className="w-full min-w-[620px] text-sm"><thead><tr>
             {['Data', 'Reserva', 'Serviço', 'Valor do serviço'].map((label) => <th key={label} className="bg-[#faf9f6] px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-forest/55">{label}</th>)}
           </tr></thead><tbody>{services.map((service) => <tr key={service.id} className="border-t border-forest/[0.075]">
-            <td className="px-5 py-3.5 text-xs text-forest/55">{(service.completed_at ?? service.scheduled_date)?.toLocaleDateString('pt-BR', { timeZone: 'America/Bahia' }) ?? '—'}</td>
+            <td className="px-5 py-3.5 text-xs text-forest/55">{(service.completed_at ? service.completed_at.toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) : service.scheduled_date?.toLocaleDateString("pt-BR", { timeZone: "UTC" })) ?? '—'}</td>
             <td className="px-5 py-3.5 text-xs font-semibold text-forest">{service.reservation.code}</td>
             <td className="px-5 py-3.5 text-xs text-forest/65">{SERVICE_TYPE_LABEL[service.type] ?? service.type}</td>
             <td className="px-5 py-3.5 text-xs font-semibold text-forest">{money.format(Number(service.price))}</td>
