@@ -2,7 +2,7 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-vi.mock("@/app/portal/empresa/actions", () => ({ confirmReceivedPortalEmpresa: vi.fn(async () => ({ error: null })), submitRepasseRequestEmpresa: vi.fn(async () => ({ error: null, success: "Pedido enviado" })), reportSupplierRemittance: vi.fn(async () => ({ error: null })), requestSupplierDriverAccess: vi.fn() }));
+vi.mock("@/app/portal/empresa/actions", () => ({ confirmNotReceivedPortalEmpresa: vi.fn(async () => ({ error: null })), registerSupplierCustomerReceipt: vi.fn(async () => ({ error: null, success: "Recebimento registrado" })), confirmReceivedPortalEmpresa: vi.fn(async () => ({ error: null })), submitRepasseRequestEmpresa: vi.fn(async () => ({ error: null, success: "Pedido enviado" })), reportSupplierRemittance: vi.fn(async () => ({ error: null })), requestSupplierDriverAccess: vi.fn() }));
 vi.mock("@/app/admin/solicitacoes/actions", () => ({ confirmSupplierRemittance: vi.fn(async () => ({ error: null })), paySupplierRequest: vi.fn(), rejectRemittanceRequest: vi.fn(), closeSettledRemittanceRequest: vi.fn() }));
 import { SupplierFinanceCards, type SupplierFinanceCard } from "@/components/portal/supplier-finance-cards";
 import { RemittanceReviewCard } from "@/components/admin/remittance-review-card";
@@ -33,4 +33,14 @@ it("admin confere contexto e comprovante e confirma recebimento sem seletor de e
   expect(screen.queryByPlaceholderText("Resposta ao solicitante")).toBeNull();
   expect(screen.getAllByRole("combobox")).toHaveLength(1);
   expect(screen.queryByText(entry.id)).toBeNull();
+});
+
+it("controle do fornecedor mostra recebimento, repasse, ganho e datas; formulário exige valor real", async () => {
+  const { SupplierCustomerFinance } = await import("@/components/portal/supplier-customer-finance");
+  render(React.createElement(SupplierCustomerFinance, { services: [{ id: "service", dedupeKey: "dedupe", reservation: "RES-2026-000002", passenger: "Passageiro", service: "Transfer", date: "14/10/2026", driver: "Motorista", expected: 380, received: 100, customerBalance: 280, supplierShare: 300, repasseTotal: 80, repassePaid: 20, repasseBalance: 60, gain: 20, legacyUnknown: false, completed: true, entryId: "entry", pendingProtocol: null, receipts: [{ amount: 100, date: "13/10/2026" }], remittances: [{ amount: 20, date: "14/10/2026" }] }] }));
+  expect(screen.getByText("Você recebeu do passageiro")).toBeTruthy(); expect(screen.getByText("Você já repassou à Nativos")).toBeTruthy();
+  expect(screen.getByText(/Recebido do passageiro:.*13\/10\/2026/)).toBeTruthy(); expect(screen.getByText(/Repasse confirmado à Nativos:.*14\/10\/2026/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Recebi do passageiro/ }));
+  expect((screen.getByLabelText("Valor recebido agora do passageiro") as HTMLInputElement).value).toBe("280.00");
+  expect(screen.getByLabelText("Data do recebimento do passageiro")).toBeTruthy();
 });

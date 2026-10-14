@@ -44,3 +44,14 @@ describe("resumo financeiro do voucher", () => {
     expect(result.remaining.toFixed(2)).toBe("0.00"); expect(result.credit.toFixed(2)).toBe("19.90");
   });
 });
+
+it("recebimento parcial explícito do fornecedor não quita o valor total nem usa o repasse", () => {
+  const result = voucherFinancialSummary({ client_id: "client", is_cortesia: false, collection_mode: "direto", services: [{ id: "service", price: 380, execution_status: "concluido", acceptance_status: "aceito", direct_collections: [{ amount: 80 }, { amount: 100, customer_amount: 100 }] }], finance_entries: [] });
+  expect(result.paid.toFixed(2)).toBe("100.00"); expect(result.remaining.toFixed(2)).toBe("280.00");
+});
+it("recebimento antigo de fornecedor sem valor real pede conferência e não orienta nova cobrança", () => {
+  const input = { client_id: "client", is_cortesia: false, collection_mode: "direto", services: [{ id: "service", price: 380, execution_status: "concluido", acceptance_status: "aceito", direct_collections: [{ amount: 80, receiver_type: "fornecedor", customer_amount: null }] }], finance_entries: [] };
+  expect(voucherFinancialSummary(input).paid.toFixed(2)).toBe("0.00");
+  expect(voucherPaymentInstructions(input).heading).toContain("conferência");
+  expect(voucherPaymentInstructions(input).collections).toHaveLength(0);
+});

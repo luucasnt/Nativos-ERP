@@ -159,7 +159,7 @@ describe("execução por fornecedor", () => {
     expect(amountsByCategory(entries)).toEqual({ "receita:repasse_fornecedor": "300" });
   });
 
-  it("cobrança direta, repassa bruto => repasse_fornecedor (bruto) + pagamento_fornecedor (custo) simultâneos", () => {
+  it("cobrança direta mantém somente margem mesmo com configuração legada de repasse bruto", () => {
     const entries = computeServiceSettlementEntries(
       baseInput({
         execution_type: "fornecedor",
@@ -170,8 +170,7 @@ describe("execução por fornecedor", () => {
       }),
     );
     expect(amountsByCategory(entries)).toEqual({
-      "receita:repasse_fornecedor": "1000",
-      "despesa:pagamento_fornecedor": "700",
+      "receita:repasse_fornecedor": "300",
     });
   });
 

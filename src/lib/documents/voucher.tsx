@@ -22,7 +22,7 @@ export async function loadVoucherData(reservationId: string) {
       services: {
         where: { execution_status: { not: "cancelado" }, acceptance_status: { not: "recusado" } },
         orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }, { id: "asc" }],
-        include: { driver: true, vehicle: true, direct_collections: { where: { reversed_at: null, status: "received" }, select: { amount: true } } },
+        include: { driver: true, vehicle: true, direct_collections: { where: { reversed_at: null, status: "received" }, select: { amount: true, customer_amount: true, receiver_type: true } } },
       },
     },
   });

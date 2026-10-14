@@ -88,9 +88,9 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
         party_id: isFaturado ? input.origin_partner_id : input.client_id,
       });
     } else if (collectionActor === "fornecedor" && input.supplier_id) {
-      // Retém custo -> só a margem; repassa bruto -> o valor cheio (o
-      // custo do fornecedor é pago separadamente abaixo).
-      const amount = isGross ? price : price.minus(supplierCost);
+      // O passageiro paga ao fornecedor. Só a parte da Nativos pertence ao razão,
+      // mesmo quando existe configuração legada de repasse bruto.
+      const amount = price.minus(supplierCost);
       if (amount.gt(0)) {
         entries.push({
           key: "repasse_fornecedor",
@@ -127,7 +127,7 @@ export function computeServiceSettlementEntries(input: ServiceSettlementInput): 
   // --- Custo que a Nativos deve ao executor, quando não foi retido por
   //     ele mesmo de uma cobrança direta acima ---
   if (input.execution_type === "fornecedor" && input.supplier_id) {
-    const nativosOwesCostSeparately = collectionActor === "nativos" || (collectionActor === "fornecedor" && isGross);
+    const nativosOwesCostSeparately = collectionActor === "nativos" || (input.is_cortesia && collectionActor === "fornecedor" && isGross);
     if (nativosOwesCostSeparately && supplierCost.gt(0)) {
       entries.push({
         key: "pagamento_fornecedor",

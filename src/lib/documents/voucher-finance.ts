@@ -3,12 +3,12 @@ import { Prisma } from "@prisma/client";
 type Amount = Prisma.Decimal | string | number;
 type VoucherFinanceInput = {
   client_id: string; is_cortesia: boolean; collection_mode: string; status?: string;
-  services: Array<{ id: string; price: Amount; execution_status: string; acceptance_status: string; driver_can_receive_payment?: boolean; driver?: { name: string } | null; direct_collections: Array<{ amount: Amount }> }>;
+  services: Array<{ id: string; price: Amount; execution_status: string; acceptance_status: string; driver_can_receive_payment?: boolean; driver?: { name: string } | null; direct_collections: Array<{ amount: Amount; customer_amount?: Amount | null; receiver_type?: string }> }>;
   finance_entries: Array<{ party_id: string | null; service_id: string | null; payments: Array<{ amount: Amount; type: string }> }>;
 };
 
 // Somente vendas e recebimentos válidos do cliente são fornecidos pelo loader.
-// DirectCollection.amount é repasse líquido, não o valor pago pelo passageiro.
+// Registros antigos armazenavam o repasse; novos registros informam customer_amount explicitamente.
 export function voucherFinancialSummary(reservation: VoucherFinanceInput) {
   const services = reservation.services.filter(service => service.execution_status !== "cancelado" && service.acceptance_status !== "recusado");
   const ids = new Set(services.map(service => service.id));
@@ -23,10 +23,11 @@ export function voucherFinancialSummary(reservation: VoucherFinanceInput) {
     const share = Prisma.Decimal.min(unallocated, Prisma.Decimal.max(0, price.minus(advance)));
     unallocated = unallocated.minus(share);
     const paid = advance.plus(share);
-    const directReceived = service.direct_collections.length > 0;
-    const directRemainder = directReceived ? Prisma.Decimal.max(0, price.minus(paid)) : new Prisma.Decimal(0);
+    const directReceived = service.direct_collections.some(c => c.customer_amount != null || c.receiver_type !== "fornecedor");
+    const explicit = service.direct_collections.filter(c => c.customer_amount != null);
+    const directRemainder = explicit.length ? explicit.reduce((sum, c) => sum.plus(c.customer_amount!), new Prisma.Decimal(0)) : directReceived ? Prisma.Decimal.max(0, price.minus(paid)) : new Prisma.Decimal(0);
     directPaid = directPaid.plus(directRemainder);
-    return { service, sequence: index + 1, paid: paid.plus(directRemainder), remaining: directReceived ? new Prisma.Decimal(0) : Prisma.Decimal.max(0, price.minus(paid)) };
+    return { service, sequence: index + 1, paid: paid.plus(directRemainder), remaining: Prisma.Decimal.max(0, price.minus(paid).minus(directRemainder)) };
   });
   const total = reservation.is_cortesia ? new Prisma.Decimal(0) : services.reduce((sum, service) => sum.plus(service.price), new Prisma.Decimal(0));
   const paid = nativosPaid.plus(directPaid);
@@ -38,6 +39,8 @@ export function voucherPaymentInstructions(reservation: VoucherFinanceInput) {
   if (["cancelado", "rejeitado"].includes(reservation.status ?? "")) return { heading: "Reserva encerrada", message: "Esta reserva não está ativa. Consulte nossa equipe antes de efetuar qualquer pagamento.", collections: [] };
   if (reservation.is_cortesia) return { heading: "Cortesia Nativos", message: "Os serviços desta reserva são oferecidos como cortesia. Não há pagamento a efetuar pelo passageiro.", collections: [] };
   if (finance.partnerBilling) return { heading: "Pagamento pelo parceiro", message: "A cobrança é tratada com o parceiro responsável pela reserva. Não efetue pagamento ao motorista por estes serviços.", collections: [] };
+  const unverifiedSupplier = reservation.services.some(service => service.direct_collections.some(c => c.receiver_type === "fornecedor" && c.customer_amount == null) && !service.direct_collections.some(c => c.customer_amount != null));
+  if (unverifiedSupplier) return { heading: "Pagamento ao fornecedor em conferência", message: "Existe uma confirmação antiga de recebimento pelo fornecedor sem o valor efetivamente recebido. Nossa equipe fará a conferência. Consulte a Nativos antes de efetuar outro pagamento.", collections: [] };
   if (finance.remaining.isZero()) return { heading: "Reserva quitada", message: "O pagamento desta reserva está integralmente registrado. Não é necessário pagar novamente ao motorista.", collections: [] };
   const collections = finance.serviceBalances.filter(item => item.remaining.gt(0)).map(item => ({
     sequence: item.sequence, amount: item.remaining,

@@ -12,8 +12,11 @@ export const driverAccessSchema = z.object({ driver_id: z.string().uuid(), email
 export async function supplierRemittanceEntry(entryId: string, companyId: string) {
   const entry = await prisma.financeEntry.findUniqueOrThrow({ where: { id: entryId }, include: { compensacao: true, payments: { where: { reversed_at: null, estorno_of_id: null } }, service: { include: { direct_collections: true } } } });
   if (entry.party_type !== "fornecedor" || entry.party_id !== companyId || entry.type !== "receita" || entry.category !== "repasse_fornecedor" || !entry.reservation_id || !entry.service || entry.service.supplier_id !== companyId || entry.service.collection_actor !== "fornecedor" || entry.service.execution_status !== "concluido" || !entry.service.direct_collections.some(c => c.status === "received" && !c.reversed_at && c.financial_responsible_id === companyId) || !entry.payment_eligible || !["pendente", "vencido"].includes(entry.status)) throw new Error("O repasse deve corresponder a um serviço concluído, recebido do passageiro e com saldo disponível da sua empresa.");
+  const actualReceived = entry.service.direct_collections.filter(c => c.status === "received" && !c.reversed_at && c.customer_amount !== null && c.financial_responsible_id === companyId).reduce((sum,c) => sum + Number(c.customer_amount), 0);
+  if (actualReceived <= 0) throw new Error("Informe o valor real recebido do passageiro antes de registrar o repasse.");
+  const paid = entry.payments.reduce((sum,p) => sum + Number(p.amount), 0);
   const compensated = entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at ? Number(entry.compensacao.amount) : 0;
-  return { entry, balance: Math.max(0, Number(entry.amount) - compensated - entry.payments.reduce((sum, p) => sum + Number(p.amount), 0)) };
+  return { entry, balance: Math.max(0, Math.min(Number(entry.amount) - compensated - paid, actualReceived - paid)) };
 }
 export function validateRemittanceAmount(amount: number, balance: number, date: string) {
   parsePaymentDate(date);

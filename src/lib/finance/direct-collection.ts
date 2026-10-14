@@ -53,11 +53,11 @@ async function resolveDirectCollectionParty(serviceId: string) {
     where: { auto_key: `svc:${serviceId}:${repasseCategoryKey}` },
   });
 
-  return { receiverType, responsibleType, partyId, amount: entry?.amount ?? service.price };
+  return { receiverType, responsibleType, partyId, customerAmount: receiverType === "fornecedor" ? service.price : undefined, amount: entry?.amount ?? service.price };
 }
 
 export async function confirmDirectCollectionReceived(serviceId: string, receiptUrl?: string) {
-  const { receiverType, responsibleType, partyId, amount } = await resolveDirectCollectionParty(serviceId);
+  const { receiverType, responsibleType, partyId, amount, customerAmount } = await resolveDirectCollectionParty(serviceId);
 
   return createDirectCollection({
     service_id: serviceId,
@@ -66,6 +66,8 @@ export async function confirmDirectCollectionReceived(serviceId: string, receipt
     financial_responsible_type: responsibleType,
     financial_responsible_id: partyId,
     amount,
+    customer_amount: customerAmount,
+    occurred_at: customerAmount ? new Date() : undefined,
     status: "received",
     receipt_url: receiptUrl ?? null,
     idempotency_key: `direct_collection:${serviceId}`,

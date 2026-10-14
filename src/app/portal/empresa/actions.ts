@@ -1,5 +1,6 @@
 "use server";
 
+import { recordSupplierCustomerReceipt } from "@/lib/finance/supplier-customer-receipts";
 import { financeBalance, requestEntryIds } from "@/lib/finance/remittance-summary";
 import { unstable_rethrow } from "next/navigation";
 import { validatePaymentProof } from "@/lib/uploads/payment-proof";
@@ -11,8 +12,6 @@ import { assertActiveCompanyPortalUser } from "@/lib/auth/get-current-user";
 import { logAudit } from "@/lib/audit";
 import {
   confirmDirectCollectionNotReceived,
-  confirmDirectCollectionReceived,
-  ensureDirectSupplierRepasseRequest,
 } from "@/lib/finance/direct-collection";
 import { submitChangeRequest } from "@/lib/change-requests/submit";
 import { alertChangeRequestNeedsReview } from "@/lib/alerts/detectors";
@@ -39,28 +38,24 @@ async function assertOwnSupplierService(serviceId: string) {
   return { user, service };
 }
 
-export async function confirmReceivedPortalEmpresa(serviceId: string, receiptUrl: string): Promise<DirectCollectionState> {
+// Compatibility response for an older open tab: no implicit full receipt is accepted.
+export async function confirmReceivedPortalEmpresa(_serviceId: string, _receiptUrl: string): Promise<DirectCollectionState> {
+  return { error: "Atualize a página e informe o valor e a data recebidos do passageiro no Financeiro." };
+}
+
+export async function registerSupplierCustomerReceipt(_prev: { error: string | null; success?: string }, form: FormData): Promise<{ error: string | null; success?: string }> {
   try {
-    const { user } = await assertOwnSupplierService(serviceId);
-    const proof = await validatePaymentProof(receiptUrl || undefined, user.id);
-
-    await confirmDirectCollectionReceived(serviceId, proof ?? undefined);
-    await ensureDirectSupplierRepasseRequest(serviceId, user.linked_company_id);
-
-    await logAudit({
-      actorId: user.id,
-      action: "recebimento_direto_confirmado_pelo_fornecedor",
-      entityType: "service",
-      entityId: serviceId,
-    });
+    const user = await assertActiveCompanyPortalUser();
+    if (!user.linked_company.roles.includes("fornecedor")) throw new Error("Acesso exclusivo do fornecedor.");
+    const input = z.object({ service_id: z.string().uuid(), amount: z.coerce.number().positive().finite(), payment_date: z.string(), dedupe_key: z.string().uuid(), receipt_url: z.string().optional() }).parse(Object.fromEntries(form));
+    const proof = await validatePaymentProof(input.receipt_url || undefined, user.id);
+    await recordSupplierCustomerReceipt({ serviceId: input.service_id, companyId: user.linked_company_id, actorId: user.id, amount: input.amount, paymentDate: input.payment_date, receiptUrl: proof ?? undefined, dedupeKey: input.dedupe_key });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Falha ao confirmar recebimento." };
+    unstable_rethrow(error);
+    return { error: error instanceof Error ? error.message : "Não foi possível registrar o recebimento." };
   }
-
-  revalidatePath("/portal/empresa/financeiro");
-  revalidatePath("/portal/empresa/operacao");
-  revalidatePath("/portal/empresa");
-  return { error: null };
+  for (const path of ["/portal/empresa/financeiro", "/portal/empresa/operacao", "/portal/empresa", "/admin/reservas", "/admin/financeiro"]) revalidatePath(path);
+  return { error: null, success: "Recebimento do passageiro registrado no seu controle. Nenhum valor entrou no caixa da Nativos." };
 }
 
 export async function confirmNotReceivedPortalEmpresa(
@@ -73,6 +68,8 @@ export async function confirmNotReceivedPortalEmpresa(
 
   try {
     const { user } = await assertOwnSupplierService(serviceId);
+
+    if (await prisma.directCollection.count({ where: { service_id: serviceId, status: "received", reversed_at: null, customer_amount: { not: null } } })) throw new Error("Já existe recebimento registrado. Confira o saldo restante no Financeiro.");
 
     await confirmDirectCollectionNotReceived(serviceId, reasonId);
 
@@ -88,6 +85,8 @@ export async function confirmNotReceivedPortalEmpresa(
   }
 
   revalidatePath("/portal/empresa");
+  revalidatePath("/portal/empresa/financeiro");
+  revalidatePath("/portal/empresa/operacao");
   return { error: null };
 }
 
