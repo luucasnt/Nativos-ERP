@@ -24,7 +24,7 @@ export async function loadWorkOrderData(serviceId: string) {
       driver: true,
       vehicle: true,
       finance_entries: { where: { reversed_at: null, estorno_of_id: null, status: { not: "cancelado" } }, include: { payments: { where: { reversed_at: null, estorno_of_id: null } } } },
-      direct_collections: { where: { reversed_at: null }, select: { status: true } },
+      direct_collections: { where: { reversed_at: null }, select: { status: true, customer_amount: true, receiver_type: true } },
     },
   });
 

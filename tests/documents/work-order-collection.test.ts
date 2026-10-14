@@ -19,3 +19,8 @@ describe("cobrança operacional na OS", () => {
     expect(workOrderCollection({ ...base, reservation: { ...base.reservation, collection_mode: "nativos" } })).toContain("Não realizar cobrança");
   });
 });
+
+it("recebimento parcial explícito mantém saldo correto na OS", () => {
+  const result = workOrderCollection({ price: "380", collection_actor: "fornecedor", driver_can_receive_payment: false, execution_status: "concluido", acceptance_status: "aceito", reservation: { status: "concluido", is_cortesia: false, collection_mode: "direto" }, finance_entries: [], direct_collections: [{ status: "received", customer_amount: "100" }] });
+  expect(result).toContain("280,00"); expect(result).not.toContain("já pago");
+});

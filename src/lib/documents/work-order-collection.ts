@@ -5,7 +5,7 @@ type CollectionService = {
   driver_can_receive_payment: boolean; execution_status: string; acceptance_status: string;
   reservation: { status: string; is_cortesia: boolean; collection_mode: string };
   finance_entries: Array<{ type: string; category: string; party_type: string; payments: Array<{ amount: Prisma.Decimal | string; type: string }> }>;
-  direct_collections: Array<{ status: string }>;
+  direct_collections: Array<{ status: string; customer_amount?: Prisma.Decimal | string | null; receiver_type?: string }>;
 };
 export function workOrderCollection(service: CollectionService) {
   if (service.execution_status === "cancelado" || service.acceptance_status === "recusado" || ["cancelado", "rejeitado"].includes(service.reservation.status)) return "Serviço indisponível para cobrança. Consulte a operação Nativos.";
@@ -15,7 +15,10 @@ export function workOrderCollection(service: CollectionService) {
   if (!direct && !service.driver_can_receive_payment) return "Não realizar cobrança ao passageiro. O pagamento é tratado pela Nativos. Em caso de dúvida, acione nossa equipe.";
   const paid = service.finance_entries.filter(entry => entry.type === "receita" && entry.category === "venda_servico" && entry.party_type === "cliente").flatMap(entry => entry.payments).filter(payment => payment.type === "recebimento").reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0));
   const alreadyReceivedDirect = service.direct_collections.some(collection => collection.status === "received");
-  const remaining = alreadyReceivedDirect ? new Prisma.Decimal(0) : Prisma.Decimal.max(0, new Prisma.Decimal(service.price).minus(paid));
+  const explicit = service.direct_collections.filter(c => c.status === "received" && c.customer_amount != null);
+  const directPaid = explicit.reduce((sum, c) => sum.plus(c.customer_amount!), new Prisma.Decimal(0));
+  if (!explicit.length && service.direct_collections.some(c => c.status === "received" && c.receiver_type === "fornecedor")) return "O fornecedor informou um recebimento antigo sem valor real confirmado. Confira com a operação Nativos antes de realizar nova cobrança ao passageiro.";
+  const remaining = alreadyReceivedDirect && !explicit.length ? new Prisma.Decimal(0) : Prisma.Decimal.max(0, new Prisma.Decimal(service.price).minus(paid).minus(directPaid));
   if (remaining.isZero()) return "Serviço já pago. Não cobrar novamente do passageiro.";
   const receiver = direct && service.collection_actor === "fornecedor" ? "Motorista/fornecedor" : "Motorista";
   return `${receiver} deve receber diretamente do cliente: ${formatCurrency(remaining)}. ${paid.gt(0) ? "Valor restante após os pagamentos antecipados registrados. " : ""}Confirme o recebimento com a operação e registre-o no sistema. Este é o valor do passageiro, não o repasse à Nativos.`;

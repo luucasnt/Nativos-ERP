@@ -1,16 +1,12 @@
 import { redirect } from "next/navigation";
 import { BadgeCheck, CalendarDays, MapPin, Route } from "lucide-react";
-import { DirectCollectionActions } from "@/components/portal/direct-collection-actions";
 import { ServiceAcceptanceActions } from "@/components/portal/service-acceptance-actions";
 import { ServiceExecutionActions } from "@/components/portal/service-execution-actions";
 import { Badge } from "@/components/ui/badge";
 import { requireCompanyPortalUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/prisma";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
-import {
-  confirmNotReceivedPortalEmpresa,
-  confirmReceivedPortalEmpresa,
-} from "../actions";
+import { buttonClass } from "@/lib/ui";
 
 function executionTone(status: string): "success" | "info" | "neutral" {
   if (status === "concluido") return "success";
@@ -32,7 +28,7 @@ export default async function PortalEmpresaOperacaoPage() {
     redirect("/portal/empresa");
   }
 
-  const [pendingAcceptance, activeServices, awaitingCollection, reasons] = await Promise.all([
+  const [pendingAcceptance, activeServices, awaitingCollection] = await Promise.all([
     prisma.service.findMany({
       where: {
         supplier_id: company.id,
@@ -79,7 +75,7 @@ export default async function PortalEmpresaOperacaoPage() {
         supplier_id: company.id,
         collection_actor: "fornecedor",
         execution_status: "concluido",
-        direct_collections: { none: {} },
+        direct_collections: { none: { status: "received", reversed_at: null, customer_amount: { not: null } } },
       },
       select: {
         id: true,
@@ -89,10 +85,7 @@ export default async function PortalEmpresaOperacaoPage() {
       orderBy: { scheduled_date: "desc" },
       take: 50,
     }),
-    prisma.catalogItem.findMany({
-      where: { type: "motivo_perda", active: true },
-      orderBy: { order: "asc" },
-    }),
+
   ]);
 
   return (
@@ -291,12 +284,7 @@ export default async function PortalEmpresaOperacaoPage() {
                     {service.reservation.code} · {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                   </span>
                 </span>
-                <DirectCollectionActions uploadEndpoint="/api/portal/comprovantes"
-                  serviceId={service.id}
-                  reasons={reasons}
-                  onConfirmReceived={confirmReceivedPortalEmpresa}
-                  onConfirmNotReceived={confirmNotReceivedPortalEmpresa}
-                />
+                <a href={`/portal/empresa/financeiro#recebimento-${service.id}`} className={buttonClass}>Registrar valor recebido no Financeiro</a>
               </li>
             ))}
           </ul>

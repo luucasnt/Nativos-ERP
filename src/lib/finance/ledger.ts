@@ -218,6 +218,11 @@ export async function createPayment(input: CreatePaymentInput, db?: Prisma.Trans
         const service = entry.service_id ? await tx.service.findUnique({ where: { id: entry.service_id }, include: { direct_collections: true } }) : null;
         if (entry.party_type !== "fornecedor" || entry.party_id !== request.company_id || entry.reservation_id !== request.reservation_id || entry.type !== "receita" || entry.category !== "repasse_fornecedor" || !service || service.supplier_id !== request.company_id || service.collection_actor !== "fornecedor" || service.execution_status !== "concluido" || !service.direct_collections.some(c => c.status === "received" && !c.reversed_at && c.financial_responsible_id === request.company_id)) throw new Error("O recebimento não corresponde à cobrança direta confirmada deste fornecedor.");
       }
+      if (input.supplierRequest && entry.category === "repasse_fornecedor" && entry.service_id) {
+        const receipts = await tx.directCollection.aggregate({ where: { service_id: entry.service_id, status: "received", reversed_at: null, customer_amount: { not: null }, financial_responsible_id: entry.party_id ?? "00000000-0000-0000-0000-000000000000" }, _sum: { customer_amount: true } });
+        const previous = await tx.payment.aggregate({ where: { finance_entry_id: entry.id, reversed_at: null, estorno_of_id: null }, _sum: { amount: true } });
+        if ((previous._sum.amount ?? new Prisma.Decimal(0)).plus(input.amount).gt(receipts._sum.customer_amount ?? 0)) throw new Error("O repasse supera o valor efetivamente recebido do passageiro. Confira o registro do fornecedor.");
+      }
       if (!canRegisterEntryPayment(entry)) {
         throw new Error("Este lançamento não está elegível para pagamento.");
       }
@@ -419,6 +424,8 @@ type CreateDirectCollectionInput = {
   financial_responsible_type: FinancialResponsibleType;
   financial_responsible_id: string;
   amount: Prisma.Decimal.Value;
+  customer_amount?: Prisma.Decimal.Value;
+  occurred_at?: Date;
   receipt_url?: string | null;
   idempotency_key: string;
   status?: DirectCollectionStatus;
@@ -440,6 +447,8 @@ export async function createDirectCollection(input: CreateDirectCollectionInput)
         status: input.status ?? existing.status,
         not_received_reason_id: input.not_received_reason_id ?? null,
         amount: input.amount,
+        customer_amount: input.customer_amount,
+        occurred_at: input.occurred_at,
         receipt_url: input.receipt_url ?? existing.receipt_url,
       },
     });
@@ -453,6 +462,8 @@ export async function createDirectCollection(input: CreateDirectCollectionInput)
       financial_responsible_type: input.financial_responsible_type,
       financial_responsible_id: input.financial_responsible_id,
       amount: input.amount,
+      customer_amount: input.customer_amount,
+      occurred_at: input.occurred_at,
       receipt_url: input.receipt_url ?? null,
       status: input.status ?? "pending",
       not_received_reason_id: input.not_received_reason_id,

@@ -1,3 +1,5 @@
+import { SupplierCustomerFinance, type SupplierCustomerService } from "@/components/portal/supplier-customer-finance";
+import { voucherFinancialSummary } from "@/lib/documents/voucher-finance";
 import { SupplierFinanceCards, type SupplierFinanceCard } from "@/components/portal/supplier-finance-cards";
 import { financeBalance, requestEntryIds } from "@/lib/finance/remittance-summary";
 import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
@@ -22,17 +24,38 @@ export default async function PortalEmpresaFinanceiroPage() {
   const isPartner = company.roles.includes("parceiro");
   const isBilledPartner = isPartner && (company.billing_enabled || company.modelo_parceiro === "faturado" || company.modelo_parceiro === "ambos");
 
-  const [supplierExtract, partnerExtract, billingCycles, supplierEntries, remittanceRequests] = await Promise.all([
+  const [supplierExtract, partnerExtract, billingCycles, supplierEntries, remittanceRequests, directServices, collectionReasons] = await Promise.all([
     isSupplier ? getPartyFinanceExtract("fornecedor", company.id) : Promise.resolve([]),
     isPartner ? getPartyFinanceExtract("parceiro", company.id) : Promise.resolve([]),
     isBilledPartner ? prisma.billingCycle.findMany({ where: { company_id: company.id }, include: { _count: { select: { reservations: true } } }, orderBy: { period: "desc" }, take: 24 }) : Promise.resolve([]),
     isSupplier ? prisma.financeEntry.findMany({ where: { party_type: "fornecedor", party_id: company.id, status: { in: ["programado", "pendente", "vencido"] }, reversed_at: null }, include: { reservation: { select: { id: true, code: true, client: { select: { name: true } } } }, service: { include: { driver: { select: { name: true } }, direct_collections: { where: { reversed_at: null } } } }, compensacao: true, payments: { where: { reversed_at: null, estorno_of_id: null }, select: { amount: true } } }, orderBy: { created_at: "asc" } }) : Promise.resolve([]),
     isSupplier ? prisma.changeRequest.findMany({ where: { company_id: company.id, type: { in: ["pagamento_fornecedor", "pagamento_repasse_fornecedor", "repasse_nativos"] } }, include: { reservation: { select: { code: true } } }, orderBy: { created_at: "desc" } }) : Promise.resolve([]),
+    isSupplier ? prisma.service.findMany({ where: { supplier_id: company.id, collection_actor: "fornecedor", execution_status: { not: "cancelado" }, acceptance_status: { not: "recusado" } }, include: {
+      driver: { select: { name: true } }, direct_collections: { where: { reversed_at: null, status: "received" }, orderBy: { created_at: "asc" } },
+      finance_entries: { where: { party_type: "fornecedor", party_id: company.id, category: "repasse_fornecedor", reversed_at: null, status: { not: "cancelado" } }, include: { compensacao: true, payments: { where: { reversed_at: null, estorno_of_id: null }, orderBy: { created_at: "asc" } } } },
+      reservation: { include: { client: { select: { name: true } }, finance_entries: { where: { type: "receita", category: "venda_servico", party_type: "cliente", reversed_at: null, estorno_of_id: null, status: { not: "cancelado" } }, include: { payments: { where: { reversed_at: null, estorno_of_id: null, type: "recebimento" } } } }, services: { orderBy: [{ scheduled_date: "asc" }, { scheduled_time: "asc" }, { id: "asc" }], include: { direct_collections: { where: { reversed_at: null, status: "received", customer_amount: { not: null } } } } } } },
+    }, orderBy: [{ scheduled_date: "desc" }, { scheduled_time: "desc" }] }) : Promise.resolve([]),
+    isSupplier ? prisma.catalogItem.findMany({ where: { type: "motivo_perda", active: true }, orderBy: { order: "asc" }, select: { id: true, label: true } }) : Promise.resolve([]),
   ]);
-  const cards: SupplierFinanceCard[] = supplierEntries.filter(e => financeBalance(e) > 0).map(e => {
+  const cards: SupplierFinanceCard[] = supplierEntries.filter(e => financeBalance(e) > 0 && !(e.category === "repasse_fornecedor" && e.service?.collection_actor === "fornecedor")).map(e => {
     const request = remittanceRequests.find(r => !["pago", "concluida", "rejeitada"].includes(r.status) && requestEntryIds(r.allocation_details).includes(e.id) && (e.type === "despesa" || r.type === "pagamento_repasse_fornecedor"));
     const balance = financeBalance(e);
     return { id: e.id, dedupeKey: crypto.randomUUID(), reservation: e.reservation?.code ?? "Pagamento avulso", passenger: e.reservation?.client.name ?? e.description ?? "Lançamento da empresa", service: e.service ? SERVICE_TYPE_LABEL[e.service.type] : "Pagamento avulso", date: e.service?.scheduled_date ? `${e.service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })} · ${e.service.scheduled_time ?? "Horário a definir"}` : "Sem data de serviço", driver: e.service?.driver?.name ?? "Não informado", total: Number(e.amount), paid: Number(e.amount) - balance, balance, direction: e.type === "despesa" ? "receber" : "pagar", eligible: e.payment_eligible && (e.type === "despesa" || e.service?.execution_status === "concluido"), collectionConfirmed: Boolean(e.service?.direct_collections.some(c => c.status === "received" && c.financial_responsible_id === company.id)), serviceId: e.service_id, pendingProtocol: request?.protocol ?? null, servicePrice: e.service ? Number(e.service.price) : null, supplierCost: e.service?.supplier_cost !== null && e.service?.supplier_cost !== undefined ? Number(e.service.supplier_cost) : null };
+  });
+
+  const customerServices: SupplierCustomerService[] = directServices.map(service => {
+    const receipts = service.direct_collections.filter(c => c.customer_amount !== null);
+    const received = receipts.reduce((sum,c) => sum + Number(c.customer_amount), 0);
+    const passengerBalance = voucherFinancialSummary(service.reservation).serviceBalances.find(b => b.service.id === service.id)?.remaining.toNumber() ?? 0;
+    const entry = service.finance_entries[0];
+    const payments = entry?.payments ?? [];
+    const repasseTotal = service.reservation.is_cortesia ? 0 : entry ? Number(entry.amount) : Math.max(0, Number(service.price) - Number(service.supplier_cost ?? 0));
+    const repassePaid = payments.reduce((sum,p) => sum + Number(p.amount), 0);
+    const repasseBalance = entry ? financeBalance(entry) : repasseTotal;
+    const pending = entry ? remittanceRequests.find(r => r.type === "pagamento_repasse_fornecedor" && !["pago", "concluida", "rejeitada"].includes(r.status) && requestEntryIds(r.allocation_details).includes(entry.id)) : null;
+    return { id: service.id, dedupeKey: crypto.randomUUID(), reservation: service.reservation.code, passenger: service.reservation.client.name, service: SERVICE_TYPE_LABEL[service.type], date: service.scheduled_date ? `${service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })} · ${service.scheduled_time ?? "Horário a definir"}` : "Sem data de serviço", driver: service.driver?.name ?? "Não informado", expected: passengerBalance + received, received, customerBalance: passengerBalance, supplierShare: Number(service.supplier_cost ?? 0), repasseTotal, repassePaid, repasseBalance, gain: Math.max(0, received - repasseTotal), legacyUnknown: receipts.length === 0 && service.direct_collections.length > 0, completed: service.execution_status === "concluido", entryId: entry?.id ?? null, pendingProtocol: pending?.protocol ?? null,
+      receipts: receipts.map(c => ({ proofUrl: c.receipt_url ? `/api/portal/recebimentos/${c.id}/comprovante` : null, amount: Number(c.customer_amount), date: (c.occurred_at ?? c.created_at).toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) })), remittances: payments.map(p => ({ amount: Number(p.amount), date: (p.occurred_at ?? p.created_at).toLocaleDateString("pt-BR", { timeZone: "America/Bahia" }) })),
+    };
   });
 
   function dueDate(cycle: (typeof billingCycles)[number]) {
@@ -74,7 +97,7 @@ export default async function PortalEmpresaFinanceiroPage() {
       {isSupplier && <section className="space-y-5" id="repasses">
         <div><h2 className="section-heading">Repasses por serviço</h2><p className="mt-1 text-sm text-forest/65">Escolha o serviço abaixo. O saldo e a ação disponível aparecem no próprio cartão.</p></div>
         <section className="surface-panel p-4 sm:p-5"><h3 className="mb-3 text-lg font-semibold">A Nativos paga para você</h3>{cards.some(e => e.direction === "receber") ? <SupplierFinanceCards entries={cards.filter(e => e.direction === "receber")} /> : <p className="text-sm text-forest/60">Nenhum pagamento pendente da Nativos.</p>}</section>
-        <section className="surface-panel p-4 sm:p-5"><h3 className="mb-2 text-lg font-semibold">Você repassa para a Nativos</h3><p className="mb-3 text-sm text-forest/65">Serviços em que o passageiro paga à sua equipe. Confirme o recebimento e envie o comprovante da transferência.</p>{cards.some(e => e.direction === "pagar") ? <SupplierFinanceCards entries={cards.filter(e => e.direction === "pagar")} /> : <p className="text-sm text-forest/60">Nenhum saldo a repassar à Nativos.</p>}</section>
+        <SupplierCustomerFinance services={customerServices} reasons={collectionReasons} />
         {remittanceRequests.length > 0 && <details className="surface-panel p-4"><summary className="cursor-pointer font-semibold">Histórico dos pedidos e pagamentos</summary><ul className="mt-4 grid gap-3">{remittanceRequests.filter(r => { const d = r.allocation_details && typeof r.allocation_details === "object" && !Array.isArray(r.allocation_details) ? r.allocation_details : {}; return !(d.origem === "cobranca_direta_fornecedor" && typeof d.payment_request_id === "string" && remittanceRequests.some(other => other.id === d.payment_request_id)); }).slice(0, 30).map(r => {
           const data = r.allocation_details && typeof r.allocation_details === "object" && !Array.isArray(r.allocation_details) ? r.allocation_details : {};
           return <li key={r.id} className="rounded-lg bg-forest/[0.04] p-3 text-sm"><strong>{r.type === "pagamento_repasse_fornecedor" ? "Transferência à Nativos" : data.origem === "cobranca_direta_fornecedor" ? "Saldo financeiro do serviço" : "Pagamento da Nativos"}</strong> · {r.reservation?.code ?? "Serviços vinculados"}{data.amount && <span> · {money.format(Number(data.amount))}</span>}<p className="mt-1 text-xs">{r.protocol} · {r.status === "pago" || r.status === "concluida" ? "Confirmado" : r.status === "rejeitada" ? "Não aprovado" : "Aguardando a Nativos"}</p><p className="mt-1 text-xs">{r.response_note ?? "Seu pedido está sendo acompanhado pela Nativos."}</p>{(r.type === "pagamento_repasse_fornecedor" || Array.isArray(data.payment_ids) && data.payment_ids.length > 0) && <a href={`/api/portal/comprovantes/${r.id}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold underline">Ver comprovante</a>}</li>;

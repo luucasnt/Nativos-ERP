@@ -315,21 +315,11 @@ export function CompanyForm({
             Recebe pagamento direto do passageiro
           </label>
           <div className="flex flex-col gap-1">
-            <label htmlFor="direct_collection_settlement_mode" className={labelClass}>
+            <span className={labelClass}>
               Modo de liquidação do pagamento direto
-            </label>
-            <select
-              id="direct_collection_settlement_mode"
-              name="direct_collection_settlement_mode"
-              defaultValue={defaultValues?.direct_collection_settlement_mode ?? ""}
-              className={inputClass}
-            >
-              <option value="">—</option>
-              <option value="retain_supplier_cost">
-                Retém o próprio custo e repassa só a margem
-              </option>
-              <option value="gross_repass">Repassa o valor bruto</option>
-            </select>
+            </span>
+            <input type="hidden" name="direct_collection_settlement_mode" value="retain_supplier_cost" />
+            <p className="text-sm text-forest/75">O fornecedor retém sua parte e repassa somente a parte da Nativos. O recebimento do passageiro fica no controle do fornecedor.</p>
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="limite_inadimplencia" className={labelClass}>
