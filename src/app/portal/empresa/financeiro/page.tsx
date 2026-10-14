@@ -1,14 +1,14 @@
-import { SupplierRemittanceForm } from "@/components/portal/supplier-workflow-forms";
+import { SupplierFinanceCards, type SupplierFinanceCard } from "@/components/portal/supplier-finance-cards";
+import { financeBalance, requestEntryIds } from "@/lib/finance/remittance-summary";
+import { SERVICE_TYPE_LABEL } from "@/lib/reservations/service-type-labels";
 import { ArrowDownLeft, ArrowUpRight, FileText, WalletCards } from "lucide-react";
 import { FinanceExtractTable } from "@/components/portal/finance-extract-table";
-import { RepasseRequestForm } from "@/components/portal/repasse-request-form";
 import { InvoiceAdvanceForm } from "@/components/portal/invoice-advance-form";
 import { InvoicePaymentForm } from "@/components/portal/invoice-payment-form";
 import { MetricCard } from "@/components/ui/metric-card";
 import { requireCompanyPortalUser } from "@/lib/auth/get-current-user";
 import { getPartyFinanceExtract } from "@/lib/finance/party-extract";
 import { prisma } from "@/lib/prisma";
-import { submitRepasseRequestEmpresa } from "../actions";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -22,40 +22,18 @@ export default async function PortalEmpresaFinanceiroPage() {
   const isPartner = company.roles.includes("parceiro");
   const isBilledPartner = isPartner && (company.billing_enabled || company.modelo_parceiro === "faturado" || company.modelo_parceiro === "ambos");
 
-  const [supplierExtract, partnerExtract, repasseEntries, billingCycles, remittanceEntries, remittanceRequests] = await Promise.all([
+  const [supplierExtract, partnerExtract, billingCycles, supplierEntries, remittanceRequests] = await Promise.all([
     isSupplier ? getPartyFinanceExtract("fornecedor", company.id) : Promise.resolve([]),
     isPartner ? getPartyFinanceExtract("parceiro", company.id) : Promise.resolve([]),
-    isSupplier
-      ? prisma.financeEntry.findMany({
-          where: {
-            party_type: "fornecedor",
-            party_id: company.id,
-            type: "despesa",
-            status: "pendente",
-            payment_eligible: true,
-          },
-          orderBy: { created_at: "desc" },
-          take: 100,
-          include: {
-            compensacao: { select: { amount: true, status: true, reversed_at: true } },
-            payments: {
-              where: { reversed_at: null, estorno_of_id: null },
-              select: { amount: true },
-            },
-          },
-        })
-      : Promise.resolve([]),
-    isBilledPartner
-      ? prisma.billingCycle.findMany({
-          where: { company_id: company.id },
-          include: { _count: { select: { reservations: true } } },
-          orderBy: { period: "desc" },
-          take: 24,
-        })
-      : Promise.resolve([]),
-    isSupplier ? prisma.financeEntry.findMany({ where: { party_type: "fornecedor", party_id: company.id, type: "receita", category: "repasse_fornecedor", status: { in: ["pendente", "vencido"] }, payment_eligible: true, service: { is: { supplier_id: company.id, collection_actor: "fornecedor", execution_status: "concluido", direct_collections: { some: { status: "received", reversed_at: null, financial_responsible_id: company.id } } } } }, include: { reservation: { select: { id: true, code: true } }, compensacao: { select: { amount: true, status: true, reversed_at: true } }, payments: { where: { reversed_at: null, estorno_of_id: null }, select: { amount: true } } }, orderBy: { created_at: "asc" } }) : Promise.resolve([]),
-    isSupplier ? prisma.changeRequest.findMany({ where: { company_id: company.id, type: "pagamento_repasse_fornecedor" }, include: { reservation: { select: { code: true } } }, orderBy: { created_at: "desc" }, take: 30 }) : Promise.resolve([]),
+    isBilledPartner ? prisma.billingCycle.findMany({ where: { company_id: company.id }, include: { _count: { select: { reservations: true } } }, orderBy: { period: "desc" }, take: 24 }) : Promise.resolve([]),
+    isSupplier ? prisma.financeEntry.findMany({ where: { party_type: "fornecedor", party_id: company.id, status: { in: ["programado", "pendente", "vencido"] }, reversed_at: null }, include: { reservation: { select: { id: true, code: true, client: { select: { name: true } } } }, service: { include: { driver: { select: { name: true } }, direct_collections: { where: { reversed_at: null } } } }, compensacao: true, payments: { where: { reversed_at: null, estorno_of_id: null }, select: { amount: true } } }, orderBy: { created_at: "asc" } }) : Promise.resolve([]),
+    isSupplier ? prisma.changeRequest.findMany({ where: { company_id: company.id, type: { in: ["pagamento_fornecedor", "pagamento_repasse_fornecedor", "repasse_nativos"] } }, include: { reservation: { select: { code: true } } }, orderBy: { created_at: "desc" } }) : Promise.resolve([]),
   ]);
+  const cards: SupplierFinanceCard[] = supplierEntries.filter(e => financeBalance(e) > 0).map(e => {
+    const request = remittanceRequests.find(r => !["pago", "concluida", "rejeitada"].includes(r.status) && requestEntryIds(r.allocation_details).includes(e.id) && (e.type === "despesa" || r.type === "pagamento_repasse_fornecedor"));
+    const balance = financeBalance(e);
+    return { id: e.id, dedupeKey: crypto.randomUUID(), reservation: e.reservation?.code ?? "Pagamento avulso", passenger: e.reservation?.client.name ?? e.description ?? "Lançamento da empresa", service: e.service ? SERVICE_TYPE_LABEL[e.service.type] : "Pagamento avulso", date: e.service?.scheduled_date ? `${e.service.scheduled_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })} · ${e.service.scheduled_time ?? "Horário a definir"}` : "Sem data de serviço", driver: e.service?.driver?.name ?? "Não informado", total: Number(e.amount), paid: Number(e.amount) - balance, balance, direction: e.type === "despesa" ? "receber" : "pagar", eligible: e.payment_eligible && (e.type === "despesa" || e.service?.execution_status === "concluido"), collectionConfirmed: Boolean(e.service?.direct_collections.some(c => c.status === "received" && c.financial_responsible_id === company.id)), serviceId: e.service_id, pendingProtocol: request?.protocol ?? null, servicePrice: e.service ? Number(e.service.price) : null, supplierCost: e.service?.supplier_cost !== null && e.service?.supplier_cost !== undefined ? Number(e.service.supplier_cost) : null };
+  });
 
   function dueDate(cycle: (typeof billingCycles)[number]) {
     const date = new Date(`${cycle.period}-01T12:00:00Z`);
@@ -67,18 +45,8 @@ export default async function PortalEmpresaFinanceiroPage() {
     .filter((entry, index, all) => all.findIndex((candidate) => candidate.id === entry.id) === index)
     .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 
-  const openEntries = extract.filter((entry) =>
-    ["programado", "pendente", "vencido"].includes(entry.status),
-  );
-  const openBalance = (entry: (typeof extract)[number]) => {
-    const amount = Number(entry.amount);
-    const compensated =
-      entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at
-        ? Math.min(amount, Number(entry.compensacao.amount))
-        : 0;
-    const paid = entry.payments.reduce((total, payment) => total + Number(payment.amount), 0);
-    return Math.max(0, amount - compensated - paid);
-  };
+  const openEntries = [...extract.filter(e => e.party_type !== "fornecedor" && ["programado", "pendente", "vencido"].includes(e.status)), ...supplierEntries];
+  const openBalance = financeBalance;
   const toReceive = openEntries
     .filter((entry) => entry.type === "despesa")
     .reduce((total, entry) => total + openBalance(entry), 0);
@@ -100,9 +68,18 @@ export default async function PortalEmpresaFinanceiroPage() {
       <section aria-label="Resumo financeiro" className="grid gap-3 sm:grid-cols-3">
         <MetricCard icon={ArrowDownLeft} label="A receber da Nativos" value={money.format(toReceive)} accent="success" />
         <MetricCard icon={ArrowUpRight} label="A pagar à Nativos" value={money.format(toPay)} accent="warning" />
-        <MetricCard icon={WalletCards} label="Movimentação liquidada" value={money.format(settled)} accent="forest" />
+        <MetricCard icon={WalletCards} label="Liquidado no extrato recente" value={money.format(settled)} accent="forest" />
       </section>
 
+      {isSupplier && <section className="space-y-5" id="repasses">
+        <div><h2 className="section-heading">Repasses por serviço</h2><p className="mt-1 text-sm text-forest/65">Escolha o serviço abaixo. O saldo e a ação disponível aparecem no próprio cartão.</p></div>
+        <section className="surface-panel p-4 sm:p-5"><h3 className="mb-3 text-lg font-semibold">A Nativos paga para você</h3>{cards.some(e => e.direction === "receber") ? <SupplierFinanceCards entries={cards.filter(e => e.direction === "receber")} /> : <p className="text-sm text-forest/60">Nenhum pagamento pendente da Nativos.</p>}</section>
+        <section className="surface-panel p-4 sm:p-5"><h3 className="mb-2 text-lg font-semibold">Você repassa para a Nativos</h3><p className="mb-3 text-sm text-forest/65">Serviços em que o passageiro paga à sua equipe. Confirme o recebimento e envie o comprovante da transferência.</p>{cards.some(e => e.direction === "pagar") ? <SupplierFinanceCards entries={cards.filter(e => e.direction === "pagar")} /> : <p className="text-sm text-forest/60">Nenhum saldo a repassar à Nativos.</p>}</section>
+        {remittanceRequests.length > 0 && <details className="surface-panel p-4"><summary className="cursor-pointer font-semibold">Histórico dos pedidos e pagamentos</summary><ul className="mt-4 grid gap-3">{remittanceRequests.filter(r => { const d = r.allocation_details && typeof r.allocation_details === "object" && !Array.isArray(r.allocation_details) ? r.allocation_details : {}; return !(d.origem === "cobranca_direta_fornecedor" && typeof d.payment_request_id === "string" && remittanceRequests.some(other => other.id === d.payment_request_id)); }).slice(0, 30).map(r => {
+          const data = r.allocation_details && typeof r.allocation_details === "object" && !Array.isArray(r.allocation_details) ? r.allocation_details : {};
+          return <li key={r.id} className="rounded-lg bg-forest/[0.04] p-3 text-sm"><strong>{r.type === "pagamento_repasse_fornecedor" ? "Transferência à Nativos" : data.origem === "cobranca_direta_fornecedor" ? "Saldo financeiro do serviço" : "Pagamento da Nativos"}</strong> · {r.reservation?.code ?? "Serviços vinculados"}{data.amount && <span> · {money.format(Number(data.amount))}</span>}<p className="mt-1 text-xs">{r.protocol} · {r.status === "pago" || r.status === "concluida" ? "Confirmado" : r.status === "rejeitada" ? "Não aprovado" : "Aguardando a Nativos"}</p><p className="mt-1 text-xs">{r.response_note ?? "Seu pedido está sendo acompanhado pela Nativos."}</p>{(r.type === "pagamento_repasse_fornecedor" || Array.isArray(data.payment_ids) && data.payment_ids.length > 0) && <a href={`/api/portal/comprovantes/${r.id}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold underline">Ver comprovante</a>}</li>;
+        })}</ul><a href="/portal/empresa/solicitacoes" className="mt-3 inline-block text-sm font-semibold underline">Ver todos os pedidos</a></details>}
+      </section>}
       {isPartner && !isBilledPartner && (
         <section className="surface-panel border-l-4 border-l-gold p-5">
           <h2 className="section-heading">Liquidação por reserva</h2>
@@ -231,35 +208,6 @@ export default async function PortalEmpresaFinanceiroPage() {
         </div>
       </section>
 
-      {isSupplier && <section className="surface-panel p-5"><h2 className="section-heading">Informar pagamento à Nativos</h2><p className="mb-4 mt-2 text-sm text-forest/65">Use quando sua equipe recebeu do passageiro e transferiu o saldo devido à Nativos. Informe cada serviço separadamente, com data e comprovante. A baixa depende da conferência financeira.</p>{remittanceEntries.some(e => openBalance(e) > 0) ? <SupplierRemittanceForm dedupeKey={crypto.randomUUID()} entries={remittanceEntries.filter(e => openBalance(e) > 0).map(e => ({ id: e.id, label: `${e.reservation?.code ?? "Reserva"} · ${e.description ?? e.category} · saldo ${money.format(openBalance(e))}` }))} /> : <p className="text-sm text-forest/60">Nenhum repasse disponível. Conclua o serviço e confirme o recebimento do passageiro em Minha operação.</p>}{remittanceRequests.length > 0 && <div className="mt-5 border-t border-forest/10 pt-4"><h3 className="text-sm font-semibold">Pagamentos informados</h3><ul className="mt-2 grid gap-2">{remittanceRequests.map(r => <li key={r.id} className="rounded-lg bg-forest/[0.04] p-3 text-sm"><strong>{r.protocol}</strong> · {r.reservation?.code} · {r.status === "pago" ? "Recebimento confirmado" : r.status === "rejeitada" ? "Rejeitado" : "Em análise"}<p className="mt-1 text-xs">{r.response_note ?? "Aguardando conferência financeira da Nativos."}</p><a href={`/api/portal/comprovantes/${r.id}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold underline">Ver comprovante</a></li>)}</ul><a href="/portal/empresa/solicitacoes" className="mt-3 inline-block text-sm font-semibold underline">Acompanhar todos os protocolos</a></div>}</section>}
-      {isSupplier && (
-        <section className="surface-panel p-5">
-          <h2 className="section-heading">Solicitar pagamento da Nativos</h2>
-          <p className="mb-4 mt-1 text-xs leading-5 text-forest/58">
-            Selecione lançamentos elegíveis e envie o pedido para a equipe financeira.
-          </p>
-          <RepasseRequestForm
-            dedupeKey={crypto.randomUUID()}
-          entries={repasseEntries.map((entry) => ({
-            id: entry.id,
-            label:
-              (entry.description ?? entry.category) +
-              " — saldo " +
-              money.format(
-                Math.max(
-                  0,
-                  Number(entry.amount) -
-                    (entry.compensacao?.status === "confirmada" && !entry.compensacao.reversed_at
-                      ? Math.min(Number(entry.amount), Number(entry.compensacao.amount))
-                      : 0) -
-                    entry.payments.reduce((total, payment) => total + Number(payment.amount), 0),
-                ),
-              ),
-          }))}
-            action={submitRepasseRequestEmpresa}
-          />
-        </section>
-      )}
     </div>
   );
 }

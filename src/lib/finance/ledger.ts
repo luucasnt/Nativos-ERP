@@ -184,16 +184,16 @@ type CreatePaymentInput = {
   supplierRequest?: { id: string; reviewerId: string };
 };
 
-export async function createPayment(input: CreatePaymentInput) {
+export async function createPayment(input: CreatePaymentInput, db?: Prisma.TransactionClient) {
   const occurredAt = input.occurred_at ?? new Date();
   if (Number.isNaN(occurredAt.getTime()) || occurredAt.getTime() > new Date().getTime()) throw new Error("Data de pagamento inválida ou futura.");
-  const existing = await prisma.payment.findUnique({ where: { dedupe_key: input.dedupe_key } });
+  const existing = await (db ?? prisma).payment.findUnique({ where: { dedupe_key: input.dedupe_key } });
   if (existing) {
     return existing;
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const execute = async (tx: Prisma.TransactionClient) => {
       if (input.supplierRequest) {
         await tx.$queryRaw`SELECT id FROM change_requests WHERE id = ${input.supplierRequest.id}::uuid FOR UPDATE`;
         const request = await tx.changeRequest.findUniqueOrThrow({ where: { id: input.supplierRequest.id } });
@@ -295,11 +295,12 @@ export async function createPayment(input: CreatePaymentInput) {
         await tx.auditLog.create({ data: { actor_id: input.supplierRequest.reviewerId, action: "repasse_fornecedor_confirmado", entity_type: "change_request", entity_id: request.id, metadata: { entryId: entry.id, serviceId: entry.service_id, reservationId: entry.reservation_id, paymentId: payment.id, amount: amount.toString() } } });
       }
       return payment;
-    });
+    };
+    return db ? await execute(db) : await prisma.$transaction(execute);
   } catch (error) {
     // A unique key é a última barreira para retries concorrentes. Se outra
     // requisição venceu a corrida, devolvemos exatamente o pagamento criado.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (!db && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const duplicate = await prisma.payment.findUnique({ where: { dedupe_key: input.dedupe_key } });
       if (duplicate) return duplicate;
     }

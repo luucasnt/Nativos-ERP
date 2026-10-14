@@ -1,5 +1,6 @@
 "use server";
 
+import { financeBalance, requestEntryIds } from "@/lib/finance/remittance-summary";
 import { unstable_rethrow } from "next/navigation";
 import { validatePaymentProof } from "@/lib/uploads/payment-proof";
 import { driverAccessSchema, supplierAccessDriver, supplierRemittanceEntry, supplierRemittanceSchema, validateRemittanceAmount } from "@/lib/change-requests/supplier-workflows";
@@ -41,7 +42,7 @@ async function assertOwnSupplierService(serviceId: string) {
 export async function confirmReceivedPortalEmpresa(serviceId: string, receiptUrl: string): Promise<DirectCollectionState> {
   try {
     const { user } = await assertOwnSupplierService(serviceId);
-    const proof = await validatePaymentProof(z.string().min(1, "Anexe um comprovante válido.").parse(receiptUrl), user.id);
+    const proof = await validatePaymentProof(receiptUrl || undefined, user.id);
 
     await confirmDirectCollectionReceived(serviceId, proof ?? undefined);
     await ensureDirectSupplierRepasseRequest(serviceId, user.linked_company_id);
@@ -56,6 +57,8 @@ export async function confirmReceivedPortalEmpresa(serviceId: string, receiptUrl
     return { error: error instanceof Error ? error.message : "Falha ao confirmar recebimento." };
   }
 
+  revalidatePath("/portal/empresa/financeiro");
+  revalidatePath("/portal/empresa/operacao");
   revalidatePath("/portal/empresa");
   return { error: null };
 }
@@ -537,59 +540,23 @@ const repasseSchema = z.object({
   nota: z.string().optional(),
 });
 
-export async function submitRepasseRequestEmpresa(
-  _prevState: ChangeRequestFormState,
-  formData: FormData,
-): Promise<ChangeRequestFormState> {
-  const user = await assertActiveCompanyPortalUser();
-  if (!user.linked_company.roles.includes("fornecedor")) {
-    return { error: "Apenas fornecedores podem solicitar repasse." };
-  }
-
-  const parsed = repasseSchema.safeParse({
-    dedupe_key: formData.get("dedupe_key"),
-    entry_ids: formData.getAll("entry_ids"),
-    nota: formData.get("nota") || undefined,
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
-  }
-
-  const entryIds = [...new Set(parsed.data.entry_ids)];
-  const eligibleCount = await prisma.financeEntry.count({
-    where: {
-      id: { in: entryIds },
-      party_type: "fornecedor",
-      party_id: user.linked_company_id,
-      type: "despesa",
-      status: "pendente",
-      payment_eligible: true,
-      reversed_at: null,
-    },
-  });
-  if (eligibleCount !== entryIds.length) {
-    return { error: "Um ou mais lançamentos não pertencem à sua conta ou não estão elegíveis." };
-  }
-
-  const changeRequest = await submitChangeRequest({
-    type: "pagamento_fornecedor",
-    requesterType: "company",
-    requesterId: user.linked_company_id,
-    companyId: user.linked_company_id,
-    allocationDetails: { entry_ids: entryIds, nota: parsed.data.nota ?? null },
-    dedupeKey: parsed.data.dedupe_key,
-  });
-
-  await logAudit({
-    actorId: user.id,
-    action: "solicitacao_repasse_criada",
-    entityType: "change_request",
-    entityId: changeRequest.id,
-  });
-
-  revalidatePath("/portal/empresa/financeiro");
-  revalidatePath("/portal/empresa/solicitacoes");
-  return { error: null };
+export async function submitRepasseRequestEmpresa(_prevState: ChangeRequestFormState, formData: FormData): Promise<ChangeRequestFormState & { success?: string }> {
+  try {
+    const user = await assertActiveCompanyPortalUser();
+    if (!user.linked_company.roles.includes("fornecedor")) throw new Error("Apenas fornecedores podem solicitar pagamento.");
+    const parsed = repasseSchema.parse({ dedupe_key: formData.get("dedupe_key"), entry_ids: formData.getAll("entry_ids"), nota: formData.get("nota") || undefined });
+    const ids = [...new Set(parsed.entry_ids)].sort();
+    const entries = await prisma.financeEntry.findMany({ where: { id: { in: ids }, party_type: "fornecedor", party_id: user.linked_company_id, type: "despesa", status: { in: ["pendente", "vencido"] }, payment_eligible: true, reversed_at: null }, include: { compensacao: true, payments: { where: { reversed_at: null, estorno_of_id: null } } } });
+    if (entries.length !== ids.length || entries.some(e => financeBalance(e) <= 0)) throw new Error("O saldo mudou ou o serviço não está disponível para pagamento. Atualize a página.");
+    const requests = await prisma.changeRequest.findMany({ where: { company_id: user.linked_company_id, type: { in: ["pagamento_fornecedor", "repasse_nativos"] } }, orderBy: { created_at: "desc" } });
+    const matching = requests.filter(r => requestEntryIds(r.allocation_details).some(entryId => ids.includes(entryId)));
+    const pending = matching.find(r => !["pago", "concluida", "rejeitada"].includes(r.status));
+    if (pending) return { error: null, success: `Pagamento já solicitado. A Nativos está acompanhando o pedido ${pending.protocol}.` };
+    const reservationIds = [...new Set(entries.map(e => e.reservation_id))];
+    const request = await submitChangeRequest({ type: "pagamento_fornecedor", requesterType: "company", requesterId: user.linked_company_id, companyId: user.linked_company_id, reservationId: reservationIds.length === 1 ? reservationIds[0] : null, allocationDetails: { entry_ids: ids, amount: entries.reduce((sum, e) => sum + financeBalance(e), 0).toFixed(2), nota: parsed.nota ?? "" }, dedupeKey: `supplier-payout-request:${user.linked_company_id}:${ids.join(":")}:${matching[0]?.id ?? "initial"}`, audit: { actorId: user.id, action: "solicitacao_repasse_criada", metadata: { entryIds: ids } } });
+    revalidatePath("/admin/solicitacoes"); revalidatePath("/portal/empresa/financeiro"); revalidatePath("/portal/empresa/solicitacoes");
+    return { error: null, success: `Pagamento solicitado. Pedido ${request.protocol} enviado à Nativos.` };
+  } catch (error) { unstable_rethrow(error); return { error: error instanceof z.ZodError ? error.issues[0]?.message ?? "Confira os dados." : error instanceof Error ? error.message : "Não foi possível solicitar pagamento." }; }
 }
 
 export async function requestSupplierDriverAccess(_previous: { error: string | null; success?: string }, formData: FormData) {
