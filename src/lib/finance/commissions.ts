@@ -125,8 +125,8 @@ async function cancelStaleReservationEntry(reservationId: string, key: string) {
 // Comissões da reserva ficam elegíveis quando a reserva inteira é
 // concluída (marco no nível da reserva, análogo ao "serviço concluído"
 // exigido para lançamentos por serviço).
-export async function markReservationCommissionsEligible(reservationId: string) {
-  const entries = await prisma.financeEntry.findMany({
+export async function markReservationCommissionsEligible(reservationId: string, db: Prisma.TransactionClient = prisma) {
+  const entries = await db.financeEntry.findMany({
     where: {
       reservation_id: reservationId,
       service_id: null,
@@ -137,6 +137,6 @@ export async function markReservationCommissionsEligible(reservationId: string) 
   });
 
   for (const entry of entries) {
-    await markFinanceEntryEligible(entry.id);
+    await markFinanceEntryEligible(entry.id, db);
   }
 }

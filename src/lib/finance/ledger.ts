@@ -88,14 +88,14 @@ export async function createFinanceEntry(input: CreateFinanceEntryInput, db: Pri
 
 // Despesas e repasses ficam elegíveis no marco operacional. Recebimentos
 // da venda ao cliente/parceiro admitem antecipação em createPayment.
-export async function markFinanceEntryEligible(entryId: string) {
+export async function markFinanceEntryEligible(entryId: string, db: Prisma.TransactionClient = prisma) {
   // An atomic predicate prevents a concurrent settlement from being
   // overwritten by a retry of the operational completion event.
-  await prisma.financeEntry.updateMany({
+  await db.financeEntry.updateMany({
     where: { id: entryId, status: "programado", reversed_at: null },
     data: { status: "pendente", payment_eligible: true },
   });
-  return prisma.financeEntry.findUniqueOrThrow({ where: { id: entryId } });
+  return db.financeEntry.findUniqueOrThrow({ where: { id: entryId } });
 }
 
 // Cancela um lançamento que ainda não gerou nenhum pagamento real — isto é
@@ -471,8 +471,8 @@ type CreateCompensationInput = {
 
 // Compensação entre obrigações opostas da mesma contraparte (spec seção
 // 6): liga os FinanceEntry envolvidos via compensacao_id, sem apagar nada.
-export async function createCompensation(input: CreateCompensationInput) {
-  const existing = await prisma.compensation.findUnique({
+export async function createCompensation(input: CreateCompensationInput, db?: Prisma.TransactionClient) {
+  const existing = await (db ?? prisma).compensation.findUnique({
     where: { idempotency_key: input.idempotency_key },
   });
   if (existing) {
@@ -480,7 +480,7 @@ export async function createCompensation(input: CreateCompensationInput) {
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const execute = async (tx: Prisma.TransactionClient) => {
       const entryIds = [...new Set(input.entryIds)];
       const amount = new Prisma.Decimal(input.amount);
       if (entryIds.length !== 2) {
@@ -578,9 +578,10 @@ export async function createCompensation(input: CreateCompensationInput) {
       }
 
       return compensation;
-    });
+    };
+    return db ? await execute(db) : await prisma.$transaction(execute);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (!db && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const concurrent = await prisma.compensation.findUnique({
         where: { idempotency_key: input.idempotency_key },
       });

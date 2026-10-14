@@ -317,17 +317,17 @@ export async function generateServiceFinanceEntries(serviceId: string, db?: Pris
 
 // Regra não-negociável (spec seção 6, item 5): só fica elegível a
 // pagamento quando o marco operacional (serviço concluído) é atingido.
-export async function markServiceFinanceEntriesEligible(serviceId: string) {
-  const entries = await prisma.financeEntry.findMany({
+export async function markServiceFinanceEntriesEligible(serviceId: string, db: Prisma.TransactionClient = prisma) {
+  const entries = await db.financeEntry.findMany({
     where: { service_id: serviceId, status: "programado", reversed_at: null },
   });
 
   for (const entry of entries) {
-    await markFinanceEntryEligible(entry.id);
+    await markFinanceEntryEligible(entry.id, db);
   }
 
-  await compensateGrossRepassPairIfPresent(serviceId);
-  await generateOwnDriverPeriodEntries(serviceId);
+  await compensateGrossRepassPairIfPresent(serviceId, db);
+  await generateOwnDriverPeriodEntries(serviceId, db);
 }
 
 function dailyDriverKey(driverId: string, referenceDate: Date) {
@@ -359,8 +359,8 @@ async function createEligibleDriverPeriodEntry(params: {
   driverId: string;
   amount: Prisma.Decimal.Value;
   autoKey: string;
-}) {
-  const existing = await prisma.financeEntry.findUnique({ where: { auto_key: params.autoKey } });
+}, db: Prisma.TransactionClient) {
+  const existing = await db.financeEntry.findUnique({ where: { auto_key: params.autoKey } });
   if (existing) {
     return existing;
   }
@@ -374,9 +374,9 @@ async function createEligibleDriverPeriodEntry(params: {
     origin_type: "service_settlement",
     origin_id: params.serviceId,
     auto_key: params.autoKey,
-  });
+  }, db);
 
-  return markFinanceEntryEligible(entry.id);
+  return markFinanceEntryEligible(entry.id, db);
 }
 
 // Decisão do cliente (correção pós-revisão da Fase 4): diaria/salario_mensal
@@ -387,8 +387,8 @@ async function createEligibleDriverPeriodEntry(params: {
 // no mesmo período não duplica. "mesclado" soma o lançamento por dia
 // (mesma regra da diária) ao repasse por comissão que já é gerado por
 // serviço em computeServiceSettlementEntries.
-async function generateOwnDriverPeriodEntries(serviceId: string) {
-  const service = await prisma.service.findUniqueOrThrow({
+async function generateOwnDriverPeriodEntries(serviceId: string, db: Prisma.TransactionClient) {
+  const service = await db.service.findUniqueOrThrow({
     where: { id: serviceId },
     include: { driver: true },
   });
@@ -406,7 +406,7 @@ async function generateOwnDriverPeriodEntries(serviceId: string) {
       driverId: driver.id,
       amount: driver.daily_rate,
       autoKey: dailyDriverKey(driver.id, referenceDate),
-    });
+    }, db);
   }
 
   if (driver.payment_type === "salario_mensal" && driver.salario_mensal) {
@@ -415,7 +415,7 @@ async function generateOwnDriverPeriodEntries(serviceId: string) {
       driverId: driver.id,
       amount: driver.salario_mensal,
       autoKey: monthlyDriverKey(driver.id, referenceDate),
-    });
+    }, db);
   }
 }
 
@@ -426,12 +426,12 @@ async function generateOwnDriverPeriodEntries(serviceId: string) {
 // fornecedor) para a mesma contraparte — exatamente o caso que
 // Compensation existe para resolver (spec seção 6). Não faz uma varredura
 // geral do razão; outras compensações ficam para uma ação manual futura.
-async function compensateGrossRepassPairIfPresent(serviceId: string) {
+async function compensateGrossRepassPairIfPresent(serviceId: string, db: Prisma.TransactionClient) {
   const [receivable, payable] = await Promise.all([
-    prisma.financeEntry.findUnique({
+    db.financeEntry.findUnique({
       where: { auto_key: `svc:${serviceId}:repasse_fornecedor` },
     }),
-    prisma.financeEntry.findUnique({
+    db.financeEntry.findUnique({
       where: { auto_key: `svc:${serviceId}:pagamento_fornecedor` },
     }),
   ]);
@@ -439,6 +439,8 @@ async function compensateGrossRepassPairIfPresent(serviceId: string) {
   if (
     !receivable ||
     !payable ||
+    receivable.status === "cancelado" ||
+    payable.status === "cancelado" ||
     receivable.reversed_at ||
     payable.reversed_at ||
     receivable.compensacao_id ||
@@ -457,7 +459,7 @@ async function compensateGrossRepassPairIfPresent(serviceId: string) {
     amount,
     idempotency_key: `svc:${serviceId}:compensacao_gross_repass`,
     entryIds: [receivable.id, payable.id],
-  });
+  }, db);
 }
 
 // Cancela (nunca apaga) os lançamentos ainda não pagos de um serviço
