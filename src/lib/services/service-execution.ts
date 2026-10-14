@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { recalculateReservationStatus } from "@/lib/reservations/status";
 import { markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
 import { markReservationCommissionsEligible } from "@/lib/finance/commissions";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { assertServiceResources } from "@/lib/services/resource-validation";
 
@@ -16,14 +17,14 @@ import { assertServiceResources } from "@/lib/services/resource-validation";
 // só o próprio motorista. Autorização fina feita aqui (não via RLS de
 // linha inteira, que abriria preço/custo/etc. à escrita de portal) e
 // reaproveitada tanto pelo portal do motorista quanto pelo da empresa.
-async function assertCanOperateService(serviceId: string) {
-  const user = await assertActiveUser();
+async function assertCanOperateService(serviceId: string, db: Prisma.TransactionClient = prisma, actor?: Awaited<ReturnType<typeof assertActiveUser>>) {
+  const user = actor ?? await assertActiveUser();
 
-  const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
+  const service = await db.service.findUniqueOrThrow({ where: { id: serviceId } });
 
   const isInternal = user.account_type === "internal";
   const isAssignedDriver =
-    user.account_type === "portal" && user.linked_driver_id === service.driver_id;
+    user.account_type === "portal" && Boolean(service.driver_id) && user.linked_driver_id === service.driver_id;
   const isSupplierCompany =
     user.account_type === "portal" &&
     Boolean(service.supplier_id) &&
@@ -115,51 +116,39 @@ export async function startService(
   return { error: null };
 }
 
-export async function completeService(
-  serviceId: string,
-): Promise<ServiceExecutionState> {
+export async function completeService(serviceId: string, input?: unknown): Promise<ServiceExecutionState> {
   try {
-    const { user, service } = await assertCanOperateService(serviceId);
-
-    if (service.execution_status !== "em_andamento") {
-      return { error: "Este serviço precisa estar em andamento para ser finalizado." };
-    }
-
-    const completion = checklistSchema.safeParse(service.completion_checklist);
-    if (!completion.success || !["passenger_embarked", "service_delivered", "payment_checked"].every((key) => completion.data[key as keyof typeof completion.data] === true)) {
-      return { error: "Conclua o checklist de finalização antes de encerrar o serviço." };
-    }
-
-    await prisma.service.update({
-      where: { id: serviceId },
-      data: { execution_status: "concluido", completed_at: new Date() },
-    });
-
-    // Regra não-negociável (spec seção 6, item 5): só agora, com o marco
-    // operacional atingido, os lançamentos deste serviço passam a ser
-    // elegíveis a pagamento.
-    await markServiceFinanceEntriesEligible(serviceId);
-
-    const { status } = await recalculateReservationStatus(service.reservation_id);
-    if (status === "concluido") {
-      await markReservationCommissionsEligible(service.reservation_id);
-    }
-
-    await logAudit({
-      actorId: user.id,
-      action: "servico_finalizado",
-      entityType: "service",
-      entityId: serviceId,
-    });
+    const authorized = await assertCanOperateService(serviceId);
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${authorized.service.reservation_id}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM services WHERE id = ${serviceId}::uuid FOR UPDATE`;
+      const { user, service } = await assertCanOperateService(serviceId, tx, authorized.user);
+      if (service.reservation_id !== authorized.service.reservation_id) throw new Error("O serviço foi alterado. Atualize a operação e tente novamente.");
+      if (service.execution_status !== "em_andamento" && service.execution_status !== "concluido") {
+        throw new Error("Inicie o serviço antes de finalizar. Atualize a operação para conferir o status atual.");
+      }
+      // Retries repair an interrupted legacy completion without changing its checklist or timestamp.
+      const alreadyCompleted = service.execution_status === "concluido";
+      const completion = checklistSchema.safeParse(alreadyCompleted || input === undefined ? service.completion_checklist : input);
+      if (!completion.success || !["passenger_embarked", "service_delivered", "payment_checked"].every((key) => completion.data[key as keyof typeof completion.data] === true)) {
+        throw new Error("Conclua o checklist de finalização antes de encerrar o serviço.");
+      }
+      if (!alreadyCompleted) {
+        await tx.service.update({ where: { id: serviceId }, data: {
+          execution_status: "concluido", completed_at: new Date(), completion_checklist: completion.data,
+          incident_notes: completion.data.notes ?? null,
+        } });
+        await tx.auditLog.create({ data: { actor_id: user.id, action: "checklist_final_salvo", entity_type: "service", entity_id: serviceId, metadata: completion.data } });
+      }
+      await markServiceFinanceEntriesEligible(serviceId, tx);
+      const { status } = await recalculateReservationStatus(service.reservation_id, tx);
+      if (status === "concluido") await markReservationCommissionsEligible(service.reservation_id, tx);
+      const audited = await tx.auditLog.findFirst({ where: { entity_id: serviceId, entity_type: "service", action: "servico_finalizado" } });
+      if (!audited) await tx.auditLog.create({ data: { actor_id: user.id, action: "servico_finalizado", entity_type: "service", entity_id: serviceId, metadata: { recovered: alreadyCompleted } } });
+    }, { maxWait: 10000, timeout: 30000 });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Falha ao finalizar o serviço." };
+    return { error: error instanceof Error ? error.message : "Falha ao finalizar o serviço. Tente novamente." };
   }
-
-  revalidatePath("/portal/motorista/servicos");
-  revalidatePath("/portal/empresa/operacao");
-  revalidatePath("/portal/empresa/financeiro");
-  revalidatePath("/admin/financeiro");
-  revalidatePath("/portal/motorista");
-  revalidatePath("/portal/empresa");
+  for (const path of ["/portal/motorista/servicos", "/portal/empresa/operacao", "/portal/empresa/financeiro", "/admin/financeiro", "/portal/motorista", "/portal/empresa", "/admin", "/admin/reservas"]) revalidatePath(path);
   return { error: null };
 }

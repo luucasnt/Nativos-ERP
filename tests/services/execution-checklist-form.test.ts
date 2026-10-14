@@ -19,12 +19,31 @@ it("Iniciar serviço apresenta checklist no mesmo fluxo e salva antes de iniciar
   expect(vi.mocked(saveServiceChecklist).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(startService).mock.invocationCallOrder[0]);
 });
 it("Finalizar serviço usa os itens de encerramento e mantém erro visível sem encerrar", async () => {
-  vi.mocked(saveServiceChecklist).mockResolvedValueOnce({ error: "Serviço indisponível" });
+  vi.mocked(completeService).mockResolvedValueOnce({ error: "Serviço indisponível" });
   render(React.createElement(ServiceExecutionActions, { serviceId: "service", executionStatus: "em_andamento" }));
   fireEvent.click(screen.getByRole("button", { name: "Finalizar serviço" }));
   expect(screen.getAllByRole("checkbox")).toHaveLength(3);
   for (const box of screen.getAllByRole("checkbox")) fireEvent.click(box);
   fireEvent.click(screen.getByRole("button", { name: "Salvar e finalizar serviço" }));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("indisponível"));
-  expect(completeService).not.toHaveBeenCalled();
+  expect(saveServiceChecklist).not.toHaveBeenCalled();
+});
+
+it("finalização envia checklist e conclusão juntos e fecha o diálogo após sucesso", async () => {
+  render(React.createElement(ServiceExecutionActions, { serviceId: "service", executionStatus: "em_andamento" }));
+  fireEvent.click(screen.getByRole("button", { name: "Finalizar serviço" }));
+  for (const box of screen.getAllByRole("checkbox")) fireEvent.click(box);
+  fireEvent.click(screen.getByRole("button", { name: "Salvar e finalizar serviço" }));
+  await waitFor(() => expect(completeService).toHaveBeenCalledWith("service", { passenger_embarked: true, service_delivered: true, payment_checked: true }));
+  expect(saveServiceChecklist).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+it("fecha o diálogo nativo quando o serviço é concluído em outra tela", () => {
+  const close = vi.spyOn(HTMLDialogElement.prototype, "close");
+  const view = render(React.createElement(ServiceExecutionActions, { serviceId: "service", executionStatus: "em_andamento" }));
+  fireEvent.click(screen.getByRole("button", { name: "Finalizar serviço" }));
+  close.mockClear();
+  view.rerender(React.createElement(ServiceExecutionActions, { serviceId: "service", executionStatus: "concluido" }));
+  expect(close).toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
