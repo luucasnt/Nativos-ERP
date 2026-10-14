@@ -15,7 +15,7 @@ export const FINANCE_ENTRY_CATEGORY_LABEL: Record<string, string> = {
   venda_servico: "Venda de serviço",
   recebimento_cliente: "Recebimento do cliente",
   pagamento_fornecedor: "Pagamento a fornecedor",
-  repasse_fornecedor: "Repasse ao fornecedor",
+  repasse_fornecedor: "Repasse do fornecedor à Nativos",
   comissao_parceiro: "Comissão de parceiro",
   comissao_indicacao: "Comissão de indicação",
   repasse_motorista: "Repasse ao motorista",

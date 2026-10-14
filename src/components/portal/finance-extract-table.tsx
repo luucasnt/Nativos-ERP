@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   FINANCE_ENTRY_CATEGORY_LABEL,
   FINANCE_ENTRY_STATUS_LABEL,
-  FINANCE_ENTRY_TYPE_LABEL,
 } from "@/lib/finance/labels";
 
 type ExtractEntry = {
@@ -80,7 +79,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
             </div>
             <div className="mt-3 flex items-end justify-between rounded-lg bg-[#faf9f6] px-3 py-2.5">
               <span className="text-[11px] uppercase tracking-[0.08em] text-forest/55">
-                {hasSettlement ? "Saldo" : FINANCE_ENTRY_TYPE_LABEL[entry.type] ?? entry.type}
+                {hasSettlement ? "Saldo" : entry.type === "despesa" ? "A receber da Nativos" : "A pagar à Nativos"}
               </span>
               <strong
                 className={
@@ -144,7 +143,7 @@ export function FinanceExtractTable({ entries }: { entries: ExtractEntry[] }) {
                       entry.category}
                   </p>
                   <p className="mt-1 text-[11px] text-forest/55">
-                    {FINANCE_ENTRY_TYPE_LABEL[entry.type] ?? entry.type}
+                    {entry.type === "despesa" ? "A receber da Nativos" : "A pagar à Nativos"}
                   </p>
                 </td>
                 <td className="px-4 py-3.5 text-xs font-semibold text-forest">

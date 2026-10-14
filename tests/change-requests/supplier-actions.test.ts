@@ -2,14 +2,16 @@ import { afterAll, beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ unstable_rethrow: vi.fn() }));
-vi.mock("@/lib/auth/get-current-user", () => ({ assertActiveCompanyPortalUser: vi.fn(), requireOwnerUser: vi.fn(), requireFinancialUser: vi.fn(), requireInternalUser: vi.fn() }));
+vi.mock("@/lib/auth/get-current-user", () => ({ assertActiveCompanyPortalUser: vi.fn(), requireOwnerUser: vi.fn(), requireFinancialUser: vi.fn(), requireInternalUser: vi.fn(), canAccessFinance: vi.fn((u: { role: string }) => u.role === "admin") }));
 vi.mock("@/lib/uploads/payment-proof", () => ({ validatePaymentProof: vi.fn(async (value: string) => value) }));
 vi.mock("@/lib/auth/provision-user", () => ({ provisionCompanyOrDriverLogin: vi.fn() }));
+import { renderToStaticMarkup } from "react-dom/server";
+import SolicitacoesPage from "@/app/admin/solicitacoes/page";
 import { PrismaClient } from "@prisma/client";
 import { assertActiveCompanyPortalUser, requireOwnerUser, requireFinancialUser, requireInternalUser } from "@/lib/auth/get-current-user";
 import { provisionCompanyOrDriverLogin } from "@/lib/auth/provision-user";
-import { requestSupplierDriverAccess, reportSupplierRemittance } from "@/app/portal/empresa/actions";
-import { approveSupplierDriverAccess, confirmSupplierRemittance, updateChangeRequestStatus } from "@/app/admin/solicitacoes/actions";
+import { requestSupplierDriverAccess, reportSupplierRemittance, submitRepasseRequestEmpresa } from "@/app/portal/empresa/actions";
+import { approveSupplierDriverAccess, confirmSupplierRemittance, updateChangeRequestStatus, paySupplierRequest, closeSettledRemittanceRequest } from "@/app/admin/solicitacoes/actions";
 import { generateServiceFinanceEntries, markServiceFinanceEntriesEligible } from "@/lib/finance/settlement";
 import { confirmDirectCollectionReceived, ensureDirectSupplierRepasseRequest } from "@/lib/finance/direct-collection";
 const prisma = new PrismaClient();
@@ -74,4 +76,67 @@ it("nega aprovação sem proprietário e baixa sem financeiro antes de acessar o
   vi.mocked(requireFinancialUser).mockRejectedValue(new Error("Financeiro necessário"));
   await expect(approveSupplierDriverAccess(crypto.randomUUID())).rejects.toThrow("Proprietário");
   await expect(confirmSupplierRemittance(crypto.randomUUID(), crypto.randomUUID())).rejects.toThrow("Financeiro");
+});
+
+async function supplierPayable(companyId: string, cost = 200) {
+  const client = await prisma.client.create({ data: { name: `Passageiro pagamento ${crypto.randomUUID()}` } });
+  const reservation = await prisma.reservation.create({ data: { code: `PAYOUT-${crypto.randomUUID()}`, client_id: client.id, collection_mode: "nativos" } });
+  const service = await prisma.service.create({ data: { reservation_id: reservation.id, type: "transfer_saida", execution_type: "fornecedor", supplier_id: companyId, supplier_cost: cost, price: cost + 200, original_price: cost + 200, collection_actor: "nativos", execution_status: "concluido", acceptance_status: "aceito" } });
+  await generateServiceFinanceEntries(service.id); await markServiceFinanceEntriesEligible(service.id);
+  return prisma.financeEntry.findUniqueOrThrow({ where: { auto_key: `svc:${service.id}:pagamento_fornecedor` } });
+}
+it("fornecedor pede com um clique; pagamento parcial e restante são ligados ao pedido sem duplicar clique", async () => {
+  const { company, admin } = await actors(); const entry = await supplierPayable(company.id);
+  const form = new FormData(); form.set("entry_ids", entry.id); form.set("dedupe_key", entry.id);
+  expect((await submitRepasseRequestEmpresa({ error: null }, form)).error).toBeNull();
+  const request = await prisma.changeRequest.findFirstOrThrow({ where: { company_id: company.id, type: "pagamento_fornecedor" } });
+  expect(request.reservation_id).toBe(entry.reservation_id);
+  expect((await submitRepasseRequestEmpresa({ error: null }, form)).success).toContain(request.protocol);
+  expect(await prisma.changeRequest.count({ where: { company_id: company.id, type: "pagamento_fornecedor" } })).toBe(1);
+  const bank = await prisma.bankAccount.create({ data: { name: "Conta pagamento solicitado", type: "corrente" } });
+  const input = { amount: "100", paymentDate: "2020-01-01", paymentMethod: "pix", bankAccountId: bank.id, receiptUrl: `storage://payment-receipts/${admin.id}/${crypto.randomUUID()}.pdf`, dedupeKey: crypto.randomUUID() };
+  expect((await paySupplierRequest(request.id, input)).error).toBeNull();
+  expect((await paySupplierRequest(request.id, input)).error).toBeNull();
+  expect(await prisma.payment.count({ where: { finance_entry_id: entry.id } })).toBe(1);
+  expect((await prisma.changeRequest.findUniqueOrThrow({ where: { id: request.id } })).status).toBe("aprovada");
+  expect((await closeSettledRemittanceRequest(request.id)).error).toContain("saldo pendente");
+  expect((await paySupplierRequest(request.id, { ...input, dedupeKey: crypto.randomUUID() })).error).toBeNull();
+  const final = await prisma.changeRequest.findUniqueOrThrow({ where: { id: request.id } });
+  expect(final.status).toBe("pago"); expect(final.allocation_details).toMatchObject({ entry_ids: [entry.id], payment_ids: expect.any(Array) });
+  expect(await prisma.payment.count({ where: { finance_entry_id: entry.id } })).toBe(2);
+  expect(await prisma.auditLog.count({ where: { entity_id: request.id, action: "pagamento_fornecedor_registrado_por_pedido" } })).toBe(2);
+});
+it("pedido antigo com vários serviços paga de uma vez; falha em um serviço desfaz todo o lote", async () => {
+  const { company, admin } = await actors(); const entries = [await supplierPayable(company.id, 200), await supplierPayable(company.id, 300)].sort((a, b) => a.id.localeCompare(b.id));
+  const request = await prisma.changeRequest.create({ data: { protocol: `TEST-BULK-${crypto.randomUUID()}`, category: "financeiro", type: "repasse_nativos", requester_type: "company", requester_id: company.id, company_id: company.id, status: "aprovada", allocation_details: { entry_ids: entries.map(e => e.id) }, dedupe_key: crypto.randomUUID() } });
+  const bank = await prisma.bankAccount.create({ data: { name: "Conta lote", type: "corrente" } });
+  const input = { amount: "500", paymentDate: "2020-01-01", paymentMethod: "pix", bankAccountId: bank.id, receiptUrl: `storage://payment-receipts/${admin.id}/${crypto.randomUUID()}.pdf`, dedupeKey: crypto.randomUUID() };
+  await prisma.financeEntry.update({ where: { id: entries[1].id }, data: { payment_eligible: false } });
+  expect((await paySupplierRequest(request.id, input)).error).toContain("elegível");
+  expect(await prisma.payment.count({ where: { finance_entry_id: { in: entries.map(e => e.id) } } })).toBe(0);
+  expect((await prisma.changeRequest.findUniqueOrThrow({ where: { id: request.id } })).status).toBe("aprovada");
+  await prisma.financeEntry.update({ where: { id: entries[1].id }, data: { payment_eligible: true } });
+  expect((await paySupplierRequest(request.id, input)).error).toBeNull(); expect((await paySupplierRequest(request.id, input)).error).toBeNull();
+  const payments = await prisma.payment.findMany({ where: { finance_entry_id: { in: entries.map(e => e.id) } } });
+  expect(payments).toHaveLength(2); expect(payments.reduce((sum, p) => sum + Number(p.amount), 0)).toBe(500);
+  expect(payments.every(p => p.bank_account_id === bank.id && p.receipt_url === input.receiptUrl)).toBe(true);
+  expect((await prisma.changeRequest.findUniqueOrThrow({ where: { id: request.id } })).status).toBe("pago");
+});
+it("não permite registrar pagamento de outro fornecedor nem sem permissão financeira", async () => {
+  const { company, admin } = await actors(); const foreign = await prisma.company.create({ data: { name: "Outra empresa", roles: ["fornecedor"] } }); const entry = await supplierPayable(foreign.id);
+  const request = await prisma.changeRequest.create({ data: { protocol: `TEST-FOREIGN-${crypto.randomUUID()}`, category: "financeiro", type: "pagamento_fornecedor", requester_type: "company", requester_id: company.id, company_id: company.id, allocation_details: { entry_ids: [entry.id] }, dedupe_key: crypto.randomUUID() } });
+  const input = { amount: "200", paymentDate: "2020-01-01", paymentMethod: "pix", bankAccountId: crypto.randomUUID(), receiptUrl: `storage://payment-receipts/${admin.id}/${crypto.randomUUID()}.pdf`, dedupeKey: crypto.randomUUID() };
+  expect((await paySupplierRequest(request.id, input)).error).toContain("outro fornecedor");
+  expect(await prisma.payment.count({ where: { finance_entry_id: entry.id } })).toBe(0);
+  vi.mocked(requireFinancialUser).mockRejectedValue(new Error("Financeiro necessário"));
+  await expect(paySupplierRequest(request.id, input)).rejects.toThrow("Financeiro necessário");
+});
+
+it("fila de repasses encontra pedido antigo aprovado pelo passageiro e mostra os dados do serviço", async () => {
+  const { company } = await actors(); const entry = await supplierPayable(company.id);
+  const reservation = await prisma.reservation.findUniqueOrThrow({ where: { id: entry.reservation_id! }, include: { client: true } });
+  const request = await prisma.changeRequest.create({ data: { protocol: `TEST-LEGACY-${crypto.randomUUID()}`, category: "financeiro", type: "repasse_nativos", requester_type: "company", requester_id: company.id, company_id: company.id, status: "aprovada", allocation_details: { entry_ids: [entry.id] }, dedupe_key: crypto.randomUUID() } });
+  const html = renderToStaticMarkup(await SolicitacoesPage({ searchParams: Promise.resolve({ tipo: "repasses", q: reservation.client.name }) }));
+  expect(html).toContain(request.protocol); expect(html).toContain(reservation.client.name); expect(html).toContain(reservation.code); expect(html).toContain("A Nativos paga ao fornecedor"); expect(html).toContain("Já paguei");
+  expect(html).not.toContain("Detalhes do pedido"); expect(html).not.toContain("Confirmar etapa");
 });

@@ -432,7 +432,7 @@ export default async function FinanceiroPage({
           label: item.label,
           href: "/admin/financeiro?view=" + item.key + "&period=" + period,
         }))}
-      /><div className="flex flex-col gap-2 sm:flex-row"><Link href="/admin/financeiro/novo" className={`${buttonClass} w-full sm:w-auto`}>Novo lançamento</Link><Link href="/admin/financeiro/fechamento" className={`${secondaryButtonClass} w-full sm:w-auto`}>Fechamento diário</Link></div></div>
+      /><div className="flex flex-col gap-2 sm:flex-row"><Link href="/admin/solicitacoes?tipo=repasses" className={`${secondaryButtonClass} w-full sm:w-auto`}>Repasses de fornecedores</Link><Link href="/admin/financeiro/novo" className={`${buttonClass} w-full sm:w-auto`}>Novo lançamento</Link><Link href="/admin/financeiro/fechamento" className={`${secondaryButtonClass} w-full sm:w-auto`}>Fechamento diário</Link></div></div>
 
       <section aria-label="Resumo financeiro" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
