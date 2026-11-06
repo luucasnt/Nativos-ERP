@@ -5,12 +5,12 @@ export function documentFilename(type: string, passenger: string, code: string, 
 
 // Safari pode usar o último segmento da URL ao compartilhar um PDF.
 // O caminho, os headers e os metadados precisam identificar o documento.
-export function documentDownloadRedirect(request: Request, filename: string) {
+export function documentDownloadRedirect(request: Request, filename: string, query?: URLSearchParams) {
   const url = new URL(request.url);
   if (decodeURIComponent(url.pathname.split("/").at(-1) ?? "") === filename) return null;
   const segments = url.pathname.split("/");
   if (segments.at(-1)?.endsWith(".pdf")) segments.pop();
   url.pathname = segments.join("/") + "/" + filename;
-  url.search = "";
+  url.search = query?.toString() ?? "";
   return new Response(null, { status: 307, headers: { Location: url.toString(), "Cache-Control": "private, no-store" } });
 }
